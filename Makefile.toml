@@ -1,0 +1,15 @@
+[tasks.build]
+command = "cargo"
+args= [
+    "build",
+    "--release"
+]
+
+[tasks.bin]
+command = "arm-none-eabi-objcopy"
+args = [
+    "-O", "binary",
+    "target/thumbv7em-none-eabi/release/stm32f4",
+    "stm32f4.bin",
+]
+dependencies = ["build"]
