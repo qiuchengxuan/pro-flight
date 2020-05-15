@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![feature(llvm_asm)]
 
 #[macro_use]
 extern crate cortex_m_rt;
@@ -9,6 +10,8 @@ extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
 
+mod usb_serial;
+
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use cortex_m_rt::ExceptionFrame;
@@ -17,12 +20,15 @@ use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
-use usb_device::prelude::*;
 
 static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
 static G_LED_ON: AtomicBool = AtomicBool::new(false);
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
+
+const DFU_SAFE: u32 = 0xCAFEFEED;
+const DFU_MAGIC: u32 = 0xDEEDBEEF;
+static mut G_DFU: u32 = DFU_SAFE;
 
 #[interrupt]
 fn TIM4() {
@@ -35,17 +41,38 @@ fn TIM4() {
     G_LED_ON.store(!led_on, Ordering::Relaxed);
 }
 
+fn enter_dfu() {
+    unsafe { G_DFU = DF_SAFE }
+    let peripherals = stm32::Peripherals::take().unwrap();
+    let rcc = peripherals.RCC.constrain();
+    rcc.cfgr.sysclk(48.mhz()).freeze();
+    unsafe {
+        peripherals.SYSCFG.memrm.write(|w| w.bits(1)); // from system memory
+        cortex_m::register::msp::write(0x2001BFFF);
+        llvm_asm!("ldr r0, 0x4
+                   bx r0"
+                  :
+                  :
+                  :
+                  : "volatile")
+    }
+}
+
 #[allow(unused_must_use)]
 #[entry]
 fn main() -> ! {
-    let cortexm_peripherals = cortex_m::Peripherals::take().unwrap();
+    if unsafe { G_DFU == DFU_MAGIC } {
+        enter_dfu();
+    }
+
+    let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc
         .cfgr
         .use_hse(8.mhz())
-        .sysclk(168.mhz())
+        .sysclk(48.mhz())
         .require_pll48clk()
         .freeze();
 
@@ -70,53 +97,46 @@ fn main() -> ! {
     };
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
+    let mut usb_serial = usb_serial::USBSerial::new(&usb_bus);
 
-    let mut serial = usbd_serial::SerialPort::new(&usb_bus);
+    let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
 
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
-        .product("ng-plane")
-        .device_class(usbd_serial::USB_CLASS_CDC)
-        .build();
-
-    let mut delay = Delay::new(cortexm_peripherals.SYST, clocks);
+    let mut buf = [0u8; 80];
+    let mut offset = 0;
     loop {
         let led_on = G_LED_ON.load(Ordering::Relaxed);
         if led_on {
             led.set_low();
-            delay.delay_ms(20_u16);
+            delay.delay_ms(10_u16);
             led.set_high();
-            delay.delay_ms(20_u16);
+            delay.delay_ms(10_u16);
             led.set_low();
         } else {
             led.set_high();
         }
 
-        if !usb_dev.poll(&mut [&mut serial]) {
+        if !usb_serial.poll() {
             continue;
         }
 
-        let mut buf = [0u8; 64];
-
-        match serial.read(&mut buf) {
-            Ok(count) if count > 0 => {
-                // Echo back in upper case
-                for c in buf[0..count].iter_mut() {
-                    if 0x61 <= *c && *c <= 0x7a {
-                        *c &= !0x20;
-                    }
+        let input = usb_serial.read(&mut buf[offset..]);
+        usb_serial.write(input);
+        let input_len = input.len();
+        offset += input_len;
+        match input.iter().position(|&b| b == '\r' as u8) {
+            Some(eol) => {
+                if buf[..offset - input_len + eol] == *b"dfu" {
+                    unsafe { G_DFU = DFU_MAGIC }
+                    cortex_m::peripheral::SCB::sys_reset();
+                } else {
+                    usb_serial.write(b"\r\nunknown input\r\n")
                 }
-
-                let mut write_offset = 0;
-                while write_offset < count {
-                    match serial.write(&buf[write_offset..count]) {
-                        Ok(len) if len > 0 => {
-                            write_offset += len;
-                        }
-                        _ => {}
-                    }
-                }
+                offset = 0;
             }
             _ => {}
+        }
+        if offset >= buf.len() {
+            offset = 0;
         }
     }
 }
