@@ -12,23 +12,23 @@ extern crate usb_device;
 
 mod usb_serial;
 
+use core::mem::MaybeUninit;
+use core::ptr::{read_volatile, write_volatile};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use cortex_m_rt::ExceptionFrame;
-use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
 static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
-static G_LED_ON: AtomicBool = AtomicBool::new(false);
+static G_LED_TOGGLE: AtomicBool = AtomicBool::new(false);
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
 const DFU_SAFE: u32 = 0xCAFEFEED;
-const DFU_MAGIC: u32 = 0xDEEDBEEF;
-static mut G_DFU: u32 = DFU_SAFE;
+const DFU_MAGIC: u32 = 0xDEADBEEF;
 
 #[interrupt]
 fn TIM4() {
@@ -37,35 +37,32 @@ fn TIM4() {
             tim.clear_interrupt(Event::TimeOut);
         };
     });
-    let led_on = G_LED_ON.load(Ordering::Relaxed);
-    G_LED_ON.store(!led_on, Ordering::Relaxed);
+    G_LED_TOGGLE.store(true, Ordering::Relaxed);
 }
 
 fn enter_dfu() {
-    unsafe { G_DFU = DF_SAFE }
+    cortex_m::Peripherals::take().unwrap();
     let peripherals = stm32::Peripherals::take().unwrap();
     let rcc = peripherals.RCC.constrain();
     rcc.cfgr.sysclk(48.mhz()).freeze();
     unsafe {
         peripherals.SYSCFG.memrm.write(|w| w.bits(1)); // from system memory
-        cortex_m::register::msp::write(0x2001BFFF);
-        llvm_asm!("ldr r0, 0x4
-                   bx r0"
-                  :
-                  :
-                  :
-                  : "volatile")
+        llvm_asm!("eor r0, r0
+                   ldr sp, [r0, #0]
+                   ldr r0, [r0, #4]
+                   bx r0" :::: "volatile");
     }
 }
 
-#[allow(unused_must_use)]
 #[entry]
 fn main() -> ! {
-    if unsafe { G_DFU == DFU_MAGIC } {
+    let mut dfu_flag: u32 = unsafe { MaybeUninit::uninit().assume_init() };
+    if unsafe { read_volatile(&dfu_flag) } == DFU_MAGIC {
+        unsafe { write_volatile(&mut dfu_flag, DFU_SAFE) };
         enter_dfu();
     }
 
-    let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
+    cortex_m::Peripherals::take().unwrap();
     let peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
@@ -78,7 +75,7 @@ fn main() -> ! {
 
     let gpio_b = peripherals.GPIOB.split();
     let mut led = gpio_b.pb5.into_push_pull_output();
-    led.set_low();
+    led.set_low().unwrap();
 
     let mut timer = Timer::tim4(peripherals.TIM4, 10.hz(), clocks);
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM4);
@@ -99,20 +96,11 @@ fn main() -> ! {
     let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
     let mut usb_serial = usb_serial::USBSerial::new(&usb_bus);
 
-    let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
-
     let mut buf = [0u8; 80];
     let mut offset = 0;
     loop {
-        let led_on = G_LED_ON.load(Ordering::Relaxed);
-        if led_on {
-            led.set_low();
-            delay.delay_ms(10_u16);
-            led.set_high();
-            delay.delay_ms(10_u16);
-            led.set_low();
-        } else {
-            led.set_high();
+        if G_LED_TOGGLE.swap(false, Ordering::Relaxed) {
+            led.toggle().unwrap();
         }
 
         if !usb_serial.poll() {
@@ -123,17 +111,19 @@ fn main() -> ! {
         usb_serial.write(input);
         let input_len = input.len();
         offset += input_len;
-        match input.iter().position(|&b| b == '\r' as u8) {
-            Some(eol) => {
-                if buf[..offset - input_len + eol] == *b"dfu" {
-                    unsafe { G_DFU = DFU_MAGIC }
-                    cortex_m::peripheral::SCB::sys_reset();
-                } else {
-                    usb_serial.write(b"\r\nunknown input\r\n")
-                }
-                offset = 0;
+        if let Some(eol) = input.iter().position(|&b| b == '\r' as u8) {
+            usb_serial.write(b"\r\n");
+            let cmd = &buf[..offset - input_len + eol];
+            offset = 0;
+            if cmd.len() == 0 {
+                continue;
             }
-            _ => {}
+            if cmd == *b"dfu" {
+                unsafe { write_volatile(&mut dfu_flag, DFU_MAGIC) };
+                cortex_m::peripheral::SCB::sys_reset();
+            } else {
+                usb_serial.write(b"unknown input\r\n");
+            }
         }
         if offset >= buf.len() {
             offset = 0;
