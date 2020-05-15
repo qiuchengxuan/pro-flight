@@ -10,17 +10,21 @@ extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
 
+mod console;
 mod usb_serial;
 
 use core::mem::MaybeUninit;
 use core::ptr::{read_volatile, write_volatile};
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use arrayvec::ArrayVec;
 use cortex_m_rt::ExceptionFrame;
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
+
+use console::Console;
 
 static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
 static G_LED_TOGGLE: AtomicBool = AtomicBool::new(false);
@@ -95,39 +99,30 @@ fn main() -> ! {
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
     let mut usb_serial = usb_serial::USBSerial::new(&usb_bus);
-
-    let mut buf = [0u8; 80];
-    let mut offset = 0;
+    let console = Console::new(&mut usb_serial);
+    let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         if G_LED_TOGGLE.swap(false, Ordering::Relaxed) {
             led.toggle().unwrap();
         }
 
-        if !usb_serial.poll() {
+        let option = console.try_read_line(&mut vec);
+        if option.is_none() {
             continue;
         }
-
-        let input = usb_serial.read(&mut buf[offset..]);
-        usb_serial.write(input);
-        let input_len = input.len();
-        offset += input_len;
-        if let Some(eol) = input.iter().position(|&b| b == '\r' as u8) {
-            usb_serial.write(b"\r\n");
-            let cmd = &buf[..offset - input_len + eol];
-            offset = 0;
-            if cmd.len() == 0 {
-                continue;
-            }
-            if cmd == *b"dfu" {
+        let line = option.unwrap();
+        if line.len() > 0 {
+            if line == *b"dfu" {
                 unsafe { write_volatile(&mut dfu_flag, DFU_MAGIC) };
                 cortex_m::peripheral::SCB::sys_reset();
             } else {
-                usb_serial.write(b"unknown input\r\n");
+                console.write(b"unknown input: ");
+                console.write(line);
+                console.write(b"\r\n")
             }
         }
-        if offset >= buf.len() {
-            offset = 0;
-        }
+        console.write(b"# ");
+        vec.clear();
     }
 }
 

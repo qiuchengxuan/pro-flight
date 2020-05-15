@@ -9,7 +9,7 @@ args= [
 command = "arm-none-eabi-objcopy"
 args = [
     "-O", "binary",
-    "target/thumbv7em-none-eabi/release/stm32f4",
-    "stm32f4.bin",
+    "target/thumbv7em-none-eabi/release/omnibusf4",
+    "omnibusf4.bin",
 ]
 dependencies = ["build"]

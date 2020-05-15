@@ -2,7 +2,7 @@
 authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "stm32f4"
+name = "omnibusf4"
 version = "0.1.0"
 
 [dependencies]
@@ -12,28 +12,17 @@ cortex-m-semihosting = "0.3.3"
 panic-halt = "0.2.0"
 cast = { version = "0.2.2", default-features = false }
 panic-semihosting = "0.5.3"
-# stm32f4 = { version = "0.11.0", features = ["stm32f405", "rt"] }
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
-
+ascii = { version = "1.0", default-features = false }
 usb-device = "0.2.5"
 usbd-serial = "0.1.0"
-
-# Uncomment for the panic example.
-# panic-itm = "0.4.1"
-
-# Uncomment for the allocator example.
+arrayvec = { version = "0.5.1", default-features = false, features = ["array-sizes-33-128"]}
 # alloc-cortex-m = "0.3.5"
 
-# Uncomment for the device example.
-# Update `memory.x`, set target to `thumbv7em-none-eabihf` in `.cargo/config`,
-# and then use `cargo build --examples device` to build it.
-# [dependencies.stm32f3]
-# features = ["stm32f303", "rt"]
-# version = "0.7.1"
+mpu6000 = "0.0.4"
 
-# this lets you use `cargo fix`!
 [[bin]]
-name = "stm32f4"
+name = "omnibusf4"
 test = false
 bench = false
 
