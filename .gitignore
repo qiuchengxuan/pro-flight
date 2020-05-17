@@ -4,4 +4,4 @@
 Cargo.lock
 target/
 
-stm32f4.bin
+omnibusf4.bin
