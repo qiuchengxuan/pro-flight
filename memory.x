@@ -34,3 +34,10 @@ MEMORY
      } > RAM2
    } INSERT AFTER .bss;
 */
+
+/* SECTIONS { */
+/*     .bss : ALIGN(4) { */
+/*         *(.bss .bss.*); */
+/*         . = ALIGN(4); */
+/*     } > CCM */
+/* } */

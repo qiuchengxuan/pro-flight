@@ -35,7 +35,7 @@ use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use components::osd::{StubTelemetrySource, OSD};
+use components::max7456_ascii_hud::{Max7456AsciiHud, StubTelemetrySource};
 use components::sysled::Sysled;
 use console::Console;
 
@@ -76,12 +76,48 @@ fn main() -> ! {
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
 
+    unsafe { &(*stm32::RCC::ptr()) }
+        .ahb1enr
+        .modify(|_, w| w.dma1en().enabled());
+    let dma1 = &peripherals.DMA1;
+    let dma_transfer = |buffer: &[u8]| {
+        dma1.hifcr.write(|w| {
+            w.ctcif7()
+                .set_bit()
+                .chtif7()
+                .set_bit()
+                .cteif7()
+                .set_bit()
+                .cfeif7()
+                .set_bit()
+        });
+        let stream = &dma1.st[7];
+        stream.ndtr.write(|w| w.ndt().bits(buffer.len() as u16));
+        let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
+        spi3.cr2.modify(|_, w| w.txdmaen().enabled());
+        let spi3_address = &spi3.dr as *const _ as u32;
+        stream.par.write(|w| w.pa().bits(spi3_address));
+        let address = buffer.as_ptr() as u32;
+        stream.m0ar.write(|w| w.m0a().bits(address));
+        stream.cr.write(|w| {
+            w.chsel()
+                .bits(0)
+                .minc()
+                .incremented()
+                .dir()
+                .memory_to_peripheral()
+                .en()
+                .enabled()
+        });
+    };
+
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
     let miso = gpio_c.pc11.into_alternate_af6();
     let mosi = gpio_c.pc12.into_alternate_af6();
     let result = max7456_spi3::init(peripherals.SPI3, (sclk, miso, mosi), clocks, &mut delay);
-    let max7456 = result.unwrap();
+    let source = StubTelemetrySource {};
+    let mut osd = Max7456AsciiHud::new(&source, result.unwrap(), dma_transfer);
 
     let cs = gpio_a.pa4.into_push_pull_output();
     let sclk = gpio_a.pa5.into_alternate_af5();
@@ -101,10 +137,6 @@ fn main() -> ! {
     timer.listen(Event::TimeOut);
     cortex_m::interrupt::free(|_cs| unsafe { G_TIM4 = Some(timer) });
 
-    let mut buffer = [[0u8; 30]; 16];
-    let source = StubTelemetrySource {};
-    let mut osd = OSD::new(&source, &mut buffer);
-
     let usb = USB {
         usb_global: peripherals.OTG_FS_GLOBAL,
         usb_device: peripherals.OTG_FS_DEVICE,
@@ -121,7 +153,7 @@ fn main() -> ! {
     loop {
         sysled.check_toggle().unwrap();
         if G_OSD_HUD_REFRESH.swap(false, Ordering::Relaxed) {
-            osd.on_timer_timeout();
+            osd.start_draw();
         }
 
         let option = console.try_read_line(&mut vec);
