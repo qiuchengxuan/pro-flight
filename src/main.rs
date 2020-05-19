@@ -4,6 +4,7 @@
 
 #[macro_use]
 extern crate cortex_m_rt;
+extern crate ascii_osd_hud;
 extern crate btoi;
 extern crate cast;
 extern crate cortex_m;
@@ -13,8 +14,10 @@ extern crate stm32f4xx_hal;
 extern crate usb_device;
 
 mod console;
+mod dfu;
 mod max7456_spi3;
 mod mpu6000_spi1;
+mod osd;
 mod usb_serial;
 
 use core::mem::MaybeUninit;
@@ -34,12 +37,11 @@ use stm32f4xx_hal::{prelude::*, stm32};
 use console::Console;
 
 static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
+static mut G_TIM5: Option<Timer<stm32::TIM5>> = None;
 static G_LED_TOGGLE: AtomicBool = AtomicBool::new(false);
+static G_OSD_HUD_REFRESH: AtomicBool = AtomicBool::new(false);
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
-
-const DFU_SAFE: u32 = 0xCAFEFEED;
-const DFU_MAGIC: u32 = 0xDEADBEEF;
 
 #[interrupt]
 fn TIM4() {
@@ -51,27 +53,20 @@ fn TIM4() {
     G_LED_TOGGLE.store(true, Ordering::Relaxed);
 }
 
-fn enter_dfu() {
-    cortex_m::Peripherals::take().unwrap();
-    let peripherals = stm32::Peripherals::take().unwrap();
-    let rcc = peripherals.RCC.constrain();
-    rcc.cfgr.sysclk(48.mhz()).freeze();
-    unsafe {
-        peripherals.SYSCFG.memrm.write(|w| w.bits(1)); // from system memory
-        llvm_asm!("eor r0, r0
-                   ldr sp, [r0, #0]
-                   ldr r0, [r0, #4]
-                   bx r0" :::: "volatile");
-    }
+#[interrupt]
+fn TIM5() {
+    cortex_m::interrupt::free(|_cs| unsafe {
+        if let Some(ref mut tim) = G_TIM5 {
+            tim.clear_interrupt(Event::TimeOut);
+        };
+    });
+    G_OSD_HUD_REFRESH.store(true, Ordering::Relaxed);
 }
 
 #[entry]
 fn main() -> ! {
-    let mut dfu_flag: u32 = unsafe { MaybeUninit::uninit().assume_init() };
-    if unsafe { read_volatile(&dfu_flag) } == DFU_MAGIC {
-        unsafe { write_volatile(&mut dfu_flag, DFU_SAFE) };
-        enter_dfu();
-    }
+    let mut dfu: dfu::Dfu = unsafe { MaybeUninit::uninit().assume_init() };
+    dfu.check();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let peripherals = stm32::Peripherals::take().unwrap();
@@ -90,17 +85,18 @@ fn main() -> ! {
 
     let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
 
+    let _cs = gpio_a.pa15.into_push_pull_output();
+    let sclk = gpio_c.pc10.into_alternate_af6();
+    let miso = gpio_c.pc11.into_alternate_af6();
+    let mosi = gpio_c.pc12.into_alternate_af6();
+    let result = max7456_spi3::init(peripherals.SPI3, (sclk, miso, mosi), clocks, &mut delay);
+    let max7456 = result.unwrap();
+
     let cs = gpio_a.pa4.into_push_pull_output();
     let sclk = gpio_a.pa5.into_alternate_af5();
     let miso = gpio_a.pa6.into_alternate_af5();
     let mosi = gpio_a.pa7.into_alternate_af5();
     let result = mpu6000_spi1::init(peripherals.SPI1, (sclk, miso, mosi), cs, clocks, &mut delay);
-
-    let _cs = gpio_a.pa15.into_push_pull_output();
-    let sclk = gpio_c.pc10.into_alternate_af6();
-    let miso = gpio_c.pc11.into_alternate_af6();
-    let mosi = gpio_c.pc12.into_alternate_af6();
-    let _ = max7456_spi3::init(peripherals.SPI3, (sclk, miso, mosi), clocks, &mut delay);
 
     let mut led = gpio_b.pb5.into_push_pull_output();
     led.set_low().unwrap();
@@ -109,8 +105,17 @@ fn main() -> ! {
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM4);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM4) }
     timer.listen(Event::TimeOut);
-
     cortex_m::interrupt::free(|_cs| unsafe { G_TIM4 = Some(timer) });
+
+    let mut buffer = [[0u8; 30]; 16];
+    let source = osd::StubTelemetrySource {};
+    let mut osd = osd::OSD::new(&source, &mut buffer);
+
+    let mut timer = Timer::tim5(peripherals.TIM5, 25.hz(), clocks);
+    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM5);
+    unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM5) }
+    timer.listen(Event::TimeOut);
+    cortex_m::interrupt::free(|_cs| unsafe { G_TIM5 = Some(timer) });
 
     let usb = USB {
         usb_global: peripherals.OTG_FS_GLOBAL,
@@ -129,6 +134,9 @@ fn main() -> ! {
         if G_LED_TOGGLE.swap(false, Ordering::Relaxed) {
             led.toggle().unwrap();
         }
+        if G_OSD_HUD_REFRESH.swap(false, Ordering::Relaxed) {
+            osd.on_timer_timeout();
+        }
 
         let option = console.try_read_line(&mut vec);
         if option.is_none() {
@@ -137,8 +145,7 @@ fn main() -> ! {
         let line = option.unwrap();
         if line.len() > 0 {
             if line == *b"dfu" {
-                unsafe { write_volatile(&mut dfu_flag, DFU_MAGIC) };
-                cortex_m::peripheral::SCB::sys_reset();
+                dfu.reboot_into();
             } else if line == *b"reboot" {
                 cortex_m::peripheral::SCB::sys_reset();
             } else if line == *b"check" {

@@ -1,6 +1,7 @@
+use core::cell::RefCell;
+
 use arrayvec::{Array, ArrayVec};
 use ascii::{AsciiChar, ToAsciiChar};
-use core::cell::RefCell;
 
 pub trait Writable {
     fn write(&mut self, output: &[u8]);
