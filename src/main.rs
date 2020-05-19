@@ -8,25 +8,26 @@ extern crate ascii_osd_hud;
 extern crate btoi;
 extern crate cast;
 extern crate cortex_m;
+extern crate cortex_m_systick_countdown;
 extern crate nb;
 extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
 
+mod components;
 mod console;
 mod dfu;
 mod max7456_spi3;
 mod mpu6000_spi1;
-mod osd;
 mod usb_serial;
 
 use core::mem::MaybeUninit;
-use core::ptr::{read_volatile, write_volatile};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use arrayvec::ArrayVec;
 use btoi::btoi_radix;
 use cortex_m_rt::ExceptionFrame;
+use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use numtoa::NumToA;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::interrupt;
@@ -34,11 +35,11 @@ use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
+use components::osd::{StubTelemetrySource, OSD};
+use components::sysled::Sysled;
 use console::Console;
 
 static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
-static mut G_TIM5: Option<Timer<stm32::TIM5>> = None;
-static G_LED_TOGGLE: AtomicBool = AtomicBool::new(false);
 static G_OSD_HUD_REFRESH: AtomicBool = AtomicBool::new(false);
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
@@ -47,16 +48,6 @@ static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 fn TIM4() {
     cortex_m::interrupt::free(|_cs| unsafe {
         if let Some(ref mut tim) = G_TIM4 {
-            tim.clear_interrupt(Event::TimeOut);
-        };
-    });
-    G_LED_TOGGLE.store(true, Ordering::Relaxed);
-}
-
-#[interrupt]
-fn TIM5() {
-    cortex_m::interrupt::free(|_cs| unsafe {
-        if let Some(ref mut tim) = G_TIM5 {
             tim.clear_interrupt(Event::TimeOut);
         };
     });
@@ -79,11 +70,11 @@ fn main() -> ! {
         .require_pll48clk()
         .freeze();
 
+    let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
+
     let gpio_a = peripherals.GPIOA.split();
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
-
-    let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
@@ -98,24 +89,21 @@ fn main() -> ! {
     let mosi = gpio_a.pa7.into_alternate_af5();
     let result = mpu6000_spi1::init(peripherals.SPI1, (sclk, miso, mosi), cs, clocks, &mut delay);
 
-    let mut led = gpio_b.pb5.into_push_pull_output();
-    led.set_low().unwrap();
+    let calibration = SysTickCalibration::from_clock_hz(clocks.sysclk().0);
+    let systick = PollingSysTick::new(delay.free(), &calibration);
 
-    let mut timer = Timer::tim4(peripherals.TIM4, 10.hz(), clocks);
+    let pin = gpio_b.pb5.into_push_pull_output();
+    let mut sysled = Sysled::new(pin, MillisCountDown::new(&systick));
+
+    let mut timer = Timer::tim4(peripherals.TIM4, 25.hz(), clocks);
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM4);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM4) }
     timer.listen(Event::TimeOut);
     cortex_m::interrupt::free(|_cs| unsafe { G_TIM4 = Some(timer) });
 
     let mut buffer = [[0u8; 30]; 16];
-    let source = osd::StubTelemetrySource {};
-    let mut osd = osd::OSD::new(&source, &mut buffer);
-
-    let mut timer = Timer::tim5(peripherals.TIM5, 25.hz(), clocks);
-    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM5);
-    unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM5) }
-    timer.listen(Event::TimeOut);
-    cortex_m::interrupt::free(|_cs| unsafe { G_TIM5 = Some(timer) });
+    let source = StubTelemetrySource {};
+    let mut osd = OSD::new(&source, &mut buffer);
 
     let usb = USB {
         usb_global: peripherals.OTG_FS_GLOBAL,
@@ -131,9 +119,7 @@ fn main() -> ! {
 
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
-        if G_LED_TOGGLE.swap(false, Ordering::Relaxed) {
-            led.toggle().unwrap();
-        }
+        sysled.check_toggle().unwrap();
         if G_OSD_HUD_REFRESH.swap(false, Ordering::Relaxed) {
             osd.on_timer_timeout();
         }
@@ -204,7 +190,9 @@ fn main() -> ! {
                 };
                 if 0x40000000 <= address && address <= 0xA0000FFF {
                     unsafe { *(address as *mut u32) = value };
-                    delay.delay_ms(50u8);
+                    let mut count_down = MillisCountDown::new(&systick);
+                    count_down.start_ms(50);
+                    nb::block!(count_down.wait()).unwrap();
                     let value = unsafe { *(address as *const u32) };
                     console.write(b"Write result: ");
                     let mut buffer = [0u8; 10];

@@ -1,4 +1,3 @@
-use core::mem::MaybeUninit;
 use core::ptr::{read_volatile, write_volatile};
 
 use cortex_m;
