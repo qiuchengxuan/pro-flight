@@ -13,10 +13,12 @@ use max7456::MAX7456;
 // memory space is required
 static mut DMA_BUFFER: [u8; 1000] = [0u8; 1000];
 
-pub struct Max7456AsciiHud<'a, BUS, C> {
+type DmaConsumer = fn(&[u8]);
+
+pub struct Max7456AsciiHud<'a, BUS> {
     hud: HUD<'a>,
     max7456: MAX7456<BUS>,
-    dma_consumer: C,
+    dma_consumer: DmaConsumer,
 }
 
 pub struct StubTelemetrySource {}
@@ -27,12 +29,15 @@ impl TelemetrySource for StubTelemetrySource {
     }
 }
 
-impl<'a, E, BUS, C> Max7456AsciiHud<'a, BUS, C>
+impl<'a, E, BUS> Max7456AsciiHud<'a, BUS>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
-    C: Fn(&[u8]),
 {
-    pub fn new(telemetry: &'a dyn TelemetrySource, max7456: MAX7456<BUS>, dma_consumer: C) -> Self {
+    pub fn new(
+        telemetry: &'a dyn TelemetrySource,
+        max7456: MAX7456<BUS>,
+        dma_consumer: DmaConsumer,
+    ) -> Self {
         let symbol_table: SymbolTable = enum_map! {
             Symbol::Antenna => 1,
             Symbol::Battery => 144,
@@ -75,7 +80,7 @@ where
         self.hud.draw(&mut screen);
         let mut writer = NotNullWriter::new(&screen, Default::default());
         let operations = writer.write(unsafe { &mut DMA_BUFFER[offset..] });
-        let consumer = &self.dma_consumer;
+        let consumer = self.dma_consumer;
         consumer(operations.0);
     }
 }

@@ -16,11 +16,9 @@ extern crate stm32f4xx_hal;
 extern crate usb_device;
 
 mod console;
-mod max7456_spi3;
+mod max7456_spi3_tim4;
 mod mpu6000_spi1;
 mod usb_serial;
-
-use core::sync::atomic::{AtomicBool, Ordering};
 
 use arrayvec::ArrayVec;
 use btoi::btoi_radix;
@@ -28,31 +26,15 @@ use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use numtoa::NumToA;
 use stm32f4xx_hal::delay::Delay;
-use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
-use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
-use components::max7456_ascii_hud::{Max7456AsciiHud, StubTelemetrySource};
 use components::sysled::Sysled;
 
 use console::Console;
 
-static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
-static G_OSD_HUD_REFRESH: AtomicBool = AtomicBool::new(false);
-
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
-
-#[interrupt]
-fn TIM4() {
-    cortex_m::interrupt::free(|_cs| unsafe {
-        if let Some(ref mut tim) = G_TIM4 {
-            tim.clear_interrupt(Event::TimeOut);
-        };
-    });
-    G_OSD_HUD_REFRESH.store(true, Ordering::Relaxed);
-}
 
 #[entry]
 fn main() -> ! {
@@ -79,46 +61,19 @@ fn main() -> ! {
     unsafe { &(*stm32::RCC::ptr()) }
         .ahb1enr
         .modify(|_, w| w.dma1en().enabled());
-    let dma1 = &peripherals.DMA1;
-    let dma_transfer = |buffer: &[u8]| {
-        dma1.hifcr.write(|w| {
-            w.ctcif7()
-                .set_bit()
-                .chtif7()
-                .set_bit()
-                .cteif7()
-                .set_bit()
-                .cfeif7()
-                .set_bit()
-        });
-        let stream = &dma1.st[7];
-        stream.ndtr.write(|w| w.ndt().bits(buffer.len() as u16));
-        let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
-        spi3.cr2.modify(|_, w| w.txdmaen().enabled());
-        let spi3_address = &spi3.dr as *const _ as u32;
-        stream.par.write(|w| w.pa().bits(spi3_address));
-        let address = buffer.as_ptr() as u32;
-        stream.m0ar.write(|w| w.m0a().bits(address));
-        stream.cr.write(|w| {
-            w.chsel()
-                .bits(0)
-                .minc()
-                .incremented()
-                .dir()
-                .memory_to_peripheral()
-                .en()
-                .enabled()
-        });
-    };
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
     let miso = gpio_c.pc11.into_alternate_af6();
     let mosi = gpio_c.pc12.into_alternate_af6();
-    let result = max7456_spi3::init(peripherals.SPI3, (sclk, miso, mosi), clocks);
-    let source = StubTelemetrySource {};
-    let mut osd = Max7456AsciiHud::new(&source, result.unwrap(), dma_transfer);
-    osd.init(&mut delay).ok();
+    max7456_spi3_tim4::init(
+        peripherals.SPI3,
+        (sclk, miso, mosi),
+        peripherals.TIM4,
+        clocks,
+        &mut delay,
+    )
+    .ok();
 
     let cs = gpio_a.pa4.into_push_pull_output();
     let sclk = gpio_a.pa5.into_alternate_af5();
@@ -131,12 +86,6 @@ fn main() -> ! {
 
     let pin = gpio_b.pb5.into_push_pull_output();
     let mut sysled = Sysled::new(pin, MillisCountDown::new(&systick));
-
-    let mut timer = Timer::tim4(peripherals.TIM4, 25.hz(), clocks);
-    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM4);
-    unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM4) }
-    timer.listen(Event::TimeOut);
-    cortex_m::interrupt::free(|_cs| unsafe { G_TIM4 = Some(timer) });
 
     let usb = USB {
         usb_global: peripherals.OTG_FS_GLOBAL,
@@ -153,9 +102,6 @@ fn main() -> ! {
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
-        if G_OSD_HUD_REFRESH.swap(false, Ordering::Relaxed) {
-            osd.start_draw();
-        }
 
         let option = console.try_read_line(&mut vec);
         if option.is_none() {
