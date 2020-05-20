@@ -115,9 +115,10 @@ fn main() -> ! {
     let sclk = gpio_c.pc10.into_alternate_af6();
     let miso = gpio_c.pc11.into_alternate_af6();
     let mosi = gpio_c.pc12.into_alternate_af6();
-    let result = max7456_spi3::init(peripherals.SPI3, (sclk, miso, mosi), clocks, &mut delay);
+    let result = max7456_spi3::init(peripherals.SPI3, (sclk, miso, mosi), clocks);
     let source = StubTelemetrySource {};
     let mut osd = Max7456AsciiHud::new(&source, result.unwrap(), dma_transfer);
+    osd.init(&mut delay).ok();
 
     let cs = gpio_a.pa4.into_push_pull_output();
     let sclk = gpio_a.pa5.into_alternate_af5();

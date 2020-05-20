@@ -8,6 +8,7 @@ version = "0.1.0"
 [dependencies]
 cortex-m = "0.6"
 embedded-hal = "0.2"
+enum-map = {version = "0.6.2", default-features = false}
 
 max7456 = { path = "../../max7456" }
 ascii-osd-hud = { path = "../../ascii-osd-hud" }
