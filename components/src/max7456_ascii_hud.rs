@@ -49,7 +49,6 @@ where
         self.hud.draw(&mut screen.0);
         let mut writer = NotNullWriter::new(&screen, Default::default());
         let operations = writer.write(unsafe { &mut DMA_BUFFER }).unwrap();
-        // self.max7456.write_operations(&operations);
         let consumer = &self.dma_consumer;
         consumer(operations.0);
     }

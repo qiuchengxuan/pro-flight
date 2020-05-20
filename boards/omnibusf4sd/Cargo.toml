@@ -2,7 +2,7 @@
 authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "omnibusf4"
+name = "omnibusf4sd"
 version = "0.1.0"
 
 [dependencies]
@@ -25,12 +25,13 @@ btoi = { version = "0.4", default-features = false }
 arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"]}
 numtoa = "0.2"
 
-mpu6000 = { path = "../mpu6000" }
-max7456 = { path = "../max7456" }
-ascii-osd-hud = { path = "../ascii-osd-hud" }
+chips = { path = "../../chips" }
+components = { path = "../../components" }
+mpu6000 = { path = "../../../mpu6000" }
+max7456 = { path = "../../../max7456" }
 
 [[bin]]
-name = "omnibusf4"
+name = "omnibusf4sd"
 test = false
 bench = false
 

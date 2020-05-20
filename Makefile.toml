@@ -1,15 +1,17 @@
-[tasks.build]
+[tasks.omnibusf4sd-elf]
 command = "cargo"
 args= [
     "build",
-    "--release"
+    "--release",
+    "--manifest-path",
+    "boards/omnibusf4sd/Cargo.toml"
 ]
 
-[tasks.bin]
+[tasks.omnibusf4sd]
 command = "arm-none-eabi-objcopy"
 args = [
     "-O", "binary",
-    "target/thumbv7em-none-eabi/release/omnibusf4",
-    "omnibusf4.bin",
+    "boards/omnibusf4sd/target/thumbv7em-none-eabi/release/omnibusf4sd",
+    "omnibusf4sd.bin",
 ]
-dependencies = ["build"]
+dependencies = ["omnibusf4sd-elf"]

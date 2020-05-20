@@ -1,27 +1,25 @@
 #![no_main]
 #![no_std]
-#![feature(llvm_asm)]
 
 #[macro_use]
 extern crate cortex_m_rt;
-extern crate ascii_osd_hud;
 extern crate btoi;
 extern crate cast;
+extern crate chips;
+extern crate components;
 extern crate cortex_m;
 extern crate cortex_m_systick_countdown;
+extern crate max7456;
 extern crate nb;
 extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
 
-mod components;
 mod console;
-mod dfu;
 mod max7456_spi3;
 mod mpu6000_spi1;
 mod usb_serial;
 
-use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use arrayvec::ArrayVec;
@@ -35,8 +33,10 @@ use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
+use chips::stm32f4::dfu::Dfu;
 use components::max7456_ascii_hud::{Max7456AsciiHud, StubTelemetrySource};
 use components::sysled::Sysled;
+
 use console::Console;
 
 static mut G_TIM4: Option<Timer<stm32::TIM4>> = None;
@@ -56,7 +56,7 @@ fn TIM4() {
 
 #[entry]
 fn main() -> ! {
-    let mut dfu: dfu::Dfu = unsafe { MaybeUninit::uninit().assume_init() };
+    let mut dfu = Dfu::new();
     dfu.check();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();

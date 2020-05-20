@@ -14,7 +14,7 @@ pub fn init<'a, PINS: Pins<stm32::SPI3>>(
     let freq: stm32f4xx_hal::time::Hertz = 10.mhz().into();
     let spi3 = Spi::spi3(spi3, pins, SPI_MODE, freq, clocks);
     let mut max7456 = MAX7456::new(spi3);
-    max7456.clear_display(delay)?;
+    max7456.wait_clear_display(delay)?;
     max7456.set_standard(Standard::PAL)?;
     max7456.set_sync_mode(SyncMode::Internal)?;
     max7456.enable_display(true)?;

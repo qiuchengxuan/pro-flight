@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use core::ptr::{read_volatile, write_volatile};
 
 use cortex_m;
@@ -9,6 +10,10 @@ const DFU_MAGIC: usize = 0xDEADBEEF;
 pub struct Dfu(usize);
 
 impl Dfu {
+    pub fn new() -> Self {
+        unsafe { MaybeUninit::uninit().assume_init() }
+    }
+
     fn enter(&self) {
         cortex_m::Peripherals::take().unwrap();
         let peripherals = stm32::Peripherals::take().unwrap();

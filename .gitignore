@@ -3,5 +3,4 @@
 .gdb_history
 Cargo.lock
 target/
-
-omnibusf4.bin
+/*.bin
