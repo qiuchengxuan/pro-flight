@@ -17,8 +17,10 @@ type DmaConsumer = fn(&[u8]);
 
 pub struct Max7456AsciiHud<'a, BUS> {
     hud: HUD<'a>,
+
     max7456: MAX7456<BUS>,
     dma_consumer: DmaConsumer,
+    continuing_draw: bool,
 }
 
 pub struct StubTelemetrySource {}
@@ -63,6 +65,7 @@ where
             hud,
             max7456,
             dma_consumer,
+            continuing_draw: false,
         }
     }
 
@@ -75,12 +78,22 @@ where
     }
 
     pub fn start_draw(&mut self) {
-        let offset = revert(unsafe { &mut DMA_BUFFER }).0.len();
+        let display = revert(unsafe { &mut DMA_BUFFER });
+        let consumer = self.dma_consumer;
+        consumer(display.0);
+    }
+
+    pub fn continue_draw(&mut self) {
+        if self.continuing_draw {
+            self.continuing_draw = false;
+            return;
+        }
+        self.continuing_draw = true;
         let mut screen = [[0u8; 29]; 16];
         self.hud.draw(&mut screen);
         let mut writer = NotNullWriter::new(&screen, Default::default());
-        let operations = writer.write(unsafe { &mut DMA_BUFFER[offset..] });
+        let display = writer.write(unsafe { &mut DMA_BUFFER });
         let consumer = self.dma_consumer;
-        consumer(operations.0);
+        consumer(display.0);
     }
 }

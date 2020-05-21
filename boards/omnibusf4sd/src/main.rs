@@ -16,8 +16,8 @@ extern crate stm32f4xx_hal;
 extern crate usb_device;
 
 mod console;
-mod max7456_spi3_tim4;
-mod mpu6000_spi1;
+mod max7456_spi3_tim7;
+mod mpu6000_spi1_tim6;
 mod usb_serial;
 
 use arrayvec::ArrayVec;
@@ -27,6 +27,7 @@ use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibra
 use numtoa::NumToA;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
+use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
@@ -66,20 +67,53 @@ fn main() -> ! {
     let sclk = gpio_c.pc10.into_alternate_af6();
     let miso = gpio_c.pc11.into_alternate_af6();
     let mosi = gpio_c.pc12.into_alternate_af6();
-    max7456_spi3_tim4::init(
+    max7456_spi3_tim7::init(
         peripherals.SPI3,
+        peripherals.TIM7,
         (sclk, miso, mosi),
-        peripherals.TIM4,
         clocks,
         &mut delay,
     )
     .ok();
 
+    // let pb0_1 = (
+    //     gpio_b.pb0.into_alternate_af2(),
+    //     gpio_b.pb1.into_alternate_af2(),
+    // );
+    // let (mut pwm1, mut pwm2) = pwm::tim3(peripherals.TIM3, pb0_1, clocks, 50.hz());
+
+    // let pwm3_4 = (
+    //     gpio_a.pa3.into_alternate_af1(),
+    //     gpio_a.pa2.into_alternate_af1(),
+    // );
+    // let pwm2 = pwm::tim2(peripherals.TIM2, pwm3_4, clocks, 20u32.khz());
+
+    // let pwm3 = pwm::tim5(
+    //     peripherals.TIM5,
+    //     gpio_a.pa1.into_alternate_af2(),
+    //     clocks,
+    //     20u32.khz(),
+    // );
+
+    // let pwm4 = pwm::tim1(
+    //     peripherals.TIM1,
+    //     gpio_a.pa8.into_alternate_af1(),
+    //     clocks,
+    //     20u32.khz(),
+    // );
+
     let cs = gpio_a.pa4.into_push_pull_output();
     let sclk = gpio_a.pa5.into_alternate_af5();
     let miso = gpio_a.pa6.into_alternate_af5();
     let mosi = gpio_a.pa7.into_alternate_af5();
-    let result = mpu6000_spi1::init(peripherals.SPI1, (sclk, miso, mosi), cs, clocks, &mut delay);
+    let result = mpu6000_spi1_tim6::init(
+        peripherals.SPI1,
+        peripherals.TIM6,
+        (sclk, miso, mosi),
+        cs,
+        clocks,
+        &mut delay,
+    );
 
     let calibration = SysTickCalibration::from_clock_hz(clocks.sysclk().0);
     let systick = PollingSysTick::new(delay.free(), &calibration);

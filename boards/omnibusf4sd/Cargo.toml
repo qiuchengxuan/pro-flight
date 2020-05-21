@@ -27,8 +27,11 @@ numtoa = "0.2"
 
 chips = { path = "../../chips" }
 components = { path = "../../components" }
+
 mpu6000 = { path = "../../../mpu6000" }
 max7456 = { path = "../../../max7456" }
+sbus = "0.2.2"
+embedded-sdmmc = "0.3.0"
 
 [[bin]]
 name = "omnibusf4sd"
