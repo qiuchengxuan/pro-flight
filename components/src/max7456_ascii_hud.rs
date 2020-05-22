@@ -1,33 +1,47 @@
+use core::cell::Cell;
+
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
-use ascii_osd_hud::telemetry::{Telemetry, TelemetrySource};
+use ascii_osd_hud::telemetry::{
+    Attitude, SphericalCoordinate, Telemetry, TelemetrySource, Waypoint,
+};
 use ascii_osd_hud::AspectRatio;
-use embedded_hal::blocking::delay::DelayUs;
+use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transfer, Write};
-use max7456::not_null_writer::{revert, NotNullWriter};
+use max7456::not_null_writer::NotNullWriter;
 use max7456::registers::{Standard, SyncMode};
 use max7456::MAX7456;
-
-// ascii-hud will generator about 120 chars, for each char
-// max7456 will generate 4 byte to write, so at lease 480 bytes
-// memory space is required
-static mut DMA_BUFFER: [u8; 1000] = [0u8; 1000];
 
 type DmaConsumer = fn(&[u8]);
 
 pub struct Max7456AsciiHud<'a, BUS> {
     hud: HUD<'a>,
-
     max7456: MAX7456<BUS>,
     dma_consumer: DmaConsumer,
-    continuing_draw: bool,
+    screen: [[u8; 29]; 16],
 }
 
-pub struct StubTelemetrySource {}
+pub struct StubTelemetrySource(pub Cell<u32>);
 
 impl TelemetrySource for StubTelemetrySource {
     fn get_telemetry(&self) -> Telemetry {
-        Default::default()
+        let value = self.0.get();
+        self.0.set(value + 1);
+        Telemetry {
+            attitude: Attitude {
+                roll: (value % 180 - 90) as i8,
+                yaw: ((value / 25) % 360) as u16,
+                ..Default::default()
+            },
+            waypoint: Waypoint {
+                coordinate: SphericalCoordinate {
+                    theta: (360 - (value / 25) % 360) as u16,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 }
 
@@ -48,29 +62,32 @@ where
             Symbol::VeclocityVector => 132,
             Symbol::Alpha => 154,
             Symbol::Square => 191,
-            Symbol::LineTop => 128, // ▔
-            Symbol::LineUpper1 => 129, // ⎺
-            Symbol::LineUpper2 => 130, // ⎻
-            Symbol::LineCenter => 131, // ⎯ or ASCII dash
-            Symbol::LineLower1 => 132, // ⎼
-            Symbol::LineLower2 => 133, // ⎽
-            Symbol::LineBottom => 134, // ▁ or ASCII underscore
-            Symbol::BoxDrawningLightUp => 124, // ╵ or ASCII |
+            Symbol::LineTop => 128,
+            Symbol::LineUpper1 => 129,
+            Symbol::LineUpper2 => 131,
+            Symbol::LineCenter => 132,
+            Symbol::LineLower1 => 133,
+            Symbol::LineLower2 => 134,
+            Symbol::LineBottom => 136,
+            Symbol::BoxDrawningLightUp => 124,
             Symbol::ZeroWithTraillingDot => 192,
-            Symbol::SmallBlackSquare => 46, // ▪
-            Symbol::VerticalLine => 124, // ⎪
+            Symbol::LineLeft => 224,
+            Symbol::LineLeft1 => 225,
+            Symbol::LineVerticalCenter => 226,
+            Symbol::LineRight => 227,
+            Symbol::LineRight1 => 228,
         };
         let hud = HUD::new(telemetry, &symbol_table, 150, AspectRatio::Standard);
         Self {
             hud,
             max7456,
             dma_consumer,
-            continuing_draw: false,
+            screen: [[0u8; 29]; 16],
         }
     }
 
-    pub fn init(&mut self, delay: &mut dyn DelayUs<u8>) -> Result<(), E> {
-        self.max7456.wait_clear_display(delay)?;
+    pub fn init(&mut self, delay: &mut dyn DelayMs<u8>) -> Result<(), E> {
+        self.max7456.reset(delay)?;
         self.max7456.set_standard(Standard::PAL)?;
         self.max7456.set_sync_mode(SyncMode::Internal)?;
         self.max7456.set_horizental_offset(8)?;
@@ -78,22 +95,14 @@ where
     }
 
     pub fn start_draw(&mut self) {
-        let display = revert(unsafe { &mut DMA_BUFFER });
-        let consumer = self.dma_consumer;
-        consumer(display.0);
-    }
-
-    pub fn continue_draw(&mut self) {
-        if self.continuing_draw {
-            self.continuing_draw = false;
-            return;
-        }
-        self.continuing_draw = true;
-        let mut screen = [[0u8; 29]; 16];
-        self.hud.draw(&mut screen);
-        let mut writer = NotNullWriter::new(&screen, Default::default());
-        let display = writer.write(unsafe { &mut DMA_BUFFER });
-        let consumer = self.dma_consumer;
-        consumer(display.0);
+        // ascii-hud will generator about 120 chars, for each char
+        // max7456 will generate 4 byte to write, so at lease 480 bytes
+        // memory space is required
+        static mut S_DMA_BUFFER: [u8; 500] = [0u8; 500];
+        let mut dma_buffer = unsafe { S_DMA_BUFFER };
+        self.hud.draw(&mut self.screen);
+        let mut writer = NotNullWriter::new(&self.screen, Default::default());
+        let display = writer.write(&mut dma_buffer);
+        (self.dma_consumer)(&display.0);
     }
 }

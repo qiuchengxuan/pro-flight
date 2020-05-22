@@ -1,3 +1,4 @@
+#![feature(maybe_uninit_uninit_array)]
 #![no_std]
 
 #[macro_use]
