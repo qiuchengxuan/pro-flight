@@ -2,21 +2,23 @@
 authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "components"
-version = "0.1.0"
+name = "rs-flight"
+version = "0.0.1"
 
 [dependencies]
 cortex-m = "0.6"
 embedded-hal = "0.2"
 enum-map = {version = "0.6.2", default-features = false}
+nalgebra = {version = "0.21", default-features = false}
+stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 
-max7456 = { path = "../../max7456" }
-ascii-osd-hud = { path = "../../ascii-osd-hud" }
+max7456 = { path = "../max7456" }
+ascii-osd-hud = { path = "../ascii-osd-hud" }
 
 [lib]
-name = "components"
-test = false
-bench = false
+name = "rs_flight"
+# test = false
+# bench = false
 
 [profile.release]
 panic = "abort"

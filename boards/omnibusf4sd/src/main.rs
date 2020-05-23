@@ -5,8 +5,6 @@
 extern crate cortex_m_rt;
 extern crate btoi;
 extern crate cast;
-extern crate chips;
-extern crate components;
 extern crate cortex_m;
 extern crate cortex_m_systick_countdown;
 extern crate max7456;
@@ -14,11 +12,18 @@ extern crate nb;
 extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
+#[macro_use]
+extern crate mpu6000;
+extern crate chips;
+extern crate dcmimu;
+extern crate rs_flight;
 
 mod console;
-mod max7456_spi3_tim7;
-mod mpu6000_spi1_tim6;
+mod spi1_exti4_gyro;
+mod spi3_tim7_osd_baro;
 mod usb_serial;
+
+use core::mem::MaybeUninit;
 
 use arrayvec::ArrayVec;
 use btoi::btoi_radix;
@@ -31,9 +36,13 @@ use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
-use components::sysled::Sysled;
+use dcmimu::DCMIMU;
+use rs_flight::components::sysled::Sysled;
 
 use console::Console;
+
+#[link_section = ".ram2bss"]
+static mut G_DCMIMU: MaybeUninit<DCMIMU> = MaybeUninit::uninit();
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
@@ -67,7 +76,7 @@ fn main() -> ! {
     let sclk = gpio_c.pc10.into_alternate_af6();
     let miso = gpio_c.pc11.into_alternate_af6();
     let mosi = gpio_c.pc12.into_alternate_af6();
-    max7456_spi3_tim7::init(
+    spi3_tim7_osd_baro::init(
         peripherals.SPI3,
         peripherals.TIM7,
         (sclk, miso, mosi),
@@ -106,14 +115,8 @@ fn main() -> ! {
     let sclk = gpio_a.pa5.into_alternate_af5();
     let miso = gpio_a.pa6.into_alternate_af5();
     let mosi = gpio_a.pa7.into_alternate_af5();
-    let result = mpu6000_spi1_tim6::init(
-        peripherals.SPI1,
-        peripherals.TIM6,
-        (sclk, miso, mosi),
-        cs,
-        clocks,
-        &mut delay,
-    );
+    let pins = (sclk, miso, mosi);
+    let result = spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, clocks, &mut delay);
 
     let calibration = SysTickCalibration::from_clock_hz(clocks.sysclk().0);
     let systick = PollingSysTick::new(delay.free(), &calibration);
@@ -177,6 +180,41 @@ fn main() -> ! {
                     console.write(b"Result: ");
                     console.write(value.numtoa(16, &mut buffer));
                     console.write(b"\r\n")
+                }
+            } else if line.starts_with(b"dump") {
+                let mut iter = line.split(|b| *b == ' ' as u8);
+                iter.next();
+                let mut address = if let Some(address) = iter.next() {
+                    match btoi_radix::<u32>(address, 16) {
+                        Ok(address) => address,
+                        _ => 0,
+                    }
+                } else {
+                    0
+                };
+                let size = if let Some(value) = iter.next() {
+                    match btoi_radix::<u32>(value, 16) {
+                        Ok(value) => value,
+                        _ => {
+                            address = 0;
+                            0
+                        }
+                    }
+                } else {
+                    address = 0;
+                    0
+                };
+                if 0x40000000 <= address && address <= 0xA0000FFF {
+                    console.write(b"Dump result: ");
+                    let mut buffer = [0u8; 10];
+                    for i in 0..size {
+                        let value = unsafe { *((address + i) as *const u32) };
+                        console.write(value.numtoa(16, &mut buffer));
+                        console.write(b" ");
+                    }
+                    console.write(b"\r\n");
+                } else {
+                    console.write(b"Bad input\r\n");
                 }
             } else if line.starts_with(b"write") {
                 let mut iter = line.split(|b| *b == ' ' as u8);

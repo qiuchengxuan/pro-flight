@@ -14,9 +14,8 @@ use max7456::MAX7456;
 
 type DmaConsumer = fn(&[u8]);
 
-pub struct Max7456AsciiHud<'a, BUS> {
+pub struct Max7456AsciiHud<'a> {
     hud: HUD<'a>,
-    max7456: MAX7456<BUS>,
     dma_consumer: DmaConsumer,
     screen: [[u8; 29]; 16],
 }
@@ -45,15 +44,19 @@ impl TelemetrySource for StubTelemetrySource {
     }
 }
 
-impl<'a, E, BUS> Max7456AsciiHud<'a, BUS>
+pub fn init<BUS, E>(max7456: &mut MAX7456<BUS>, delay: &mut dyn DelayMs<u8>) -> Result<(), E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
-    pub fn new(
-        telemetry: &'a dyn TelemetrySource,
-        max7456: MAX7456<BUS>,
-        dma_consumer: DmaConsumer,
-    ) -> Self {
+    max7456.reset(delay)?;
+    max7456.set_standard(Standard::PAL)?;
+    max7456.set_sync_mode(SyncMode::Internal)?;
+    max7456.set_horizental_offset(8)?;
+    max7456.enable_display(true)
+}
+
+impl<'a> Max7456AsciiHud<'a> {
+    pub fn new(telemetry: &'a dyn TelemetrySource, dma_consumer: DmaConsumer) -> Self {
         let symbol_table: SymbolTable = enum_map! {
             Symbol::Antenna => 1,
             Symbol::Battery => 144,
@@ -80,18 +83,9 @@ where
         let hud = HUD::new(telemetry, &symbol_table, 150, AspectRatio::Standard);
         Self {
             hud,
-            max7456,
             dma_consumer,
             screen: [[0u8; 29]; 16],
         }
-    }
-
-    pub fn init(&mut self, delay: &mut dyn DelayMs<u8>) -> Result<(), E> {
-        self.max7456.reset(delay)?;
-        self.max7456.set_standard(Standard::PAL)?;
-        self.max7456.set_sync_mode(SyncMode::Internal)?;
-        self.max7456.set_horizental_offset(8)?;
-        self.max7456.enable_display(true)
     }
 
     pub fn start_draw(&mut self) {

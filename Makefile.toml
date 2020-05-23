@@ -1,10 +1,11 @@
 [tasks.omnibusf4sd-elf]
-command = "cargo"
-args= [
-    "build",
-    "--release",
-    "--manifest-path",
-    "boards/omnibusf4sd/Cargo.toml"
+script = [
+'''
+#!/usr/bin/env bash
+cd boards/omnibusf4sd
+cargo build --release
+cd -
+'''
 ]
 
 [tasks.omnibusf4sd]
