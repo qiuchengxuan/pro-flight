@@ -1,4 +1,4 @@
-use core::cell::Cell;
+use core::mem::MaybeUninit;
 
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioc::{PC10, PC11, PC12};
@@ -12,11 +12,13 @@ use stm32f4xx_hal::{prelude::*, stm32};
 use max7456::{MAX7456, SPI_MODE};
 
 use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud, StubTelemetrySource};
+use rs_flight::hal::imu::IMU;
 
-static mut G_SOURCE: StubTelemetrySource = StubTelemetrySource(Cell::new(0));
 static mut G_TIM7: Option<Timer<stm32::TIM7>> = None;
 #[link_section = ".ram2bss"]
 static mut G_OSD: Option<Max7456AsciiHud> = None;
+
+static mut G_SOURCE: MaybeUninit<StubTelemetrySource> = MaybeUninit::uninit();
 
 fn clear_dma1_stream7_tx_interrupts() {
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
@@ -79,6 +81,7 @@ pub fn init<'a>(
     tim7: stm32::TIM7,
     pins: Spi3Pins,
     clocks: Clocks,
+    imu: &'static dyn IMU,
     delay: &mut Delay,
 ) -> Result<(), Error> {
     let freq: stm32f4xx_hal::time::Hertz = 10.mhz().into();
@@ -86,7 +89,12 @@ pub fn init<'a>(
     let mut max7456 = MAX7456::new(spi3);
     max7456_ascii_hud::init(&mut max7456, delay)?;
 
-    let osd = Max7456AsciiHud::new(unsafe { &G_SOURCE }, dma1_stream7_transfer_spi3);
+    unsafe { &(*stm32::RCC::ptr()) }
+        .ahb1enr
+        .modify(|_, w| w.dma1en().enabled());
+
+    unsafe { G_SOURCE = MaybeUninit::new(StubTelemetrySource::new(imu)) };
+    let osd = Max7456AsciiHud::new(unsafe { &*G_SOURCE.as_ptr() }, dma1_stream7_transfer_spi3);
     unsafe { G_OSD = Some(osd) };
 
     let mut timer = Timer::tim7(tim7, 50.hz(), clocks);

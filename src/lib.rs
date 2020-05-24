@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate enum_map;
 extern crate ascii_osd_hud;
+extern crate dcmimu;
 extern crate nalgebra;
 
 pub mod components;

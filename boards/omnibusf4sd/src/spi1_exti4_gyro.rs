@@ -1,4 +1,5 @@
 use core::convert::Infallible;
+use core::mem::MaybeUninit;
 
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
@@ -6,11 +7,12 @@ use stm32f4xx_hal::gpio::{Alternate, AF5};
 use stm32f4xx_hal::gpio::{Output, PushPull};
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
-use stm32f4xx_hal::spi::{Error, Pins, Spi};
+use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use rs_flight::datastructures::ring_buffer::RingBuffer;
-use rs_flight::hal::sensors::{Acceleration, Gyro};
+use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
+use rs_flight::hal::imu::AccelGyroHandler;
+use rs_flight::hal::sensors::{Acceleration, Gyro, Temperature};
 
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive, IntPinConfig};
 use mpu6000::{self, SpiBus, MPU6000, SPI_MODE};
@@ -23,47 +25,42 @@ type Spi1Pins = (
 
 type SpiError = mpu6000::SpiError<Error, Error, Infallible>;
 type Spi1Bus = SpiBus<Spi<stm32::SPI1, Spi1Pins>, PA4<Output<PushPull>>>;
-static mut G_MPU6000: Option<MPU6000<Spi1Bus>> = None;
+static mut G_MPU6000: MaybeUninit<MPU6000<Spi1Bus>> = MaybeUninit::uninit();
 
-#[link_section = ".ram2bss"]
-static mut G_GYRO_RING_BUFFER: Option<RingBuffer<Gyro<u32>>> = None;
-#[link_section = ".ram2bss"]
-static mut G_ACCELERATION_RING_BUFFER: Option<RingBuffer<Acceleration<u32>>> = None;
-#[link_section = ".ram2bss"]
-static mut G_TEMPERATURE_RING_BUFFER: Option<RingBuffer<u16>> = None;
+static mut G_ACCEL_GYRO_HANDLER: AccelGyroHandler = event_nop_handler;
+static mut G_TEMPERATURE_HANDLER: EventHandler<Temperature<u16>> = event_nop_handler;
 
 #[interrupt]
 fn EXTI4() {
     let exti = unsafe { &*(stm32::EXTI::ptr()) };
     cortex_m::interrupt::free(|_cs| exti.emr.modify(|_, w| w.mr4().set_bit()));
     static mut COUNTER: usize = 0;
+    let mpu6000 = unsafe { &mut *G_MPU6000.as_mut_ptr() };
+
+    static mut ACCELERATION_BUFFER: [Acceleration<u32>; 1] = [Acceleration((0, 0, 0)); 1];
+    static mut GYRO_BUFFER: [Gyro<u32>; 1] = [Gyro((0, 0, 0)); 1];
     unsafe {
-        if let Some(ref mut mpu6000) = G_MPU6000 {
-            let gyro = mpu6000.get_gyro().ok().unwrap();
-            if let Some(ref mut gyro_ring) = G_GYRO_RING_BUFFER {
-                gyro_ring.push(Gyro(gyro));
-            }
-            let acceleration = mpu6000.get_acceleration().ok().unwrap();
-            if let Some(ref mut acceleration_ring) = G_ACCELERATION_RING_BUFFER {
-                acceleration_ring.push(Acceleration(acceleration));
-            }
-            // 10hz
-            if COUNTER % 100 == 0 {
-                if let Some(ref mut temperature_ring) = G_TEMPERATURE_RING_BUFFER {
-                    temperature_ring.push(mpu6000.get_temperature().ok().unwrap());
-                }
-            }
-            COUNTER += 0;
+        ACCELERATION_BUFFER[0] = Acceleration(mpu6000.get_acceleration().ok().unwrap());
+        GYRO_BUFFER[0] = Gyro(mpu6000.get_gyro().ok().unwrap());
+        G_ACCEL_GYRO_HANDLER((&ACCELERATION_BUFFER, &GYRO_BUFFER));
+    }
+
+    unsafe {
+        if COUNTER % 100 == 0 {
+            let temperature = mpu6000.get_temperature().ok().unwrap();
+            G_TEMPERATURE_HANDLER(Temperature(temperature));
         }
+        COUNTER += 1;
     }
     exti.emr.modify(|_, w| w.mr4().clear_bit());
 }
 
-pub fn init<'a>(
+pub fn init(
     spi1: stm32::SPI1,
     pins: Spi1Pins,
     cs: PA4<Output<PushPull>>,
     clocks: Clocks,
+    event_handlers: (AccelGyroHandler, EventHandler<Temperature<u16>>),
     delay: &mut Delay,
 ) -> Result<bool, SpiError> {
     let freq: stm32f4xx_hal::time::Hertz = 1.mhz().into();
@@ -89,6 +86,15 @@ pub fn init<'a>(
     };
     let spi1 = unsafe { &(*stm32::SPI1::ptr()) };
     spi1.cr1.modify(|_, w| w.br().bits(br));
-    unsafe { G_MPU6000 = Some(mpu6000) };
+    unsafe { G_MPU6000 = MaybeUninit::new(mpu6000) };
+
+    let (accel_gyro_handler, temperature_handler) = event_handlers;
+    unsafe {
+        G_ACCEL_GYRO_HANDLER = accel_gyro_handler;
+        G_TEMPERATURE_HANDLER = temperature_handler;
+    }
+
+    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
+    unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::EXTI4) }
     Ok(true)
 }

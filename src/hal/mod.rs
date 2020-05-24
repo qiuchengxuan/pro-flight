@@ -1,2 +1,2 @@
-pub mod osd;
+pub mod imu;
 pub mod sensors;

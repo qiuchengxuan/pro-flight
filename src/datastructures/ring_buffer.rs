@@ -54,7 +54,7 @@ mod test {
         use super::RingBuffer;
 
         let mut buffer = [0u8; 32];
-        let mut ring = RingBuffer::new(&mut buffer[..]);
+        let mut ring = RingBuffer::new(&mut buffer);
         assert_eq!(ring.pop(), None);
         ring.push(1u8);
         assert_eq!(ring.pop(), Some(1u8));

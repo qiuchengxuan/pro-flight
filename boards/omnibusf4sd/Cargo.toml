@@ -27,7 +27,6 @@ numtoa = "0.2"
 
 chips = { path = "../../chips" }
 rs-flight = { path = "../../" }
-dcmimu = "0.1"
 
 mpu6000 = { path = "../../../mpu6000" }
 max7456 = { path = "../../../max7456" }

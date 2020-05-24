@@ -15,12 +15,12 @@ extern crate usb_device;
 #[macro_use]
 extern crate mpu6000;
 extern crate chips;
-extern crate dcmimu;
 extern crate rs_flight;
 
 mod console;
 mod spi1_exti4_gyro;
 mod spi3_tim7_osd_baro;
+
 mod usb_serial;
 
 use core::mem::MaybeUninit;
@@ -36,13 +36,12 @@ use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
-use dcmimu::DCMIMU;
+use rs_flight::components::imu::{get_handler, imu};
 use rs_flight::components::sysled::Sysled;
+use rs_flight::datastructures::event::event_nop_handler;
+use rs_flight::hal::sensors::Temperature;
 
 use console::Console;
-
-#[link_section = ".ram2bss"]
-static mut G_DCMIMU: MaybeUninit<DCMIMU> = MaybeUninit::uninit();
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
@@ -67,23 +66,6 @@ fn main() -> ! {
     let gpio_a = peripherals.GPIOA.split();
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
-
-    unsafe { &(*stm32::RCC::ptr()) }
-        .ahb1enr
-        .modify(|_, w| w.dma1en().enabled());
-
-    let _cs = gpio_a.pa15.into_push_pull_output();
-    let sclk = gpio_c.pc10.into_alternate_af6();
-    let miso = gpio_c.pc11.into_alternate_af6();
-    let mosi = gpio_c.pc12.into_alternate_af6();
-    spi3_tim7_osd_baro::init(
-        peripherals.SPI3,
-        peripherals.TIM7,
-        (sclk, miso, mosi),
-        clocks,
-        &mut delay,
-    )
-    .ok();
 
     // let pb0_1 = (
     //     gpio_b.pb0.into_alternate_af2(),
@@ -116,7 +98,23 @@ fn main() -> ! {
     let miso = gpio_a.pa6.into_alternate_af5();
     let mosi = gpio_a.pa7.into_alternate_af5();
     let pins = (sclk, miso, mosi);
-    let result = spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, clocks, &mut delay);
+    let handlers = (get_handler(), event_nop_handler as fn(_: Temperature<u16>));
+    let result = spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, clocks, handlers, &mut delay);
+    result.ok();
+
+    let _cs = gpio_a.pa15.into_push_pull_output();
+    let sclk = gpio_c.pc10.into_alternate_af6();
+    let miso = gpio_c.pc11.into_alternate_af6();
+    let mosi = gpio_c.pc12.into_alternate_af6();
+    spi3_tim7_osd_baro::init(
+        peripherals.SPI3,
+        peripherals.TIM7,
+        (sclk, miso, mosi),
+        clocks,
+        imu(),
+        &mut delay,
+    )
+    .ok();
 
     let calibration = SysTickCalibration::from_clock_hz(clocks.sysclk().0);
     let systick = PollingSysTick::new(delay.free(), &calibration);
@@ -150,19 +148,6 @@ fn main() -> ! {
                 dfu.reboot_into();
             } else if line == *b"reboot" {
                 cortex_m::peripheral::SCB::sys_reset();
-            } else if line == *b"check" {
-                match result {
-                    Ok(b) => {
-                        if b {
-                            console.write(b"found mpu6000\r\n");
-                        } else {
-                            console.write(b"not mpu6000\r\n");
-                        }
-                    }
-                    Err(_) => {
-                        console.write(b"spi1 error");
-                    }
-                }
             } else if line.starts_with(b"read") {
                 let mut iter = line.split(|b| *b == ' ' as u8);
                 iter.next();
