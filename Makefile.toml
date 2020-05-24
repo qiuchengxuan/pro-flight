@@ -12,7 +12,7 @@ cd -
 command = "arm-none-eabi-objcopy"
 args = [
     "-O", "binary",
-    "boards/omnibusf4sd/target/thumbv7em-none-eabi/release/omnibusf4sd",
+    "boards/omnibusf4sd/target/thumbv7em-none-eabihf/release/omnibusf4sd",
     "omnibusf4sd.bin",
 ]
 dependencies = ["omnibusf4sd-elf"]

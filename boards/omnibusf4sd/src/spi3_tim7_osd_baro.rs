@@ -14,9 +14,9 @@ use max7456::{MAX7456, SPI_MODE};
 use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud, StubTelemetrySource};
 use rs_flight::hal::imu::IMU;
 
-static mut G_TIM7: Option<Timer<stm32::TIM7>> = None;
+static mut G_TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
 #[link_section = ".ram2bss"]
-static mut G_OSD: Option<Max7456AsciiHud> = None;
+static mut G_OSD: MaybeUninit<Max7456AsciiHud> = MaybeUninit::uninit();
 
 static mut G_SOURCE: MaybeUninit<StubTelemetrySource> = MaybeUninit::uninit();
 
@@ -37,14 +37,10 @@ fn clear_dma1_stream7_tx_interrupts() {
 #[interrupt]
 fn TIM7() {
     cortex_m::interrupt::free(|_cs| unsafe {
-        if let Some(ref mut tim) = G_TIM7 {
-            tim.clear_interrupt(Event::TimeOut);
-        };
+        (&mut *G_TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
     });
     unsafe {
-        if let Some(ref mut osd) = G_OSD {
-            osd.start_draw();
-        }
+        (&mut *G_OSD.as_mut_ptr()).start_draw();
     }
 }
 
@@ -95,12 +91,12 @@ pub fn init<'a>(
 
     unsafe { G_SOURCE = MaybeUninit::new(StubTelemetrySource::new(imu)) };
     let osd = Max7456AsciiHud::new(unsafe { &*G_SOURCE.as_ptr() }, dma1_stream7_transfer_spi3);
-    unsafe { G_OSD = Some(osd) };
+    unsafe { G_OSD = MaybeUninit::new(osd) };
 
     let mut timer = Timer::tim7(tim7, 50.hz(), clocks);
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM7);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM7) }
     timer.listen(Event::TimeOut);
-    cortex_m::interrupt::free(|_cs| unsafe { G_TIM7 = Some(timer) });
+    cortex_m::interrupt::free(|_cs| unsafe { G_TIM7 = MaybeUninit::new(timer) });
     Ok(())
 }

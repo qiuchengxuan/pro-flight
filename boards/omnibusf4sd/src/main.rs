@@ -18,27 +18,31 @@ extern crate chips;
 extern crate rs_flight;
 
 mod console;
+// mod software_interrupt;
 mod spi1_exti4_gyro;
 mod spi3_tim7_osd_baro;
-
 mod usb_serial;
 
-use core::mem::MaybeUninit;
+use core::fmt::Write;
 
-use arrayvec::ArrayVec;
+use arrayvec::{ArrayString, ArrayVec};
 use btoi::btoi_radix;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
-use numtoa::NumToA;
+
 use stm32f4xx_hal::delay::Delay;
+use stm32f4xx_hal::gpio::Edge;
+use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
-use rs_flight::components::imu::{get_handler, imu};
+use chips::stm32f4::valid_memory_address;
+use rs_flight::components::imu::{self};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::datastructures::event::event_nop_handler;
+use rs_flight::hal::imu::IMU;
 use rs_flight::hal::sensors::Temperature;
 
 use console::Console;
@@ -51,7 +55,7 @@ fn main() -> ! {
     dfu.check();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
-    let peripherals = stm32::Peripherals::take().unwrap();
+    let mut peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc
@@ -60,6 +64,11 @@ fn main() -> ! {
         .sysclk(64.mhz())
         .require_pll48clk()
         .freeze();
+
+    unsafe {
+        let rcc = &*stm32::RCC::ptr();
+        rcc.apb2enr.write(|w| w.syscfgen().enabled());
+    }
 
     let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
 
@@ -97,10 +106,27 @@ fn main() -> ! {
     let sclk = gpio_a.pa5.into_alternate_af5();
     let miso = gpio_a.pa6.into_alternate_af5();
     let mosi = gpio_a.pa7.into_alternate_af5();
+    let mut int = gpio_c.pc4.into_pull_up_input();
+    int.make_interrupt_source(&mut peripherals.SYSCFG);
+    int.enable_interrupt(&mut peripherals.EXTI);
+    int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
     let pins = (sclk, miso, mosi);
-    let handlers = (get_handler(), event_nop_handler as fn(_: Temperature<u16>));
-    let result = spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, clocks, handlers, &mut delay);
+    let handlers = (
+        imu::get_accel_gyro_handler(),
+        event_nop_handler as fn(_: Temperature<i32>),
+    );
+    let result = spi1_exti4_gyro::init(
+        peripherals.SPI1,
+        pins,
+        cs,
+        int,
+        clocks,
+        handlers,
+        &mut delay,
+    );
     result.ok();
+
+    let imu = imu::init();
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
@@ -111,7 +137,7 @@ fn main() -> ! {
         peripherals.TIM7,
         (sclk, miso, mosi),
         clocks,
-        imu(),
+        imu,
         &mut delay,
     )
     .ok();
@@ -134,9 +160,11 @@ fn main() -> ! {
     let mut usb_serial = usb_serial::USBSerial::new(&usb_bus);
     let console = Console::new(&mut usb_serial);
 
+    let mut output = ArrayString::<[u8; 80]>::new();
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
+        imu::trigger_handle();
 
         let option = console.try_read_line(&mut vec);
         if option.is_none() {
@@ -148,94 +176,51 @@ fn main() -> ! {
                 dfu.reboot_into();
             } else if line == *b"reboot" {
                 cortex_m::peripheral::SCB::sys_reset();
-            } else if line.starts_with(b"read") {
-                let mut iter = line.split(|b| *b == ' ' as u8);
-                iter.next();
-                let address = if let Some(address) = iter.next() {
-                    match btoi_radix::<u32>(address, 16) {
-                        Ok(address) => address,
-                        _ => 0,
-                    }
-                } else {
-                    0
-                };
-                if 0x40000000 <= address && address <= 0xA0000FFF {
-                    let value = unsafe { *(address as *const u32) };
-                    let mut buffer = [0u8; 10];
-                    console.write(b"Result: ");
-                    console.write(value.numtoa(16, &mut buffer));
-                    console.write(b"\r\n")
-                }
-            } else if line.starts_with(b"dump") {
-                let mut iter = line.split(|b| *b == ' ' as u8);
-                iter.next();
-                let mut address = if let Some(address) = iter.next() {
-                    match btoi_radix::<u32>(address, 16) {
-                        Ok(address) => address,
-                        _ => 0,
-                    }
-                } else {
-                    0
-                };
-                let size = if let Some(value) = iter.next() {
-                    match btoi_radix::<u32>(value, 16) {
-                        Ok(value) => value,
-                        _ => {
-                            address = 0;
-                            0
+            } else if line == *b"imu" {
+                let attitude = imu.get_attitude();
+                write!(
+                    &mut output,
+                    "Pitch: {}, Roll: {}, Yaw: {}\r\n",
+                    attitude.pitch, attitude.roll, attitude.yaw
+                )
+                .ok();
+                console.write(&output.as_bytes());
+            } else if line.starts_with(b"read ") {
+                if let Some(word) = line[5..].split(|b| *b == ' ' as u8).next() {
+                    if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
+                        if valid_memory_address(address) {
+                            let value = unsafe { *(address as *const u32) };
+                            write!(&mut output, "Result: {:x}\r\n", value).ok();
+                            console.write(&output.as_bytes());
                         }
                     }
-                } else {
-                    address = 0;
-                    0
-                };
-                if 0x40000000 <= address && address <= 0xA0000FFF {
-                    console.write(b"Dump result: ");
-                    let mut buffer = [0u8; 10];
-                    for i in 0..size {
-                        let value = unsafe { *((address + i) as *const u32) };
-                        console.write(value.numtoa(16, &mut buffer));
-                        console.write(b" ");
-                    }
-                    console.write(b"\r\n");
-                } else {
-                    console.write(b"Bad input\r\n");
                 }
-            } else if line.starts_with(b"write") {
-                let mut iter = line.split(|b| *b == ' ' as u8);
-                iter.next();
-                let mut address = if let Some(address) = iter.next() {
-                    match btoi_radix::<u32>(address, 16) {
-                        Ok(address) => address,
-                        _ => 0,
-                    }
-                } else {
-                    0
-                };
-                let value = if let Some(value) = iter.next() {
-                    match btoi_radix::<u32>(value, 16) {
-                        Ok(value) => value,
-                        _ => {
-                            address = 0;
-                            0
+            } else if line.starts_with(b"readf ") {
+                if let Some(word) = line[6..].split(|b| *b == ' ' as u8).next() {
+                    if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
+                        if valid_memory_address(address) {
+                            let value = unsafe { *(address as *const f32) };
+                            write!(&mut output, "Result: {}\r\n", value).ok();
+                            console.write(&output.as_bytes());
                         }
                     }
-                } else {
-                    address = 0;
-                    0
-                };
-                if 0x40000000 <= address && address <= 0xA0000FFF {
-                    unsafe { *(address as *mut u32) = value };
-                    let mut count_down = MillisCountDown::new(&systick);
-                    count_down.start_ms(50);
-                    nb::block!(count_down.wait()).unwrap();
-                    let value = unsafe { *(address as *const u32) };
-                    console.write(b"Write result: ");
-                    let mut buffer = [0u8; 10];
-                    console.write(value.numtoa(16, &mut buffer));
-                    console.write(b"\r\n");
-                } else {
-                    console.write(b"Bad input\r\n");
+                }
+            } else if line.starts_with(b"write ") {
+                let mut iter = line[6..]
+                    .split(|b| *b == ' ' as u8)
+                    .flat_map(|w| btoi_radix::<u32>(w, 16).ok());
+                if let Some(address) = iter.next() {
+                    if let Some(value) = iter.next() {
+                        if valid_memory_address(address) {
+                            unsafe { *(address as *mut u32) = value };
+                            let mut count_down = MillisCountDown::new(&systick);
+                            count_down.start_ms(50);
+                            nb::block!(count_down.wait()).unwrap();
+                            let value = unsafe { *(address as *const u32) };
+                            write!(&mut output, "Write result: {:x}\r\n", value).ok();
+                            console.write(&output.as_bytes());
+                        }
+                    }
                 }
             } else {
                 console.write(b"unknown input: ");
@@ -245,6 +230,7 @@ fn main() -> ! {
         }
         console.write(b"# ");
         vec.clear();
+        output.clear();
     }
 }
 

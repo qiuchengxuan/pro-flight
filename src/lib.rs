@@ -3,8 +3,9 @@
 
 #[macro_use]
 extern crate enum_map;
+extern crate ahrs;
+#[macro_use]
 extern crate ascii_osd_hud;
-extern crate dcmimu;
 extern crate nalgebra;
 
 pub mod components;
@@ -13,5 +14,4 @@ pub mod drivers;
 pub mod hal;
 
 #[cfg(test)]
-#[macro_use]
 extern crate std;

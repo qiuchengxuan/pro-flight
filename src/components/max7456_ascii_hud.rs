@@ -78,7 +78,7 @@ impl<'a> Max7456AsciiHud<'a> {
             Symbol::LineRight => 227,
             Symbol::LineRight1 => 228,
         };
-        let hud = HUD::new(telemetry, &symbol_table, 150, AspectRatio::Standard);
+        let hud = HUD::new(telemetry, &symbol_table, 150, aspect_ratio!(16:9));
         Self {
             hud,
             dma_consumer,
@@ -88,9 +88,9 @@ impl<'a> Max7456AsciiHud<'a> {
 
     pub fn start_draw(&mut self) {
         // ascii-hud will generator about 120 chars, for each char
-        // max7456 will generate 4 byte to write, so at lease 480 bytes
-        // memory space is required
-        static mut S_DMA_BUFFER: [u8; 500] = [0u8; 500];
+        // max7456 will generate 4 byte to write, including chars to clear,
+        // so at lease 800 bytes memory space is required
+        static mut S_DMA_BUFFER: [u8; 1000] = [0u8; 1000];
         let mut dma_buffer = unsafe { S_DMA_BUFFER };
         self.hud.draw(&mut self.screen);
         let mut writer = NotNullWriter::new(&self.screen, Default::default());
