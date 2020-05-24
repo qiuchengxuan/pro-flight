@@ -1,4 +1,7 @@
-use nalgebra::Vector3;
+pub type Tuple3<T> = (T, T, T);
 
-pub struct Acceleration(Vector3<u32>);
-pub struct Gyro(Vector3<u32>);
+#[derive(Copy, Clone)]
+pub struct Acceleration<T>(pub Tuple3<T>);
+
+#[derive(Copy, Clone)]
+pub struct Gyro<T>(pub Tuple3<T>);
