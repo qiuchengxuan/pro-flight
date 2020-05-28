@@ -17,7 +17,6 @@ extern crate mpu6000;
 extern crate chips;
 extern crate rs_flight;
 
-mod console;
 // mod software_interrupt;
 mod spi1_exti4_gyro;
 mod spi3_tim7_osd_baro;
@@ -33,21 +32,18 @@ use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibra
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::Edge;
 use stm32f4xx_hal::gpio::ExtiPin;
-use stm32f4xx_hal::otg_fs::{UsbBus, USB};
+use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
+use rs_flight::components::console;
 use rs_flight::components::imu::{self};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::imu::IMU;
 use rs_flight::hal::sensors::Temperature;
-
-use console::Console;
-
-static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
@@ -156,9 +152,7 @@ fn main() -> ! {
         pin_dp: gpio_a.pa12.into_alternate_af10(),
     };
 
-    let usb_bus = UsbBus::new(usb, unsafe { &mut EP_MEMORY });
-    let mut usb_serial = usb_serial::USBSerial::new(&usb_bus);
-    let console = Console::new(&mut usb_serial);
+    let (mut serial, mut device) = usb_serial::init(usb);
 
     let mut output = ArrayString::<[u8; 80]>::new();
     let mut vec = ArrayVec::<[u8; 80]>::new();
@@ -166,7 +160,11 @@ fn main() -> ! {
         sysled.check_toggle().unwrap();
         imu::trigger_handle();
 
-        let option = console.try_read_line(&mut vec);
+        if !device.poll(&mut [&mut serial]) {
+            continue;
+        }
+
+        let option = console::read_line(&mut serial, &mut vec);
         if option.is_none() {
             continue;
         }
@@ -184,14 +182,14 @@ fn main() -> ! {
                     attitude.pitch, attitude.roll, attitude.yaw
                 )
                 .ok();
-                console.write(&output.as_bytes());
+                console::write(&mut serial, &output.as_bytes()).ok();
             } else if line.starts_with(b"read ") {
                 if let Some(word) = line[5..].split(|b| *b == ' ' as u8).next() {
                     if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
                         if valid_memory_address(address) {
                             let value = unsafe { *(address as *const u32) };
                             write!(&mut output, "Result: {:x}\r\n", value).ok();
-                            console.write(&output.as_bytes());
+                            console::write(&mut serial, &output.as_bytes()).ok();
                         }
                     }
                 }
@@ -201,7 +199,7 @@ fn main() -> ! {
                         if valid_memory_address(address) {
                             let value = unsafe { *(address as *const f32) };
                             write!(&mut output, "Result: {}\r\n", value).ok();
-                            console.write(&output.as_bytes());
+                            console::write(&mut serial, &output.as_bytes()).ok();
                         }
                     }
                 }
@@ -218,17 +216,17 @@ fn main() -> ! {
                             nb::block!(count_down.wait()).unwrap();
                             let value = unsafe { *(address as *const u32) };
                             write!(&mut output, "Write result: {:x}\r\n", value).ok();
-                            console.write(&output.as_bytes());
+                            console::write(&mut serial, &output.as_bytes()).ok();
                         }
                     }
                 }
             } else {
-                console.write(b"unknown input: ");
-                console.write(line);
-                console.write(b"\r\n")
+                console::write(&mut serial, b"unknown input: ").ok();
+                console::write(&mut serial, line).ok();
+                console::write(&mut serial, b"\r\n").ok();
             }
         }
-        console.write(b"# ");
+        console::write(&mut serial, b"# ").ok();
         vec.clear();
         output.clear();
     }
