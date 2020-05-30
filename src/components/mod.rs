@@ -1,3 +1,4 @@
+#[macro_use]
 pub mod console;
 pub mod imu;
 #[macro_use]

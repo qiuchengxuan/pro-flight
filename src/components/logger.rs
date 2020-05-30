@@ -37,17 +37,17 @@ impl fmt::Write for Logger {
         if buffer.len() <= bytes.len() {
             return Ok(());
         }
-        let index = self.allocate(bytes.len() + 1);
-        let index = index % buffer.len();
+        let mut index = self.allocate(bytes.len() + 2) % buffer.len();
         if index + bytes.len() < buffer.len() {
             buffer[index..index + bytes.len()].copy_from_slice(bytes);
-            buffer[index + bytes.len()] = '\n' as u8;
-            return Ok(());
+            index = index + bytes.len();
+        } else {
+            let size = buffer.len() - index;
+            buffer[index..index + size].copy_from_slice(&bytes[..size]);
+            buffer[..bytes.len() - size].copy_from_slice(&bytes[size..]);
+            index = bytes.len() - size;
         }
-        let size = buffer.len() - index;
-        buffer[index..index + size].copy_from_slice(&bytes[..size]);
-        buffer[..bytes.len() - size].copy_from_slice(&bytes[size..]);
-        buffer[bytes.len() - size] = '\n' as u8;
+        buffer[index..index + 2].copy_from_slice(b"\r\n");
         Ok(())
     }
 }

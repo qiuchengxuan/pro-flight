@@ -25,7 +25,7 @@ mod usb_serial;
 
 use core::fmt::Write;
 
-use arrayvec::{ArrayString, ArrayVec};
+use arrayvec::ArrayVec;
 use btoi::btoi_radix;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
@@ -39,7 +39,7 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
-use rs_flight::components::console;
+use rs_flight::components::console::{self, Console};
 use rs_flight::components::imu::{self};
 use rs_flight::components::logger;
 use rs_flight::components::sysled::Sysled;
@@ -161,7 +161,6 @@ fn main() -> ! {
 
     let (mut serial, mut device) = usb_serial::init(usb);
 
-    let mut output = ArrayString::<[u8; 80]>::new();
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
@@ -187,20 +186,19 @@ fn main() -> ! {
                 }
             } else if line == *b"imu" {
                 let attitude = imu.get_attitude();
-                write!(
-                    &mut output,
+                console!(
+                    &mut serial,
                     "Pitch: {}, Roll: {}, Yaw: {}\r\n",
-                    attitude.pitch, attitude.roll, attitude.yaw
-                )
-                .ok();
-                console::write(&mut serial, &output.as_bytes()).ok();
+                    attitude.pitch,
+                    attitude.roll,
+                    attitude.yaw
+                );
             } else if line.starts_with(b"read ") {
                 if let Some(word) = line[5..].split(|b| *b == ' ' as u8).next() {
                     if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
                         if valid_memory_address(address) {
                             let value = unsafe { *(address as *const u32) };
-                            write!(&mut output, "Result: {:x}\r\n", value).ok();
-                            console::write(&mut serial, &output.as_bytes()).ok();
+                            console!(&mut serial, "Result: {:x}\r\n", value);
                         }
                     }
                 }
@@ -209,8 +207,7 @@ fn main() -> ! {
                     if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
                         if valid_memory_address(address) {
                             let value = unsafe { *(address as *const f32) };
-                            write!(&mut output, "Result: {}\r\n", value).ok();
-                            console::write(&mut serial, &output.as_bytes()).ok();
+                            console!(&mut serial, "Result: {}\r\n", value);
                         }
                     }
                 }
@@ -226,20 +223,16 @@ fn main() -> ! {
                             count_down.start_ms(50);
                             nb::block!(count_down.wait()).unwrap();
                             let value = unsafe { *(address as *const u32) };
-                            write!(&mut output, "Write result: {:x}\r\n", value).ok();
-                            console::write(&mut serial, &output.as_bytes()).ok();
+                            console!(&mut serial, "Write result: {:x}\r\n", value);
                         }
                     }
                 }
             } else {
-                console::write(&mut serial, b"unknown input: ").ok();
-                console::write(&mut serial, line).ok();
-                console::write(&mut serial, b"\r\n").ok();
+                console!(&mut serial, "unknown input\r\n");
             }
         }
-        console::write(&mut serial, b"# ").ok();
+        console!(&mut serial, "# ");
         vec.clear();
-        output.clear();
     }
 }
 
