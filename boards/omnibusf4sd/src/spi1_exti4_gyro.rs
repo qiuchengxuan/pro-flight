@@ -41,20 +41,16 @@ static mut G_ACCEL_GYRO_HANDLER: AccelGyroHandler = event_nop_handler;
 static mut G_TEMPERATURE_HANDLER: EventHandler<Temperature<i32>> = event_nop_handler;
 
 #[interrupt]
-fn EXTI4() {
-    cortex_m::interrupt::free(|_cs| {
-        cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
-        unsafe { &mut *G_INT.as_mut_ptr() }.clear_interrupt_pending_bit()
-    });
-    let mpu6000 = unsafe { &mut *G_MPU6000.as_mut_ptr() };
+unsafe fn EXTI4() {
+    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
+    { &mut *G_INT.as_mut_ptr() }.clear_interrupt_pending_bit();
+    let mpu6000 = &mut *G_MPU6000.as_mut_ptr();
 
     static mut ACCELERATION_BUFFER: [Acceleration<f32>; 1] = [Acceleration((0.0, 0.0, 0.0)); 1];
     static mut GYRO_BUFFER: [Gyro<f32>; 1] = [Gyro((0.0, 0.0, 0.0)); 1];
-    unsafe {
-        ACCELERATION_BUFFER[0] = Acceleration(mpu6000.get_acceleration().ok().unwrap().into());
-        GYRO_BUFFER[0] = Gyro(mpu6000.get_gyro().ok().unwrap().into());
-        G_ACCEL_GYRO_HANDLER((&ACCELERATION_BUFFER, &GYRO_BUFFER));
-    }
+    ACCELERATION_BUFFER[0] = Acceleration(mpu6000.get_acceleration().ok().unwrap().into());
+    GYRO_BUFFER[0] = Gyro(mpu6000.get_gyro().ok().unwrap().into());
+    G_ACCEL_GYRO_HANDLER((&ACCELERATION_BUFFER, &GYRO_BUFFER));
 }
 
 pub fn init(
@@ -96,6 +92,10 @@ pub fn init(
         1..=2 => 0b000,
         3..=5 => 0b001,
         6..=11 => 0b010,
+        12..=23 => 0b011,
+        24..=47 => 0b100,
+        48..=95 => 0b101,
+        96..=191 => 0b110,
         _ => 0b011,
     };
     let spi1 = unsafe { &(*stm32::SPI1::ptr()) };

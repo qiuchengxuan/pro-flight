@@ -15,7 +15,6 @@ use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud, StubTeleme
 use rs_flight::hal::imu::IMU;
 
 static mut G_TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
-#[link_section = ".ram2bss"]
 static mut G_OSD: MaybeUninit<Max7456AsciiHud> = MaybeUninit::uninit();
 
 static mut G_SOURCE: MaybeUninit<StubTelemetrySource> = MaybeUninit::uninit();
@@ -45,8 +44,8 @@ fn dma1_stream7_transfer_spi3(buffer: &[u8]) {
     stream.ndtr.write(|w| w.ndt().bits(buffer.len() as u16));
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
     spi3.cr2.modify(|_, w| w.txdmaen().enabled());
-    let spi3_data_register = &spi3.dr as *const _ as u32;
-    stream.par.write(|w| w.pa().bits(spi3_data_register));
+    let data_register = &spi3.dr as *const _ as u32;
+    stream.par.write(|w| w.pa().bits(data_register));
     stream.m0ar.write(|w| w.m0a().bits(buffer.as_ptr() as u32));
     stream.cr.write(|w| {
         w.chsel().bits(0).minc().incremented().dir().memory_to_peripheral().en().enabled()
@@ -76,6 +75,6 @@ pub fn init<'a>(
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM7);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM7) }
     timer.listen(Event::TimeOut);
-    cortex_m::interrupt::free(|_cs| unsafe { G_TIM7 = MaybeUninit::new(timer) });
+    unsafe { G_TIM7 = MaybeUninit::new(timer) };
     Ok(())
 }

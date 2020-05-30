@@ -92,3 +92,17 @@ pub fn reader() -> LogReader {
     let index = unsafe { INDEX.load(Ordering::Relaxed) as usize };
     LogReader((index, 0))
 }
+
+mod test {
+    #[test]
+    fn write_log() {
+        use super::Logger;
+        use core::fmt::Write;
+
+        static mut BUFFER: [u8; 100] = [0u8; 100];
+        super::init(unsafe { &mut BUFFER });
+        log!("test a");
+        log!("test b");
+        assert_eq!(super::reader().next().unwrap(), b"test a\r\ntest b\r\n");
+    }
+}

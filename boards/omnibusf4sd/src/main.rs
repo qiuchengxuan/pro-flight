@@ -41,13 +41,12 @@ use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::imu::{self};
-use rs_flight::components::logger;
+use rs_flight::components::logger::{self, Logger};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::imu::IMU;
 use rs_flight::hal::sensors::Temperature;
 
-#[link_section = ".ram2bss"]
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
 
 #[entry]
@@ -55,13 +54,14 @@ fn main() -> ! {
     let mut dfu = Dfu::new();
     dfu.check();
 
-    logger::init(unsafe { &mut LOG_BUFFER });
-
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
-    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(64.mhz()).require_pll48clk().freeze();
+    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
+
+    logger::init(unsafe { &mut LOG_BUFFER });
+    log!("hclk: {}", clocks.hclk().0);
 
     unsafe {
         let rcc = &*stm32::RCC::ptr();
@@ -110,9 +110,7 @@ fn main() -> ! {
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
     let pins = (sclk, miso, mosi);
     let handlers = (imu::get_accel_gyro_handler(), event_nop_handler as fn(_: Temperature<i32>));
-    let result =
-        spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay);
-    result.ok();
+    spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay).ok();
 
     let imu = imu::init();
 
@@ -149,7 +147,7 @@ fn main() -> ! {
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
-        imu::trigger_handle();
+        // imu::trigger_handle();
 
         if !device.poll(&mut [&mut serial]) {
             continue;
