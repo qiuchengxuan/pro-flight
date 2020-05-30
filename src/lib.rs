@@ -1,13 +1,15 @@
 #![no_std]
 #![feature(maybe_uninit_uninit_array)]
 
-#[macro_use]
-extern crate enum_map;
 extern crate ahrs;
-#[macro_use]
-extern crate ascii_osd_hud;
 extern crate arrayvec;
 extern crate ascii;
+#[macro_use]
+extern crate ascii_osd_hud;
+#[macro_use]
+extern crate enum_map;
+#[macro_use]
+extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 

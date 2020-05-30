@@ -8,7 +8,7 @@ version = "0.1.0"
 [dependencies]
 # alloc-cortex-m = "0.3.5"
 cast = { version = "0.2.2", default-features = false }
-cortex-m = "0.6"
+cortex-m = { version = "0.6", features = ["inline-asm"] }
 cortex-m-rt = "0.6"
 cortex-m-semihosting = "0.3"
 cortex-m-systick-countdown = "0.1"

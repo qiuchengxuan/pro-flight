@@ -10,26 +10,17 @@ pub struct StubIMU(pub Madgwick<f32>);
 
 impl IMU for StubIMU {
     fn get_attitude(&self) -> Attitude {
-        let quat = self.0.quat / (core::f32::consts::PI / 180.0);
-        Attitude { pitch: quat[3] as i8, roll: quat[2] as i8, yaw: quat[1] as u16 }
+        let xyz = self.0.quat.imag() / (core::f32::consts::PI / 180.0);
+        Attitude { pitch: xyz[0] as i8, roll: xyz[1] as i8, yaw: xyz[2] as u16 }
     }
 }
 
 static mut G_IMU: MaybeUninit<StubIMU> = MaybeUninit::uninit();
 
-static mut G_ACCELERATION: &[Acceleration<f32>] = &[];
-static mut G_GYRO: &[Gyro<f32>] = &[];
-pub fn accel_gyro_handler(event: (&'static [Acceleration<f32>], &'static [Gyro<f32>])) {
+pub fn accel_gyro_handler(event: (Acceleration<f32>, Gyro<f32>)) {
     let (acceleration, gyro) = event;
-    cortex_m::interrupt::free(|_| unsafe {
-        G_ACCELERATION = acceleration;
-        G_GYRO = gyro
-    })
-}
-
-pub fn trigger_handle() {
-    let (a_x, a_y, a_z) = cortex_m::interrupt::free(|_| unsafe { G_ACCELERATION[0].0 });
-    let (g_x, g_y, g_z) = cortex_m::interrupt::free(|_| unsafe { G_GYRO[0].0 });
+    let (a_x, a_y, a_z) = acceleration;
+    let (g_x, g_y, g_z) = gyro;
     let accel = Vector3::new(a_x, a_y, a_z);
     let mut gyro = Vector3::new(g_x, g_y, g_z);
     gyro = gyro * (core::f32::consts::PI / 180.0);

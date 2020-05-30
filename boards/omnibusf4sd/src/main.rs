@@ -5,16 +5,15 @@
 extern crate cortex_m_rt;
 extern crate btoi;
 extern crate cast;
+extern crate chips;
 extern crate cortex_m;
 extern crate cortex_m_systick_countdown;
 extern crate max7456;
+extern crate mpu6000;
 extern crate nb;
 extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
-#[macro_use]
-extern crate mpu6000;
-extern crate chips;
 #[macro_use]
 extern crate rs_flight;
 
@@ -58,7 +57,7 @@ fn main() -> ! {
     let mut peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
-    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
+    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).require_pll48clk().freeze();
 
     logger::init(unsafe { &mut LOG_BUFFER });
     log!("hclk: {}", clocks.hclk().0);
@@ -66,6 +65,7 @@ fn main() -> ! {
     unsafe {
         let rcc = &*stm32::RCC::ptr();
         rcc.apb2enr.write(|w| w.syscfgen().enabled());
+        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled());
     }
 
     let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
@@ -109,7 +109,7 @@ fn main() -> ! {
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
     let pins = (sclk, miso, mosi);
-    let handlers = (imu::get_accel_gyro_handler(), event_nop_handler as fn(_: Temperature<i32>));
+    let handlers = (imu::get_accel_gyro_handler(), event_nop_handler as fn(_: Temperature<i16>));
     spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay).ok();
 
     let imu = imu::init();
@@ -147,7 +147,6 @@ fn main() -> ! {
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
-        // imu::trigger_handle();
 
         if !device.poll(&mut [&mut serial]) {
             continue;

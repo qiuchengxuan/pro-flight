@@ -19,27 +19,18 @@ static mut G_OSD: MaybeUninit<Max7456AsciiHud> = MaybeUninit::uninit();
 
 static mut G_SOURCE: MaybeUninit<StubTelemetrySource> = MaybeUninit::uninit();
 
-fn clear_dma1_stream7_tx_interrupts() {
-    let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
-    dma1.hifcr
-        .write(|w| w.ctcif7().set_bit().chtif7().set_bit().cteif7().set_bit().cfeif7().set_bit())
-}
-
 #[interrupt]
-fn TIM7() {
-    cortex_m::interrupt::free(|_cs| unsafe {
-        (&mut *G_TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
-    });
-    unsafe {
-        (&mut *G_OSD.as_mut_ptr()).start_draw();
-    }
+unsafe fn TIM7() {
+    (&mut *G_TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
+    (&mut *G_OSD.as_mut_ptr()).start_draw();
 }
 
 type Spi3Pins = (PC10<Alternate<AF6>>, PC11<Alternate<AF6>>, PC12<Alternate<AF6>>);
 
 fn dma1_stream7_transfer_spi3(buffer: &[u8]) {
-    clear_dma1_stream7_tx_interrupts();
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
+    unsafe { dma1.hifcr.write(|w| w.bits(0x3D << 22)) };
+
     let stream = &dma1.st[7];
     stream.ndtr.write(|w| w.ndt().bits(buffer.len() as u16));
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
@@ -64,8 +55,6 @@ pub fn init<'a>(
     let spi3 = Spi::spi3(spi3, pins, SPI_MODE, freq, clocks);
     let mut max7456 = MAX7456::new(spi3);
     max7456_ascii_hud::init(&mut max7456, delay)?;
-
-    unsafe { &(*stm32::RCC::ptr()) }.ahb1enr.modify(|_, w| w.dma1en().enabled());
 
     unsafe { G_SOURCE = MaybeUninit::new(StubTelemetrySource::new(imu)) };
     let osd = Max7456AsciiHud::new(unsafe { &*G_SOURCE.as_ptr() }, dma1_stream7_transfer_spi3);

@@ -1,7 +1,7 @@
 use crate::datastructures::event::EventHandler;
 use crate::hal::sensors::{Acceleration, Gyro};
 
-pub type AccelGyroHandler = EventHandler<(&'static [Acceleration<f32>], &'static [Gyro<f32>])>;
+pub type AccelGyroHandler = EventHandler<(Acceleration<f32>, Gyro<f32>)>;
 
 pub struct Attitude {
     pub pitch: i8, // negative means sink
