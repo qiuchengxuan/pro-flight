@@ -16,11 +16,18 @@ impl IMU for StubIMU {
 }
 
 static mut G_IMU: MaybeUninit<StubIMU> = MaybeUninit::uninit();
+static mut G_ACCEL: Acceleration<f32> = (0.0, 0.0, 0.0);
+static mut G_GYRO: Gyro<f32> = (0.0, 0.0, 0.0);
 
 pub fn accel_gyro_handler(event: (Acceleration<f32>, Gyro<f32>)) {
     let (acceleration, gyro) = event;
-    let (a_x, a_y, a_z) = acceleration;
-    let (g_x, g_y, g_z) = gyro;
+    unsafe { G_ACCEL = acceleration };
+    unsafe { G_GYRO = gyro };
+}
+
+pub fn process_accel_gyro() {
+    let (a_x, a_y, a_z) = unsafe { G_ACCEL };
+    let (g_x, g_y, g_z) = unsafe { G_GYRO };
     let accel = Vector3::new(a_x, a_y, a_z);
     let mut gyro = Vector3::new(g_x, g_y, g_z);
     gyro = gyro * (core::f32::consts::PI / 180.0);

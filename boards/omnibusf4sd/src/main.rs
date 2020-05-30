@@ -57,7 +57,7 @@ fn main() -> ! {
     let mut peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
-    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).require_pll48clk().freeze();
+    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
     logger::init(unsafe { &mut LOG_BUFFER });
     log!("hclk: {}", clocks.hclk().0);
@@ -65,7 +65,7 @@ fn main() -> ! {
     unsafe {
         let rcc = &*stm32::RCC::ptr();
         rcc.apb2enr.write(|w| w.syscfgen().enabled());
-        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled());
+        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled());
     }
 
     let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
@@ -147,6 +147,8 @@ fn main() -> ! {
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
+
+        imu::process_accel_gyro();
 
         if !device.poll(&mut [&mut serial]) {
             continue;
