@@ -15,6 +15,7 @@ extern crate usb_device;
 #[macro_use]
 extern crate mpu6000;
 extern crate chips;
+#[macro_use]
 extern crate rs_flight;
 
 // mod software_interrupt;
@@ -40,15 +41,21 @@ use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use rs_flight::components::console;
 use rs_flight::components::imu::{self};
+use rs_flight::components::logger;
 use rs_flight::components::sysled::Sysled;
 use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::imu::IMU;
 use rs_flight::hal::sensors::Temperature;
 
+#[link_section = ".ram2bss"]
+static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
+
 #[entry]
 fn main() -> ! {
     let mut dfu = Dfu::new();
     dfu.check();
+
+    logger::init(unsafe { &mut LOG_BUFFER });
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
@@ -174,6 +181,10 @@ fn main() -> ! {
                 dfu.reboot_into();
             } else if line == *b"reboot" {
                 cortex_m::peripheral::SCB::sys_reset();
+            } else if line == *b"logread" {
+                for s in logger::reader() {
+                    console::write(&mut serial, s).ok();
+                }
             } else if line == *b"imu" {
                 let attitude = imu.get_attitude();
                 write!(

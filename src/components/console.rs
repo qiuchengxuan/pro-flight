@@ -52,6 +52,7 @@ where
                     writes!(serial, &BACKSPACE);
                 }
             }
+            AsciiChar::ESC => continue,
             _ => {
                 serial.write(b).ok();
                 vec.push(b);
