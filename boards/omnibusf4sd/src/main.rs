@@ -61,12 +61,7 @@ fn main() -> ! {
     let mut peripherals = stm32::Peripherals::take().unwrap();
 
     let rcc = peripherals.RCC.constrain();
-    let clocks = rcc
-        .cfgr
-        .use_hse(8.mhz())
-        .sysclk(64.mhz())
-        .require_pll48clk()
-        .freeze();
+    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(64.mhz()).require_pll48clk().freeze();
 
     unsafe {
         let rcc = &*stm32::RCC::ptr();
@@ -114,19 +109,9 @@ fn main() -> ! {
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
     let pins = (sclk, miso, mosi);
-    let handlers = (
-        imu::get_accel_gyro_handler(),
-        event_nop_handler as fn(_: Temperature<i32>),
-    );
-    let result = spi1_exti4_gyro::init(
-        peripherals.SPI1,
-        pins,
-        cs,
-        int,
-        clocks,
-        handlers,
-        &mut delay,
-    );
+    let handlers = (imu::get_accel_gyro_handler(), event_nop_handler as fn(_: Temperature<i32>));
+    let result =
+        spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay);
     result.ok();
 
     let imu = imu::init();

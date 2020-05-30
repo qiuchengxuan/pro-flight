@@ -22,16 +22,12 @@ use mpu6000::bus::{DelayNs, SpiBus};
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
 use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000, SPI_MODE};
 
-type Spi1Pins = (
-    PA5<Alternate<AF5>>,
-    PA6<Alternate<AF5>>,
-    PA7<Alternate<AF5>>,
-);
+type Spi1Pins = (PA5<Alternate<AF5>>, PA6<Alternate<AF5>>, PA7<Alternate<AF5>>);
 
 pub struct TickDelay(u32);
 
-impl DelayNs<u16> for TickDelay {
-    fn delay_ns(&mut self, ns: u16) {
+impl DelayNs<u8> for TickDelay {
+    fn delay_ns(&mut self, ns: u8) {
         cortex_m::asm::delay(ns as u32 * (self.0 / 1000_000) / 1000 + 1)
     }
 }
@@ -50,7 +46,6 @@ fn EXTI4() {
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
         unsafe { &mut *G_INT.as_mut_ptr() }.clear_interrupt_pending_bit()
     });
-    static mut COUNTER: usize = 0;
     let mpu6000 = unsafe { &mut *G_MPU6000.as_mut_ptr() };
 
     static mut ACCELERATION_BUFFER: [Acceleration<f32>; 1] = [Acceleration((0.0, 0.0, 0.0)); 1];
@@ -59,13 +54,6 @@ fn EXTI4() {
         ACCELERATION_BUFFER[0] = Acceleration(mpu6000.get_acceleration().ok().unwrap().into());
         GYRO_BUFFER[0] = Gyro(mpu6000.get_gyro().ok().unwrap().into());
         G_ACCEL_GYRO_HANDLER((&ACCELERATION_BUFFER, &GYRO_BUFFER));
-    }
-
-    unsafe {
-        if COUNTER % 100 == 0 {
-            G_TEMPERATURE_HANDLER(Temperature(mpu6000.get_temperature().ok().unwrap()));
-        }
-        COUNTER += 1;
     }
 }
 

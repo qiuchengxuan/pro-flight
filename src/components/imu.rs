@@ -11,11 +11,7 @@ pub struct StubIMU(pub Madgwick<f32>);
 impl IMU for StubIMU {
     fn get_attitude(&self) -> Attitude {
         let quat = self.0.quat / (core::f32::consts::PI / 180.0);
-        Attitude {
-            pitch: quat[3] as i8,
-            roll: quat[2] as i8,
-            yaw: quat[1] as u16,
-        }
+        Attitude { pitch: quat[3] as i8, roll: quat[2] as i8, yaw: quat[1] as u16 }
     }
 }
 
@@ -37,10 +33,7 @@ pub fn trigger_handle() {
     let accel = Vector3::new(a_x, a_y, a_z);
     let mut gyro = Vector3::new(g_x, g_y, g_z);
     gyro = gyro * (core::f32::consts::PI / 180.0);
-    unsafe { &mut *G_IMU.as_mut_ptr() }
-        .0
-        .update_imu(&gyro, &accel)
-        .ok();
+    unsafe { &mut *G_IMU.as_mut_ptr() }.0.update_imu(&gyro, &accel).ok();
 }
 
 pub fn get_accel_gyro_handler() -> AccelGyroHandler {

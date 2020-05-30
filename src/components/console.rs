@@ -5,11 +5,7 @@ use embedded_hal::serial::{Read, Write};
 use arrayvec::{Array, ArrayVec};
 use ascii::{AsciiChar, ToAsciiChar};
 
-const BACKSPACE: [u8; 3] = [
-    AsciiChar::BackSpace as u8,
-    ' ' as u8,
-    AsciiChar::BackSpace as u8,
-];
+const BACKSPACE: [u8; 3] = [AsciiChar::BackSpace as u8, ' ' as u8, AsciiChar::BackSpace as u8];
 
 macro_rules! writes {
     ($serial:expr, $slice:expr) => {

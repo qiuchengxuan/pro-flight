@@ -11,11 +11,7 @@ pub struct Attitude {
 
 impl Default for Attitude {
     fn default() -> Self {
-        Self {
-            pitch: 0,
-            roll: 0,
-            yaw: 0,
-        }
+        Self { pitch: 0, roll: 0, yaw: 0 }
     }
 }
 

@@ -32,11 +32,7 @@ impl<'a> TelemetrySource for StubTelemetrySource<'a> {
     fn get_telemetry(&self) -> Telemetry {
         let attitude = self.imu.get_attitude();
         Telemetry {
-            attitude: Attitude {
-                roll: attitude.roll,
-                yaw: attitude.yaw,
-                pitch: attitude.pitch,
-            },
+            attitude: Attitude { roll: attitude.roll, yaw: attitude.yaw, pitch: attitude.pitch },
             ..Default::default()
         }
     }
@@ -79,11 +75,7 @@ impl<'a> Max7456AsciiHud<'a> {
             Symbol::LineRight1 => 228,
         };
         let hud = HUD::new(telemetry, &symbol_table, 150, aspect_ratio!(16:9));
-        Self {
-            hud,
-            dma_consumer,
-            screen: [[0u8; 29]; 16],
-        }
+        Self { hud, dma_consumer, screen: [[0u8; 29]; 16] }
     }
 
     pub fn start_draw(&mut self) {
