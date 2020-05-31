@@ -3,7 +3,6 @@
 
 #[macro_use]
 extern crate cortex_m_rt;
-extern crate btoi;
 extern crate cast;
 extern crate chips;
 extern crate cortex_m;
@@ -25,7 +24,6 @@ mod usb_serial;
 use core::fmt::Write;
 
 use arrayvec::ArrayVec;
-use btoi::btoi_radix;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 
@@ -38,6 +36,7 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
+use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::imu::{self};
 use rs_flight::components::logger::{self, Logger};
@@ -73,6 +72,8 @@ fn main() -> ! {
     let gpio_a = peripherals.GPIOA.split();
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
+
+    cmdlet::init(valid_memory_address);
 
     // let pb0_1 = (
     //     gpio_b.pb0.into_alternate_af2(),
@@ -178,39 +179,14 @@ fn main() -> ! {
                     attitude.yaw
                 );
             } else if line.starts_with(b"read ") {
-                if let Some(word) = line[5..].split(|b| *b == ' ' as u8).next() {
-                    if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
-                        if valid_memory_address(address) {
-                            let value = unsafe { *(address as *const u32) };
-                            console!(&mut serial, "Result: {:x}\r\n", value);
-                        }
-                    }
-                }
+                cmdlet::read(line, &mut serial);
+            } else if line.starts_with(b"dump ") {
+                cmdlet::dump(line, &mut serial);
             } else if line.starts_with(b"readf ") {
-                if let Some(word) = line[6..].split(|b| *b == ' ' as u8).next() {
-                    if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
-                        if valid_memory_address(address) {
-                            let value = unsafe { *(address as *const f32) };
-                            console!(&mut serial, "Result: {}\r\n", value);
-                        }
-                    }
-                }
+                cmdlet::readf(line, &mut serial);
             } else if line.starts_with(b"write ") {
-                let mut iter = line[6..]
-                    .split(|b| *b == ' ' as u8)
-                    .flat_map(|w| btoi_radix::<u32>(w, 16).ok());
-                if let Some(address) = iter.next() {
-                    if let Some(value) = iter.next() {
-                        if valid_memory_address(address) {
-                            unsafe { *(address as *mut u32) = value };
-                            let mut count_down = MillisCountDown::new(&systick);
-                            count_down.start_ms(50);
-                            nb::block!(count_down.wait()).unwrap();
-                            let value = unsafe { *(address as *const u32) };
-                            console!(&mut serial, "Write result: {:x}\r\n", value);
-                        }
-                    }
-                }
+                let mut count_down = MillisCountDown::new(&systick);
+                cmdlet::write(line, &mut serial, &mut count_down);
             } else {
                 console!(&mut serial, "unknown input\r\n");
             }

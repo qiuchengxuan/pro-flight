@@ -10,6 +10,7 @@ extern crate ascii_osd_hud;
 extern crate enum_map;
 #[macro_use]
 extern crate mpu6000;
+extern crate btoi;
 extern crate nalgebra;
 extern crate nb;
 

@@ -6,6 +6,7 @@ use stm32f4xx_hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
 use stm32f4xx_hal::gpio::gpioc::PC4;
 
 use stm32f4xx_hal::gpio::ExtiPin;
+
 use stm32f4xx_hal::gpio::{Alternate, AF5};
 use stm32f4xx_hal::gpio::{Input, Output, PullUp, PushPull};
 use stm32f4xx_hal::interrupt;
@@ -43,7 +44,8 @@ type SpiError = mpu6000::bus::SpiError<Error, Error, Infallible>;
 static mut G_CS: MaybeUninit<PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut G_INT: MaybeUninit<PC4<Input<PullUp>>> = MaybeUninit::uninit();
 static mut G_CALIBRATION: MaybeUninit<Measurement<GyroSensitive>> = MaybeUninit::uninit();
-static mut G_DMA_BUFFER: [i16; 7] = [0i16; 7];
+#[export_name = "G_DMA_BUFFER"]
+static mut G_DMA_BUFFER: [u8; 16] = [0u8; 16];
 
 static mut G_ACCEL_GYRO_HANDLER: AccelGyroHandler = event_nop_handler;
 static mut G_TEMPERATURE_HANDLER: EventHandler<sensors::Temperature<i16>> = event_nop_handler;
@@ -54,38 +56,30 @@ unsafe fn EXTI4() {
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
     cortex_m::peripheral::NVIC::mask(stm32::Interrupt::EXTI4);
 
+    { &mut *G_CS.as_mut_ptr() }.set_low().ok();
+
     let spi1 = &(*stm32::SPI1::ptr());
     spi1.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
     let data_register = &spi1.dr as *const _ as u32;
-    { &mut *G_CS.as_mut_ptr() }.set_low().ok();
     let dma2 = &*(stm32::DMA2::ptr());
 
     // dma2 channel 3 stream 0 rx
     let stream = &dma2.st[0];
-    stream.ndtr.write(|w| w.ndt().bits(7));
+    stream.ndtr.write(|w| w.ndt().bits(G_DMA_BUFFER.len() as u16));
     stream.par.write(|w| w.pa().bits(data_register));
     let m0ar = &stream.m0ar;
     m0ar.write(|w| w.m0a().bits(G_DMA_BUFFER.as_ptr() as u32));
     stream.cr.write(|w| {
-        w.chsel()
-            .bits(3)
-            .minc()
-            .incremented()
-            .msize()
-            .bits16()
-            .dir()
-            .peripheral_to_memory()
-            .en()
-            .enabled()
+        w.chsel().bits(3).minc().incremented().dir().peripheral_to_memory().en().enabled()
     });
 
+    static READ_REG: [u8; 1] = [Register::AccelerometerXHigh as u8 | 0x80];
+
     // dma2 channel 3 stream 3 tx
-    dma2.lifcr.write(|w| w.bits(0x3D << 22));
-    static REG: [u8; 1] = [Register::AccelerometerXHigh as u8 | 0x80; 1];
     let stream = &dma2.st[3];
-    stream.ndtr.write(|w| w.ndt().bits(14));
+    stream.ndtr.write(|w| w.ndt().bits(G_DMA_BUFFER.len() as u16));
     stream.par.write(|w| w.pa().bits(data_register));
-    stream.m0ar.write(|w| w.m0a().bits(REG.as_ptr() as u32));
+    stream.m0ar.write(|w| w.m0a().bits(READ_REG.as_ptr() as u32));
     let cr = &stream.cr;
     cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().tcie().enabled().en().enabled());
 }
@@ -99,9 +93,9 @@ unsafe fn DMA2_STREAM3() {
     dma2.lifcr.write(|w| w.bits(0x3D << 22 | 0x3D));
 
     let buf = &G_DMA_BUFFER;
-    let acceleration = Measurement::new(buf[0], buf[1], buf[2], ACCELEROMETER_SENSITIVE);
-    let temperature = Temperature(buf[3]);
-    let mut gyro = Measurement::new(buf[4], buf[5], buf[6], GYRO_SENSITIVE);
+    let acceleration = Measurement::new(&buf[2..], ACCELEROMETER_SENSITIVE);
+    let temperature = Temperature::new(buf[8], buf[9]);
+    let mut gyro = Measurement::new(&buf[10..], GYRO_SENSITIVE);
     gyro.calibrated(&*G_CALIBRATION.as_ptr());
     G_ACCEL_GYRO_HANDLER((acceleration.into(), gyro.into()));
     G_TEMPERATURE_HANDLER(temperature.centi_celcius());
@@ -142,10 +136,10 @@ pub fn init(
     let spi1 = unsafe { &(*stm32::SPI1::ptr()) };
     spi1.cr1.modify(|_, w| w.br().bits(br));
 
-    let mut calibration = mpu6000.get_gyro().ok().unwrap();
+    let mut calibration = mpu6000.read_gyro().ok().unwrap();
     for _ in 0..200 {
         delay.delay_ms(1u8);
-        let gyro = mpu6000.get_gyro().ok().unwrap();
+        let gyro = mpu6000.read_gyro().ok().unwrap();
         calibration = Measurement::average(&calibration, &gyro);
     }
 
