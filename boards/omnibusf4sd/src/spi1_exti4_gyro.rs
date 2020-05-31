@@ -1,5 +1,4 @@
 use core::convert::Infallible;
-use core::fmt::Write;
 use core::mem::MaybeUninit;
 
 use stm32f4xx_hal::delay::Delay;
@@ -14,11 +13,8 @@ use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use rs_flight::components::logger::Logger;
-use rs_flight::components::mpu6000::{
-    init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE,
-};
 use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
+use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
 use rs_flight::hal::imu::AccelGyroHandler;
 use rs_flight::hal::sensors;
 

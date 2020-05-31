@@ -13,7 +13,9 @@ extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 
+#[macro_use]
 pub mod components;
+
 pub mod datastructures;
 pub mod drivers;
 pub mod hal;
