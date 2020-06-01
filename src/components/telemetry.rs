@@ -40,21 +40,9 @@ impl TelemetrySource for TelemetryUnit {
 }
 
 static mut G_TELEMETRY_UNIT: MaybeUninit<TelemetryUnit> = MaybeUninit::uninit();
-static mut G_ACCEL_GYRO: (Acceleration, Gyro) =
-    (Acceleration { x: 0, y: 0, z: 0, sensitive: 0.0 }, Gyro { x: 0, y: 0, z: 0, sensitive: 0.0 });
-static mut G_DATA_VALID: bool = false;
 
 pub fn accel_gyro_handler(event: (Acceleration, Gyro)) {
-    unsafe { G_ACCEL_GYRO = event };
-    unsafe { G_DATA_VALID = true };
-}
-
-pub fn process_accel_gyro() {
-    if !unsafe { G_DATA_VALID } {
-        return;
-    }
-    unsafe { G_DATA_VALID = false };
-    unsafe { &mut *G_TELEMETRY_UNIT.as_mut_ptr() }.on_accel_gyro_event(unsafe { G_ACCEL_GYRO });
+    unsafe { &mut *G_TELEMETRY_UNIT.as_mut_ptr() }.on_accel_gyro_event(event);
 }
 
 pub fn init(gyro_accel_rate: u16, refresh_rate: u16) -> &'static TelemetryUnit {

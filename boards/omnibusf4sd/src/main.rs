@@ -47,6 +47,7 @@ use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::sensors::Temperature;
 use rs_flight::hal::AccelGyroHandler;
 
+const GYRO_SAMPLE_RATE: u16 = 100;
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
 
 #[entry]
@@ -116,9 +117,19 @@ fn main() -> ! {
         telemetry::accel_gyro_handler as AccelGyroHandler,
         event_nop_handler as fn(_: Temperature<i16>),
     );
-    spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay).ok();
+    spi1_exti4_gyro::init(
+        peripherals.SPI1,
+        pins,
+        cs,
+        int,
+        clocks,
+        handlers,
+        &mut delay,
+        GYRO_SAMPLE_RATE,
+    )
+    .ok();
 
-    let telemetry = telemetry::init(1000, 50);
+    let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 50);
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
@@ -153,9 +164,6 @@ fn main() -> ! {
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
-
-        telemetry::process_accel_gyro();
-
         if !device.poll(&mut [&mut serial]) {
             continue;
         }

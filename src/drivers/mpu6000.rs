@@ -26,6 +26,7 @@ pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dp
 
 pub fn init<E, B: Bus<Error = E>, D: DelayUs<u8> + DelayMs<u8>>(
     mpu6000: &mut MPU6000<B>,
+    sample_rate: u16,
     delay: &mut D,
 ) -> Result<bool, E> {
     mpu6000.reset(delay)?;
@@ -44,6 +45,8 @@ pub fn init<E, B: Bus<Error = E>, D: DelayUs<u8> + DelayMs<u8>>(
     mpu6000.set_gyro_sensitive(GYRO_SENSITIVE)?;
     delay.delay_us(15u8);
     mpu6000.set_dlpf(1)?;
+    delay.delay_us(15u8);
+    mpu6000.set_sample_rate(sample_rate)?;
     delay.delay_us(15u8);
     mpu6000.set_int_pin_config(IntPinConfig::IntReadClear, true)?;
     delay.delay_us(15u8);

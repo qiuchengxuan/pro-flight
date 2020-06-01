@@ -111,12 +111,13 @@ pub fn init(
     clocks: Clocks,
     event_handlers: (AccelGyroHandler, EventHandler<sensors::Temperature<i16>>),
     delay: &mut Delay,
+    sample_rate: u16,
 ) -> Result<(), SpiError> {
     let freq: stm32f4xx_hal::time::Hertz = 1.mhz().into();
     let spi1 = Spi::spi1(spi1, pins, SPI_MODE, freq, clocks);
     let bus = SpiBus::new(spi1, &mut cs, TickDelay(clocks.sysclk().0));
     let mut mpu6000 = MPU6000::new(bus);
-    if !mpu6000_init(&mut mpu6000, delay)? {
+    if !mpu6000_init(&mut mpu6000, sample_rate, delay)? {
         return Ok(());
     }
 
@@ -136,7 +137,7 @@ pub fn init(
     spi1.cr1.modify(|_, w| w.br().bits(br));
 
     let mut calibration = mpu6000.read_gyro().ok().unwrap();
-    for _ in 0..200 {
+    for _ in 0..1000 {
         delay.delay_ms(1u8);
         let gyro = mpu6000.read_gyro().ok().unwrap();
         calibration = Measurement::average(&calibration, &gyro);
