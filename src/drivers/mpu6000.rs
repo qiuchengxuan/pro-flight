@@ -43,6 +43,8 @@ pub fn init<E, B: Bus<Error = E>, D: DelayUs<u8> + DelayMs<u8>>(
     delay.delay_us(15u8);
     mpu6000.set_gyro_sensitive(GYRO_SENSITIVE)?;
     delay.delay_us(15u8);
+    mpu6000.set_dlpf(1)?;
+    delay.delay_us(15u8);
     mpu6000.set_int_pin_config(IntPinConfig::IntReadClear, true)?;
     delay.delay_us(15u8);
     mpu6000.set_interrupt_enable(Interrupt::DataReady, true)?;

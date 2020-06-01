@@ -118,7 +118,7 @@ fn main() -> ! {
     );
     spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay).ok();
 
-    let telemetry = telemetry::init();
+    let telemetry = telemetry::init(1000, 50);
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
@@ -176,7 +176,7 @@ fn main() -> ! {
                 }
             } else if line == *b"telemetry" {
                 let telemetry = telemetry.get_telemetry();
-                console!(&mut serial, "{:?}", telemetry);
+                console!(&mut serial, "{:?}\r\n", telemetry);
             } else if line.starts_with(b"read ") {
                 cmdlet::read(line, &mut serial);
             } else if line.starts_with(b"dump ") {

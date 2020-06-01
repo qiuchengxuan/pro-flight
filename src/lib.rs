@@ -6,11 +6,12 @@ extern crate arrayvec;
 extern crate ascii;
 #[macro_use]
 extern crate ascii_osd_hud;
+extern crate btoi;
 #[macro_use]
 extern crate enum_map;
+extern crate integer_sqrt;
 #[macro_use]
 extern crate mpu6000;
-extern crate btoi;
 extern crate nalgebra;
 extern crate nb;
 
