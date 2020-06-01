@@ -16,8 +16,7 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
 use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
-use rs_flight::hal::imu::AccelGyroHandler;
-use rs_flight::hal::sensors;
+use rs_flight::hal::{sensors, AccelGyroHandler};
 
 use mpu6000::bus::{DelayNs, SpiBus};
 use mpu6000::measurement::{Measurement, Temperature};

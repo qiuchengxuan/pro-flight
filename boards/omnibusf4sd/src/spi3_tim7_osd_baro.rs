@@ -1,5 +1,7 @@
 use core::mem::MaybeUninit;
 
+use ascii_osd_hud::telemetry::TelemetrySource;
+use max7456::{MAX7456, SPI_MODE};
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioc::{PC10, PC11, PC12};
 use stm32f4xx_hal::gpio::{Alternate, AF6};
@@ -9,15 +11,10 @@ use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use max7456::{MAX7456, SPI_MODE};
-
-use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud, StubTelemetrySource};
-use rs_flight::hal::imu::IMU;
+use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud};
 
 static mut G_TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
 static mut G_OSD: MaybeUninit<Max7456AsciiHud> = MaybeUninit::uninit();
-
-static mut G_SOURCE: MaybeUninit<StubTelemetrySource> = MaybeUninit::uninit();
 
 #[interrupt]
 unsafe fn TIM7() {
@@ -48,7 +45,7 @@ pub fn init<'a>(
     tim7: stm32::TIM7,
     pins: Spi3Pins,
     clocks: Clocks,
-    imu: &'static dyn IMU,
+    telemetry_source: &'static dyn TelemetrySource,
     delay: &mut Delay,
 ) -> Result<(), Error> {
     let freq: stm32f4xx_hal::time::Hertz = 10.mhz().into();
@@ -56,8 +53,7 @@ pub fn init<'a>(
     let mut max7456 = MAX7456::new(spi3);
     max7456_ascii_hud::init(&mut max7456, delay)?;
 
-    unsafe { G_SOURCE = MaybeUninit::new(StubTelemetrySource::new(imu)) };
-    let osd = Max7456AsciiHud::new(unsafe { &*G_SOURCE.as_ptr() }, dma1_stream7_transfer_spi3);
+    let osd = Max7456AsciiHud::new(telemetry_source, dma1_stream7_transfer_spi3);
     unsafe { G_OSD = MaybeUninit::new(osd) };
 
     let mut timer = Timer::tim7(tim7, 50.hz(), clocks);

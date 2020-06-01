@@ -1,6 +1,6 @@
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
-use ascii_osd_hud::telemetry::{Attitude, Telemetry, TelemetrySource};
+use ascii_osd_hud::telemetry::TelemetrySource;
 use ascii_osd_hud::AspectRatio;
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transfer, Write};
@@ -8,34 +8,12 @@ use max7456::not_null_writer::NotNullWriter;
 use max7456::registers::{Standard, SyncMode};
 use max7456::MAX7456;
 
-use crate::hal::imu::IMU;
-
 type DmaConsumer = fn(&[u8]);
 
 pub struct Max7456AsciiHud<'a> {
     hud: HUD<'a>,
     dma_consumer: DmaConsumer,
     screen: [[u8; 29]; 16],
-}
-
-pub struct StubTelemetrySource<'a> {
-    imu: &'a dyn IMU,
-}
-
-impl<'a> StubTelemetrySource<'a> {
-    pub fn new(imu: &'a dyn IMU) -> Self {
-        Self { imu }
-    }
-}
-
-impl<'a> TelemetrySource for StubTelemetrySource<'a> {
-    fn get_telemetry(&self) -> Telemetry {
-        let attitude = self.imu.get_attitude();
-        Telemetry {
-            attitude: Attitude { roll: attitude.roll, yaw: attitude.yaw, pitch: attitude.pitch },
-            ..Default::default()
-        }
-    }
 }
 
 pub fn init<BUS, E>(max7456: &mut MAX7456<BUS>, delay: &mut dyn DelayMs<u8>) -> Result<(), E>

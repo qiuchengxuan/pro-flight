@@ -3,6 +3,7 @@
 
 #[macro_use]
 extern crate cortex_m_rt;
+extern crate ascii_osd_hud;
 extern crate cast;
 extern crate chips;
 extern crate cortex_m;
@@ -34,16 +35,17 @@ use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
+use ascii_osd_hud::telemetry::TelemetrySource;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
-use rs_flight::components::imu::{self};
 use rs_flight::components::logger::{self, Logger};
 use rs_flight::components::sysled::Sysled;
+use rs_flight::components::telemetry;
 use rs_flight::datastructures::event::event_nop_handler;
-use rs_flight::hal::imu::IMU;
 use rs_flight::hal::sensors::Temperature;
+use rs_flight::hal::AccelGyroHandler;
 
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
 
@@ -110,10 +112,13 @@ fn main() -> ! {
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
     let pins = (sclk, miso, mosi);
-    let handlers = (imu::get_accel_gyro_handler(), event_nop_handler as fn(_: Temperature<i16>));
+    let handlers = (
+        telemetry::accel_gyro_handler as AccelGyroHandler,
+        event_nop_handler as fn(_: Temperature<i16>),
+    );
     spi1_exti4_gyro::init(peripherals.SPI1, pins, cs, int, clocks, handlers, &mut delay).ok();
 
-    let imu = imu::init();
+    let telemetry = telemetry::init();
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
@@ -124,7 +129,7 @@ fn main() -> ! {
         peripherals.TIM7,
         (sclk, miso, mosi),
         clocks,
-        imu,
+        telemetry,
         &mut delay,
     )
     .ok();
@@ -149,7 +154,7 @@ fn main() -> ! {
     loop {
         sysled.check_toggle().unwrap();
 
-        imu::process_accel_gyro();
+        telemetry::process_accel_gyro();
 
         if !device.poll(&mut [&mut serial]) {
             continue;
@@ -169,15 +174,9 @@ fn main() -> ! {
                 for s in logger::reader() {
                     console::write(&mut serial, s).ok();
                 }
-            } else if line == *b"imu" {
-                let attitude = imu.get_attitude();
-                console!(
-                    &mut serial,
-                    "Pitch: {}, Roll: {}, Yaw: {}\r\n",
-                    attitude.pitch,
-                    attitude.roll,
-                    attitude.yaw
-                );
+            } else if line == *b"telemetry" {
+                let telemetry = telemetry.get_telemetry();
+                console!(&mut serial, "{:?}", telemetry);
             } else if line.starts_with(b"read ") {
                 cmdlet::read(line, &mut serial);
             } else if line.starts_with(b"dump ") {

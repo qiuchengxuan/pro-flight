@@ -25,6 +25,7 @@ arrayvec = { version = "0.5", default-features = false, features = ["array-sizes
 chips = { path = "../../chips" }
 rs-flight = { path = "../../" }
 
+ascii-osd-hud = { path = "../../../ascii-osd-hud" }
 mpu6000 = { path = "../../../mpu6000" }
 max7456 = { path = "../../../max7456" }
 sbus = "0.2.2"

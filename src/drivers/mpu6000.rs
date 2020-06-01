@@ -1,9 +1,22 @@
 use core::fmt::Write;
 
+use crate::hal::sensors::Measurement;
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 use mpu6000::bus::Bus;
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
 use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
+
+impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
+    fn into(self) -> Measurement {
+        Measurement { x: self.x, y: self.y, z: self.z, sensitive: self.sensitive.into() }
+    }
+}
+
+impl Into<Measurement> for mpu6000::measurement::Measurement<GyroSensitive> {
+    fn into(self) -> Measurement {
+        Measurement { x: self.x, y: self.y, z: self.z, sensitive: self.sensitive.into() }
+    }
+}
 
 use crate::components::logger::Logger;
 
