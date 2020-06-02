@@ -37,24 +37,24 @@ impl fmt::Write for Logger {
         if buffer.len() <= bytes.len() {
             return Ok(());
         }
-        let mut index = self.allocate(bytes.len() + 2) % buffer.len();
+        let index = self.allocate(bytes.len() + 2) % buffer.len();
         if index + bytes.len() < buffer.len() {
             buffer[index..index + bytes.len()].copy_from_slice(bytes);
-            index = index + bytes.len();
         } else {
             let size = buffer.len() - index;
             buffer[index..index + size].copy_from_slice(&bytes[..size]);
             buffer[..bytes.len() - size].copy_from_slice(&bytes[size..]);
-            index = bytes.len() - size;
         }
-        buffer[index..index + 2].copy_from_slice(b"\r\n");
         Ok(())
     }
 }
 
 #[macro_export]
 macro_rules! log {
-    ($($arg:tt)*) => (write!(&mut Logger{}, $($arg)*).ok())
+    ($($arg:tt)*) => {
+        write!(&mut Logger{}, $($arg)*).ok();
+        write!(&mut Logger{}, "\r\n").ok()
+    };
 }
 
 pub fn init(buffer: &'static mut [u8]) {

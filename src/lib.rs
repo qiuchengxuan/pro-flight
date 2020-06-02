@@ -10,6 +10,7 @@ extern crate btoi;
 #[macro_use]
 extern crate enum_map;
 extern crate integer_sqrt;
+extern crate micromath;
 #[macro_use]
 extern crate mpu6000;
 extern crate nalgebra;

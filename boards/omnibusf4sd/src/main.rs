@@ -35,7 +35,6 @@ use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use ascii_osd_hud::telemetry::TelemetrySource;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use rs_flight::components::cmdlet;
@@ -47,7 +46,7 @@ use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::sensors::Temperature;
 use rs_flight::hal::AccelGyroHandler;
 
-const GYRO_SAMPLE_RATE: u16 = 100;
+const GYRO_SAMPLE_RATE: usize = 1000;
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
 
 #[entry]
@@ -125,11 +124,11 @@ fn main() -> ! {
         clocks,
         handlers,
         &mut delay,
-        GYRO_SAMPLE_RATE,
+        GYRO_SAMPLE_RATE as u16,
     )
     .ok();
 
-    let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 50);
+    let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 256);
 
     let _cs = gpio_a.pa15.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
@@ -183,8 +182,7 @@ fn main() -> ! {
                     console::write(&mut serial, s).ok();
                 }
             } else if line == *b"telemetry" {
-                let telemetry = telemetry.get_telemetry();
-                console!(&mut serial, "{:?}\r\n", telemetry);
+                console!(&mut serial, "{}\n", telemetry);
             } else if line.starts_with(b"read ") {
                 cmdlet::read(line, &mut serial);
             } else if line.starts_with(b"dump ") {

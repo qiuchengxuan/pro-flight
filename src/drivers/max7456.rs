@@ -21,7 +21,7 @@ pub fn dma_draw(&mut self) {
     // ascii-hud will generator about 120 chars, for each char
     // max7456 will generate 4 byte to write, so at lease 480 bytes
     // memory space is required
-    static mut S_DMA_BUFFER: [u8; 500] = [0u8; 500];
+    static mut S_DMA_BUFFER: [u8; 800] = [0u8; 800];
     let mut dma_buffer = unsafe { S_DMA_BUFFER };
     self.hud.draw(&mut self.screen);
     let mut writer = NotNullWriter::new(&self.screen, Default::default());

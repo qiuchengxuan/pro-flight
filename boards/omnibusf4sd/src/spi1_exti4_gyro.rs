@@ -20,7 +20,7 @@ use rs_flight::hal::{sensors, AccelGyroHandler};
 
 use mpu6000::bus::{DelayNs, SpiBus};
 use mpu6000::measurement::{Measurement, Temperature};
-use mpu6000::registers::{GyroSensitive, Register};
+use mpu6000::registers::Register;
 use mpu6000::{self, MPU6000, SPI_MODE};
 
 type Spi1Pins = (PA5<Alternate<AF5>>, PA6<Alternate<AF5>>, PA7<Alternate<AF5>>);
@@ -42,7 +42,6 @@ impl DelayNs<u16> for TickDelay {
 type SpiError = mpu6000::bus::SpiError<Error, Error, Infallible>;
 static mut G_CS: MaybeUninit<PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut G_INT: MaybeUninit<PC4<Input<PullUp>>> = MaybeUninit::uninit();
-static mut G_CALIBRATION: MaybeUninit<Measurement<GyroSensitive>> = MaybeUninit::uninit();
 #[export_name = "G_DMA_BUFFER"]
 static mut G_DMA_BUFFER: [u8; 16] = [0u8; 16];
 
@@ -94,8 +93,7 @@ unsafe fn DMA2_STREAM3() {
     let buf = &G_DMA_BUFFER;
     let acceleration = Measurement::new(&buf[2..], ACCELEROMETER_SENSITIVE);
     let temperature = Temperature::new(buf[8], buf[9]);
-    let mut gyro = Measurement::new(&buf[10..], GYRO_SENSITIVE);
-    gyro.calibrated(&*G_CALIBRATION.as_ptr());
+    let gyro = Measurement::new(&buf[10..], GYRO_SENSITIVE);
     G_ACCEL_GYRO_HANDLER((acceleration.into(), gyro.into()));
     G_TEMPERATURE_HANDLER(temperature.centi_celcius());
 
@@ -115,6 +113,8 @@ pub fn init(
 ) -> Result<(), SpiError> {
     let freq: stm32f4xx_hal::time::Hertz = 1.mhz().into();
     let spi1 = Spi::spi1(spi1, pins, SPI_MODE, freq, clocks);
+    let cr2 = &unsafe { &(*stm32::SPI1::ptr()) }.cr2;
+    cr2.modify(|_, w| w.txdmaen().disabled().rxdmaen().disabled());
     let bus = SpiBus::new(spi1, &mut cs, TickDelay(clocks.sysclk().0));
     let mut mpu6000 = MPU6000::new(bus);
     if !mpu6000_init(&mut mpu6000, sample_rate, delay)? {
@@ -136,20 +136,12 @@ pub fn init(
     let spi1 = unsafe { &(*stm32::SPI1::ptr()) };
     spi1.cr1.modify(|_, w| w.br().bits(br));
 
-    let mut calibration = mpu6000.read_gyro().ok().unwrap();
-    for _ in 0..1000 {
-        delay.delay_ms(1u8);
-        let gyro = mpu6000.read_gyro().ok().unwrap();
-        calibration = Measurement::average(&calibration, &gyro);
-    }
-
     let (accel_gyro_handler, temperature_handler) = event_handlers;
     unsafe {
         G_CS = MaybeUninit::new(cs);
         G_INT = MaybeUninit::new(int);
         G_ACCEL_GYRO_HANDLER = accel_gyro_handler;
         G_TEMPERATURE_HANDLER = temperature_handler;
-        G_CALIBRATION = MaybeUninit::new(calibration);
     }
 
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM3);

@@ -52,7 +52,7 @@ impl<'a> Max7456AsciiHud<'a> {
             Symbol::LineRight => 227,
             Symbol::LineRight1 => 228,
         };
-        let hud = HUD::new(telemetry, &symbol_table, 150, aspect_ratio!(16:9));
+        let hud = HUD::new(telemetry, &symbol_table, 150, aspect_ratio!(5:4));
         Self { hud, dma_consumer, screen: [[0u8; 29]; 16] }
     }
 
