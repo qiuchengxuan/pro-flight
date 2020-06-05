@@ -28,6 +28,7 @@ rs-flight = { path = "../../" }
 ascii-osd-hud = { path = "../../../ascii-osd-hud" }
 mpu6000 = "0.1.5"
 max7456 = { path = "../../../max7456" }
+bmp280 = { path = "../../../bmp280" }
 sbus = "0.2.2"
 embedded-sdmmc = "0.3.0"
 

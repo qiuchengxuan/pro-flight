@@ -1,5 +1,7 @@
 use nalgebra::Vector3;
 
+use crate::datastructures::measurement::Altitude;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Measurement {
     pub x: i16,
@@ -76,5 +78,13 @@ impl Default for Measurement {
 
 pub type Acceleration = Measurement;
 pub type Gyro = Measurement;
-
 pub type Temperature<T> = T;
+
+#[derive(Copy, Clone)]
+pub struct Pressure(pub u32); // unit of Pa
+
+impl Pressure {
+    pub fn to_sea_level_altitude(self) -> Altitude {
+        Altitude((1013 - (self.0 / 100) as i32) * 82)
+    }
+}

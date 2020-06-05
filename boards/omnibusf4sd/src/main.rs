@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate cortex_m_rt;
 extern crate ascii_osd_hud;
+extern crate bmp280;
 extern crate cast;
 extern crate chips;
 extern crate cortex_m;
@@ -143,7 +144,8 @@ fn main() -> ! {
 
     let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 256);
 
-    let _cs = gpio_a.pa15.into_push_pull_output();
+    let cs_osd = gpio_a.pa15.into_push_pull_output();
+    let cs_baro = gpio_b.pb3.into_push_pull_output();
     let sclk = gpio_c.pc10.into_alternate_af6();
     let miso = gpio_c.pc11.into_alternate_af6();
     let mosi = gpio_c.pc12.into_alternate_af6();
@@ -151,8 +153,11 @@ fn main() -> ! {
         peripherals.SPI3,
         peripherals.TIM7,
         (sclk, miso, mosi),
+        cs_osd,
+        cs_baro,
         clocks,
         telemetry,
+        telemetry::barometer_handler,
         &mut delay,
     )
     .ok();

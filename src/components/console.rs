@@ -51,10 +51,10 @@ where
                 }
             }
             AsciiChar::ESC => continue,
-            _ => {
-                serial.write(b).ok();
-                vec.push(b);
-            }
+            _ => match vec.try_push(b) {
+                Ok(()) => serial.write(b).ok().unwrap(),
+                _ => (),
+            },
         }
     }
 }

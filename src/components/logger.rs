@@ -37,7 +37,7 @@ impl fmt::Write for Logger {
         if buffer.len() <= bytes.len() {
             return Ok(());
         }
-        let index = self.allocate(bytes.len() + 2) % buffer.len();
+        let index = self.allocate(bytes.len()) % buffer.len();
         if index + bytes.len() < buffer.len() {
             buffer[index..index + bytes.len()].copy_from_slice(bytes);
         } else {

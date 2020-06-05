@@ -6,16 +6,29 @@ use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
 use crate::datastructures::measurement::{quaternion_to_euler, DEGREE_PER_DAG};
-use crate::hal::sensors::{Acceleration, Gyro};
+use crate::hal::sensors::{Acceleration, Gyro, Pressure};
 
+pub struct IMU(Madgwick<f32>);
+
+impl Default for IMU {
+    fn default() -> Self {
+        Self(Madgwick::new(0.001, 0.1))
+    }
+}
+
+#[derive(Default)]
 pub struct TelemetryUnit {
-    imu: Madgwick<f32>,
+    imu: IMU,
     calibration_loop: u16,
 
     counter: usize,
     measurements: (Acceleration, Gyro),
     calibration: (Acceleration, Gyro),
     calibrated: bool,
+    altitude: i16,
+    prev_altitude: i16,
+    initial_altitude: i16,
+    vertical_speed: i16,
 }
 
 impl TelemetryUnit {
@@ -33,7 +46,17 @@ impl TelemetryUnit {
             (acceleration.calibrated(&self.calibration.0), gyro.calibrated(&self.calibration.1));
         let mut gyro: Vector3<f32> = self.measurements.1.into();
         gyro = gyro / DEGREE_PER_DAG;
-        self.imu.update_imu(&gyro, &(acceleration.into())).ok();
+        self.imu.0.update_imu(&gyro, &(acceleration.into())).ok();
+    }
+
+    fn on_barometer_event(&mut self, event: Pressure) {
+        self.prev_altitude = self.altitude;
+        if self.initial_altitude == 0 {
+            self.initial_altitude = self.altitude;
+        }
+        self.altitude = event.to_sea_level_altitude().as_feet() as i16;
+        self.vertical_speed =
+            (self.vertical_speed + (self.altitude - self.prev_altitude) * 20 * 60) / 2;
     }
 
     pub fn g_force(&self) -> u8 {
@@ -50,11 +73,13 @@ impl core::fmt::Display for TelemetryUnit {
         write!(
             f,
             "{{\"acceleration\":{},\"gyro\":{},\"euler\":{},\"g-force\":{},\
+               \"altitude\":{},\
                \"calibration\":{{\"acceleration\":{},\"gyro\":{}}}}}",
             self.measurements.0,
             self.measurements.1,
-            quaternion_to_euler(self.imu.quat),
+            quaternion_to_euler(self.imu.0.quat),
             self.g_force(),
+            self.altitude,
             self.calibration.0,
             self.calibration.1,
         )
@@ -63,7 +88,7 @@ impl core::fmt::Display for TelemetryUnit {
 
 impl hud::TelemetrySource for TelemetryUnit {
     fn get_telemetry(&self) -> hud::Telemetry {
-        let euler = quaternion_to_euler(self.imu.quat);
+        let euler = quaternion_to_euler(self.imu.0.quat);
         let roll = -euler.theta as i16;
         let mut pitch = -euler.phi as i8;
         if pitch > 90 {
@@ -73,7 +98,15 @@ impl hud::TelemetrySource for TelemetryUnit {
         };
         let attitude = hud::Attitude { roll, pitch };
         let heading = ((-euler.psi as isize + 360) % 360) as u16;
-        hud::Telemetry { attitude, heading, g_force: self.g_force(), ..Default::default() }
+        hud::Telemetry {
+            altitude: self.altitude,
+            attitude,
+            heading,
+            g_force: self.g_force(),
+            height: self.altitude - self.initial_altitude,
+            vertical_speed: self.vertical_speed,
+            ..Default::default()
+        }
     }
 }
 
@@ -83,17 +116,15 @@ pub fn accel_gyro_handler(event: (Acceleration, Gyro)) {
     unsafe { &mut *G_TELEMETRY_UNIT.as_mut_ptr() }.on_accel_gyro_event(event);
 }
 
+pub fn barometer_handler(event: Pressure) {
+    unsafe { &mut *G_TELEMETRY_UNIT.as_mut_ptr() }.on_barometer_event(event);
+}
+
 pub fn init(gyro_accel_sample_rate: usize, calibration_loop: u16) -> &'static TelemetryUnit {
-    let imu = Madgwick::new(1.0 / gyro_accel_sample_rate as f32, 0.1);
+    let imu = IMU(Madgwick::new(1.0 / gyro_accel_sample_rate as f32, 0.1));
     unsafe {
-        G_TELEMETRY_UNIT = MaybeUninit::new(TelemetryUnit {
-            imu,
-            calibration_loop,
-            counter: 0,
-            measurements: Default::default(),
-            calibrated: false,
-            calibration: Default::default(),
-        });
+        G_TELEMETRY_UNIT =
+            MaybeUninit::new(TelemetryUnit { imu, calibration_loop, ..Default::default() });
         &*G_TELEMETRY_UNIT.as_ptr()
     }
 }

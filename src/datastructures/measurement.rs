@@ -24,3 +24,15 @@ pub fn quaternion_to_euler(q: Quaternion<f32>) -> Euler {
     let psi = (2.0 * (w * k + i * j)).atan2(1.0 - 2.0 * (j * j + k * k)) * DEGREE_PER_DAG;
     Euler { phi, theta, psi }
 }
+
+pub struct Altitude(pub i32); // in units of centimeter
+
+impl Altitude {
+    pub fn as_feet(self) -> i32 {
+        self.0 / 33
+    }
+
+    pub fn as_meter(self) -> i32 {
+        self.0 / 10
+    }
+}
