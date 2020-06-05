@@ -14,6 +14,7 @@ use stm32f4xx_hal::{prelude::*, stm32};
 use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud};
 
 static mut G_TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
+#[link_section = ".ccmram"]
 static mut G_OSD: MaybeUninit<Max7456AsciiHud> = MaybeUninit::uninit();
 
 #[interrupt]

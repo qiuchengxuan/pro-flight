@@ -17,12 +17,12 @@ extern crate usb_device;
 #[macro_use]
 extern crate rs_flight;
 
-// mod software_interrupt;
 mod spi1_exti4_gyro;
 mod spi3_tim7_osd_baro;
 mod usb_serial;
 
 use core::fmt::Write;
+use core::mem::MaybeUninit;
 
 use arrayvec::ArrayVec;
 use cortex_m_rt::ExceptionFrame;
@@ -47,12 +47,19 @@ use rs_flight::hal::sensors::Temperature;
 use rs_flight::hal::AccelGyroHandler;
 
 const GYRO_SAMPLE_RATE: usize = 1000;
+#[link_section = ".uninit.STACKS"]
+static mut PANIC: bool = false;
+#[link_section = ".uninit.STACKS"]
+#[link_section = ".ccmram"]
+static mut PANIC_FRAME: MaybeUninit<ExceptionFrame> = MaybeUninit::uninit();
+#[link_section = ".ccmram"]
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
+#[link_section = ".uninit.STACKS"]
+static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
 
 #[entry]
 fn main() -> ! {
-    let mut dfu = Dfu::new();
-    dfu.check();
+    unsafe { &mut *DFU.as_mut_ptr() }.check();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
@@ -60,8 +67,14 @@ fn main() -> ! {
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
+    unsafe { LOG_BUFFER = core::mem::zeroed() };
     logger::init(unsafe { &mut LOG_BUFFER });
-    log!("hclk: {}", clocks.hclk().0);
+    if unsafe { PANIC } {
+        unsafe { PANIC = false };
+        log!("Last panic at pc {:x}", unsafe { &*PANIC_FRAME.as_ptr() }.pc);
+    }
+    log!("hclk: {}mhz", clocks.hclk().0 / 1000_000);
+    log!("stack top: {:x}", cortex_m::register::msp::read());
 
     unsafe {
         let rcc = &*stm32::RCC::ptr();
@@ -174,7 +187,7 @@ fn main() -> ! {
         let line = option.unwrap();
         if line.len() > 0 {
             if line == *b"dfu" {
-                dfu.reboot_into();
+                unsafe { &mut *DFU.as_mut_ptr() }.reboot_into();
             } else if line == *b"reboot" {
                 cortex_m::peripheral::SCB::sys_reset();
             } else if line == *b"logread" {
@@ -193,7 +206,7 @@ fn main() -> ! {
                 let mut count_down = MillisCountDown::new(&systick);
                 cmdlet::write(line, &mut serial, &mut count_down);
             } else {
-                console!(&mut serial, "unknown input\r\n");
+                console!(&mut serial, "unknown input\n");
             }
         }
         console!(&mut serial, "# ");
@@ -202,11 +215,14 @@ fn main() -> ! {
 }
 
 #[exception]
-fn HardFault(ef: &ExceptionFrame) -> ! {
-    panic!("HardFault at {:#?}", ef);
+unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
+    PANIC = true;
+    PANIC_FRAME = MaybeUninit::new(*ef);
+    (&mut *DFU.as_mut_ptr()).reboot_into();
+    loop {}
 }
 
 #[exception]
-fn DefaultHandler(irqn: i16) {
-    panic!("Unhandled exception (IRQn = {})", irqn);
+unsafe fn DefaultHandler(_irqn: i16) {
+    (&mut *DFU.as_mut_ptr()).reboot_into();
 }

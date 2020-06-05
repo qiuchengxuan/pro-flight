@@ -27,9 +27,9 @@ MEMORY
    sources added the attribute `#[link_section = ".ram2bss"]` to the data
    you want to place there. */
 /* Note that the section will not be zero-initialized by the runtime! */
-/* SECTIONS { */
-/*      .ram2bss (NOLOAD) : ALIGN(4) { */
-/*        *(.ram2bss); */
-/*        . = ALIGN(4); */
-/*      } > CCMRAM */
-/* } INSERT AFTER .bss; */
+SECTIONS {
+     .ccmram (NOLOAD) : ALIGN(4) {
+       *(.ccmram);
+       . = ALIGN(4);
+     } > CCMRAM
+} INSERT AFTER .bss;
