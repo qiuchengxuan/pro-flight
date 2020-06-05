@@ -1,7 +1,7 @@
 use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
-use max7456::{MAX7456, SPI_MODE};
+use max7456::SPI_MODE;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioc::{PC10, PC11, PC12};
 use stm32f4xx_hal::gpio::{Alternate, AF6};
@@ -11,17 +11,12 @@ use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use rs_flight::components::max7456_ascii_hud::{self, Max7456AsciiHud};
+use rs_flight::components::ascii_hud::AsciiHud;
+use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
 
 static mut G_TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
 #[link_section = ".ccmram"]
-static mut G_OSD: MaybeUninit<Max7456AsciiHud> = MaybeUninit::uninit();
-
-#[interrupt]
-unsafe fn TIM7() {
-    (&mut *G_TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
-    (&mut *G_OSD.as_mut_ptr()).start_draw();
-}
+static mut G_OSD: MaybeUninit<AsciiHud> = MaybeUninit::uninit();
 
 type Spi3Pins = (PC10<Alternate<AF6>>, PC11<Alternate<AF6>>, PC12<Alternate<AF6>>);
 
@@ -41,6 +36,17 @@ fn dma1_stream7_transfer_spi3(buffer: &[u8]) {
     });
 }
 
+#[interrupt]
+unsafe fn TIM7() {
+    let spi3 = &(*stm32::SPI3::ptr());
+    spi3.cr2.modify(|_, w| w.txdmaen().disabled());
+
+    (&mut *G_TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
+    (&mut *G_OSD.as_mut_ptr()).start_draw(|screen| {
+        process_screen(screen, dma1_stream7_transfer_spi3);
+    });
+}
+
 pub fn init<'a>(
     spi3: stm32::SPI3,
     tim7: stm32::TIM7,
@@ -51,10 +57,9 @@ pub fn init<'a>(
 ) -> Result<(), Error> {
     let freq: stm32f4xx_hal::time::Hertz = 10.mhz().into();
     let spi3 = Spi::spi3(spi3, pins, SPI_MODE, freq, clocks);
-    let mut max7456 = MAX7456::new(spi3);
-    max7456_ascii_hud::init(&mut max7456, delay)?;
+    max7456_init(spi3, delay)?;
 
-    let osd = Max7456AsciiHud::new(telemetry_source, dma1_stream7_transfer_spi3);
+    let osd = AsciiHud::new(telemetry_source);
     unsafe { G_OSD = MaybeUninit::new(osd) };
 
     let mut timer = Timer::tim7(tim7, 50.hz(), clocks);
