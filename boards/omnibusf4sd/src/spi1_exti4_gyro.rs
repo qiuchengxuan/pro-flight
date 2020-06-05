@@ -43,7 +43,7 @@ type SpiError = mpu6000::bus::SpiError<Error, Error, Infallible>;
 static mut G_CS: MaybeUninit<PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut G_INT: MaybeUninit<PC4<Input<PullUp>>> = MaybeUninit::uninit();
 #[export_name = "G_DMA_BUFFER"]
-static mut G_DMA_BUFFER: [u8; 16] = [0u8; 16];
+static mut G_DMA_BUFFER: [i16; 8] = [0i16; 8];
 
 static mut G_ACCEL_GYRO_HANDLER: AccelGyroHandler = event_nop_handler;
 static mut G_TEMPERATURE_HANDLER: EventHandler<sensors::Temperature<i16>> = event_nop_handler;
@@ -63,37 +63,48 @@ unsafe fn EXTI4() {
 
     // dma2 channel 3 stream 0 rx
     let stream = &dma2.st[0];
-    stream.ndtr.write(|w| w.ndt().bits(G_DMA_BUFFER.len() as u16));
+    stream.ndtr.write(|w| w.ndt().bits((G_DMA_BUFFER.len() as u16) * 2));
     stream.par.write(|w| w.pa().bits(data_register));
     let m0ar = &stream.m0ar;
     m0ar.write(|w| w.m0a().bits(G_DMA_BUFFER.as_ptr() as u32));
     stream.cr.write(|w| {
-        w.chsel().bits(3).minc().incremented().dir().peripheral_to_memory().en().enabled()
+        w.chsel()
+            .bits(3)
+            .minc()
+            .incremented()
+            .msize()
+            .bits16()
+            .dir()
+            .peripheral_to_memory()
+            .tcie()
+            .enabled()
+            .en()
+            .enabled()
     });
 
     static READ_REG: [u8; 1] = [Register::AccelerometerXHigh as u8 | 0x80];
 
     // dma2 channel 3 stream 3 tx
     let stream = &dma2.st[3];
-    stream.ndtr.write(|w| w.ndt().bits(G_DMA_BUFFER.len() as u16));
+    stream.ndtr.write(|w| w.ndt().bits(G_DMA_BUFFER.len() as u16 * 2));
     stream.par.write(|w| w.pa().bits(data_register));
     stream.m0ar.write(|w| w.m0a().bits(READ_REG.as_ptr() as u32));
     let cr = &stream.cr;
-    cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().tcie().enabled().en().enabled());
+    cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().en().enabled());
 }
 
 #[interrupt]
-unsafe fn DMA2_STREAM3() {
-    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM3);
+unsafe fn DMA2_STREAM0() {
+    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM0);
     let spi1 = &(*stm32::SPI1::ptr());
     spi1.cr2.modify(|_, w| w.txdmaen().disabled().rxdmaen().disabled());
     let dma2 = &*(stm32::DMA2::ptr());
     dma2.lifcr.write(|w| w.bits(0x3D << 22 | 0x3D));
 
     let buf = &G_DMA_BUFFER;
-    let acceleration = Measurement::new(&buf[2..], ACCELEROMETER_SENSITIVE);
-    let temperature = Temperature::new(buf[8], buf[9]);
-    let gyro = Measurement::new(&buf[10..], GYRO_SENSITIVE);
+    let acceleration = Measurement::from_array(&buf[1..], ACCELEROMETER_SENSITIVE).unwrap();
+    let temperature = Temperature(buf[4]);
+    let gyro = Measurement::from_array(&buf[5..], GYRO_SENSITIVE).unwrap();
     G_ACCEL_GYRO_HANDLER((acceleration.into(), gyro.into()));
     G_TEMPERATURE_HANDLER(temperature.centi_celcius());
 
@@ -144,8 +155,8 @@ pub fn init(
         G_TEMPERATURE_HANDLER = temperature_handler;
     }
 
-    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM3);
-    unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA2_STREAM3) }
+    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM0);
+    unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA2_STREAM0) }
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::EXTI4) }
     Ok(())
