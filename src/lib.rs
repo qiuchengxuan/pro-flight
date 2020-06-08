@@ -10,12 +10,16 @@ extern crate bmp280;
 extern crate btoi;
 #[macro_use]
 extern crate enum_map;
+extern crate embedded_sdmmc;
 extern crate integer_sqrt;
 extern crate micromath;
 #[macro_use]
 extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
+#[macro_use]
+extern crate sval;
+extern crate sval_json;
 
 #[macro_use]
 pub mod components;

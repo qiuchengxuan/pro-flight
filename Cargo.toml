@@ -6,22 +6,25 @@ name = "rs-flight"
 version = "0.0.2"
 
 [dependencies]
+ahrs = { version = "0.2.2", default-features = false}
 arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"]}
 ascii = { version = "1.0", default-features = false }
+ascii-osd-hud = { path = "../ascii-osd-hud" }
 bmp280 = { path = "../bmp280" }
 btoi = { version = "0.4", default-features = false }
 cortex-m = "0.6"
 embedded-hal = "0.2"
-enum-map = {version = "0.6.2", default-features = false}
+enum-map = { version = "0.6.2", default-features = false }
 integer-sqrt = "0.1.3"
-nalgebra = {version = "0.18", default-features = false}
-nb = "0.1"
-stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 max7456 = { path = "../max7456" }
 micromath = "1.0"
 mpu6000 = "0.1.5"
-ascii-osd-hud = { path = "../ascii-osd-hud" }
-ahrs = { version = "0.2.2", default-features = false}
+nalgebra = { version = "0.18", default-features = false }
+nb = "0.1"
+stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
+sval = { version = "0.5", default-features = false, features = ["derive", "fmt"] }
+sval_json = { version = "0.5", default-features = false }
+embedded-sdmmc = "0.3.0"
 
 [lib]
 name = "rs_flight"

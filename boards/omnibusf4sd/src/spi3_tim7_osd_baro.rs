@@ -11,8 +11,8 @@ use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa::PA15;
 use stm32f4xx_hal::gpio::gpiob::PB3;
 use stm32f4xx_hal::gpio::gpioc::{PC10, PC11, PC12};
-use stm32f4xx_hal::gpio::{Alternate, AF6};
-use stm32f4xx_hal::gpio::{Output, PushPull};
+use stm32f4xx_hal::gpio::Input;
+use stm32f4xx_hal::gpio::{Floating, Output, PushPull};
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Error, Spi};
@@ -48,8 +48,6 @@ impl DelayNs<u16> for TickDelay {
         cortex_m::asm::delay(ns as u32 * (self.0 / 1000_000) / 1000 + 1)
     }
 }
-
-type Spi3Pins = (PC10<Alternate<AF6>>, PC11<Alternate<AF6>>, PC12<Alternate<AF6>>);
 
 fn dma1_stream7_transfer_spi3(buffer: &[u8]) {
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
@@ -129,16 +127,22 @@ unsafe fn TIM7() {
 pub fn init<'a>(
     spi3: stm32::SPI3,
     tim7: stm32::TIM7,
-    pins: Spi3Pins,
-    mut cs_osd: PA15<Output<PushPull>>,
-    mut cs_baro: PB3<Output<PushPull>>,
+    spi3_pins: (PC10<Input<Floating>>, PC11<Input<Floating>>, PC12<Input<Floating>>),
+    pa15: PA15<Input<Floating>>,
+    pb3: PB3<Input<Floating>>,
     clocks: Clocks,
     telemetry_source: &'static dyn TelemetrySource,
     baro_handler: EventHandler<Pressure>,
     delay: &mut Delay,
 ) -> Result<(), Error> {
+    let mut cs_osd = pa15.into_push_pull_output();
+    let mut cs_baro = pb3.into_push_pull_output();
+    let (pc10, pc11, pc12) = spi3_pins;
+    let sclk = pc10.into_alternate_af6();
+    let miso = pc11.into_alternate_af6();
+    let mosi = pc12.into_alternate_af6();
     let freq: stm32f4xx_hal::time::Hertz = 10.mhz().into();
-    let spi3 = Spi::spi3(spi3, pins, SPI_MODE, freq, clocks);
+    let spi3 = Spi::spi3(spi3, (sclk, miso, mosi), SPI_MODE, freq, clocks);
     let mut css: [&mut dyn OutputPin<Error = Infallible>; 2] = [&mut cs_baro, &mut cs_osd];
     let spi = SharedSpi::new(spi3, &mut css);
 

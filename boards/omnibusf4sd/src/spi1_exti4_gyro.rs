@@ -1,29 +1,22 @@
 use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
-use stm32f4xx_hal::delay::Delay;
-use stm32f4xx_hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
-use stm32f4xx_hal::gpio::gpioc::PC4;
-
-use stm32f4xx_hal::gpio::ExtiPin;
-
-use stm32f4xx_hal::gpio::{Alternate, AF5};
-use stm32f4xx_hal::gpio::{Input, Output, PullUp, PushPull};
-use stm32f4xx_hal::interrupt;
-use stm32f4xx_hal::rcc::Clocks;
-use stm32f4xx_hal::spi::{Error, Spi};
-use stm32f4xx_hal::{prelude::*, stm32};
-
-use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
-use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
-use rs_flight::hal::{sensors, AccelGyroHandler};
-
 use mpu6000::bus::{self, DelayNs, SpiBus};
 use mpu6000::measurement::{Measurement, Temperature};
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
-
-type Spi1Pins = (PA5<Alternate<AF5>>, PA6<Alternate<AF5>>, PA7<Alternate<AF5>>);
+use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
+use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
+use rs_flight::hal::{sensors, AccelGyroHandler};
+use stm32f4xx_hal::delay::Delay;
+use stm32f4xx_hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
+use stm32f4xx_hal::gpio::gpioc::PC4;
+use stm32f4xx_hal::gpio::ExtiPin;
+use stm32f4xx_hal::gpio::{Floating, Input, Output, PullUp, PushPull};
+use stm32f4xx_hal::interrupt;
+use stm32f4xx_hal::rcc::Clocks;
+use stm32f4xx_hal::spi::{Error, Spi};
+use stm32f4xx_hal::{prelude::*, stm32};
 
 pub struct TickDelay(u32);
 
@@ -108,16 +101,22 @@ unsafe fn DMA2_STREAM0() {
 
 pub fn init(
     spi1: stm32::SPI1,
-    pins: Spi1Pins,
-    mut cs: PA4<Output<PushPull>>,
+    spi1_pins: (PA5<Input<Floating>>, PA6<Input<Floating>>, PA7<Input<Floating>>),
+    pa4: PA4<Input<Floating>>,
     int: PC4<Input<PullUp>>,
     clocks: Clocks,
     event_handlers: (AccelGyroHandler, EventHandler<sensors::Temperature<i16>>),
     delay: &mut Delay,
     sample_rate: u16,
 ) -> Result<(), SpiError> {
+    let mut cs = pa4.into_push_pull_output();
+    let (pa5, pa6, pa7) = spi1_pins;
+    let sclk = pa5.into_alternate_af5();
+    let miso = pa6.into_alternate_af5();
+    let mosi = pa7.into_alternate_af5();
+
     let freq: stm32f4xx_hal::time::Hertz = 1.mhz().into();
-    let spi1 = Spi::spi1(spi1, pins, SPI_MODE, freq, clocks);
+    let spi1 = Spi::spi1(spi1, (sclk, miso, mosi), SPI_MODE, freq, clocks);
     let bus = SpiBus::new(spi1, &mut cs, TickDelay(clocks.sysclk().0));
     if !mpu6000_init(bus, sample_rate, delay)? {
         return Ok(());

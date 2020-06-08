@@ -16,19 +16,25 @@ impl Default for IMU {
     }
 }
 
+#[derive(Default, Value)]
+pub struct TelemetryData {
+    measurements: (Acceleration, Gyro),
+    altitude: i16,
+    vertical_speed: i16,
+}
+
 #[derive(Default)]
 pub struct TelemetryUnit {
     imu: IMU,
     calibration_loop: u16,
 
     counter: usize,
-    measurements: (Acceleration, Gyro),
     calibration: (Acceleration, Gyro),
     calibrated: bool,
-    altitude: i16,
     prev_altitude: i16,
     initial_altitude: i16,
-    vertical_speed: i16,
+
+    data: TelemetryData,
 }
 
 impl TelemetryUnit {
@@ -36,31 +42,31 @@ impl TelemetryUnit {
         let (mut acceleration, gyro) = event;
         self.counter += 1;
         if !self.calibrated {
-            self.measurements = event;
+            self.data.measurements = event;
             acceleration.z -= acceleration.sensitive as i16;
             self.calibration =
                 (self.calibration.0.average(&acceleration), self.calibration.1.average(&gyro));
             self.calibrated = self.counter >= self.calibration_loop as usize;
         }
-        self.measurements =
+        self.data.measurements =
             (acceleration.calibrated(&self.calibration.0), gyro.calibrated(&self.calibration.1));
-        let mut gyro: Vector3<f32> = self.measurements.1.into();
+        let mut gyro: Vector3<f32> = self.data.measurements.1.into();
         gyro = gyro / DEGREE_PER_DAG;
         self.imu.0.update_imu(&gyro, &(acceleration.into())).ok();
     }
 
     fn on_barometer_event(&mut self, event: Pressure) {
-        self.prev_altitude = self.altitude;
+        self.prev_altitude = self.data.altitude;
         if self.initial_altitude == 0 {
-            self.initial_altitude = self.altitude;
+            self.initial_altitude = self.data.altitude;
         }
-        self.altitude = event.to_sea_level_altitude().as_feet() as i16;
-        self.vertical_speed =
-            (self.vertical_speed + (self.altitude - self.prev_altitude) * 20 * 60) / 2;
+        self.data.altitude = event.to_sea_level_altitude().as_feet() as i16;
+        self.data.vertical_speed =
+            (self.data.vertical_speed + (self.data.altitude - self.prev_altitude) * 20 * 60) / 2;
     }
 
     pub fn g_force(&self) -> u8 {
-        let acceleration = self.measurements.0;
+        let acceleration = self.data.measurements.0;
         let (x, y, z) = (acceleration.x as i32, acceleration.y as i32, acceleration.z as i32);
         let g_force = ((x * x + y * y + z * z) as u32).integer_sqrt();
         let g_force = (g_force as f32 / acceleration.sensitive * 100.0) as u16;
@@ -70,19 +76,7 @@ impl TelemetryUnit {
 
 impl core::fmt::Display for TelemetryUnit {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(
-            f,
-            "{{\"acceleration\":{},\"gyro\":{},\"euler\":{},\"g-force\":{},\
-               \"altitude\":{},\
-               \"calibration\":{{\"acceleration\":{},\"gyro\":{}}}}}",
-            self.measurements.0,
-            self.measurements.1,
-            quaternion_to_euler(self.imu.0.quat),
-            self.g_force(),
-            self.altitude,
-            self.calibration.0,
-            self.calibration.1,
-        )
+        sval::fmt::debug(f, &self.data)
     }
 }
 
@@ -99,12 +93,12 @@ impl hud::TelemetrySource for TelemetryUnit {
         let attitude = hud::Attitude { roll, pitch };
         let heading = ((-euler.psi as isize + 360) % 360) as u16;
         hud::Telemetry {
-            altitude: self.altitude,
+            altitude: self.data.altitude,
             attitude,
             heading,
             g_force: self.g_force(),
-            height: self.altitude - self.initial_altitude,
-            vertical_speed: self.vertical_speed,
+            height: self.data.altitude - self.initial_altitude,
+            vertical_speed: self.data.vertical_speed,
             ..Default::default()
         }
     }

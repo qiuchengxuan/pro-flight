@@ -9,6 +9,7 @@ extern crate cast;
 extern crate chips;
 extern crate cortex_m;
 extern crate cortex_m_systick_countdown;
+extern crate embedded_sdmmc;
 extern crate max7456;
 extern crate mpu6000;
 extern crate nb;
@@ -26,18 +27,12 @@ use core::fmt::Write;
 use core::mem::MaybeUninit;
 
 use arrayvec::ArrayVec;
-use cortex_m_rt::ExceptionFrame;
-use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
-
-use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::Edge;
 use stm32f4xx_hal::gpio::ExtiPin;
-use stm32f4xx_hal::otg_fs::USB;
-use stm32f4xx_hal::pwm;
-use stm32f4xx_hal::{prelude::*, stm32};
-
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
+use cortex_m_rt::ExceptionFrame;
+use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::logger::{self, Logger};
@@ -46,6 +41,10 @@ use rs_flight::components::telemetry;
 use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::sensors::Temperature;
 use rs_flight::hal::AccelGyroHandler;
+use stm32f4xx_hal::delay::Delay;
+use stm32f4xx_hal::otg_fs::USB;
+use stm32f4xx_hal::pwm;
+use stm32f4xx_hal::{prelude::*, stm32};
 
 const GYRO_SAMPLE_RATE: usize = 1000;
 #[link_section = ".uninit.STACKS"]
@@ -117,23 +116,18 @@ fn main() -> ! {
     //     20u32.khz(),
     // );
 
-    let cs = gpio_a.pa4.into_push_pull_output();
-    let sclk = gpio_a.pa5.into_alternate_af5();
-    let miso = gpio_a.pa6.into_alternate_af5();
-    let mosi = gpio_a.pa7.into_alternate_af5();
     let mut int = gpio_c.pc4.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
-    let pins = (sclk, miso, mosi);
     let handlers = (
         telemetry::accel_gyro_handler as AccelGyroHandler,
         event_nop_handler as fn(_: Temperature<i16>),
     );
     spi1_exti4_gyro::init(
         peripherals.SPI1,
-        pins,
-        cs,
+        (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7),
+        gpio_a.pa4,
         int,
         clocks,
         handlers,
@@ -144,17 +138,12 @@ fn main() -> ! {
 
     let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 256);
 
-    let cs_osd = gpio_a.pa15.into_push_pull_output();
-    let cs_baro = gpio_b.pb3.into_push_pull_output();
-    let sclk = gpio_c.pc10.into_alternate_af6();
-    let miso = gpio_c.pc11.into_alternate_af6();
-    let mosi = gpio_c.pc12.into_alternate_af6();
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,
         peripherals.TIM7,
-        (sclk, miso, mosi),
-        cs_osd,
-        cs_baro,
+        (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12),
+        gpio_a.pa15,
+        gpio_b.pb3,
         clocks,
         telemetry,
         telemetry::barometer_handler,

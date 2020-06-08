@@ -7,30 +7,27 @@ version = "0.1.0"
 
 [dependencies]
 # alloc-cortex-m = "0.3.5"
+arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"]}
+ascii-osd-hud = { path = "../../../ascii-osd-hud" }
+bmp280 = { path = "../../../bmp280" }
 cast = { version = "0.2.2", default-features = false }
-cortex-m = { version = "0.6", features = ["inline-asm"] }
+chips = { path = "../../chips" }
+cortex-m = "0.6"
 cortex-m-rt = "0.6"
 cortex-m-semihosting = "0.3"
 cortex-m-systick-countdown = "0.1"
 embedded-hal = "0.2"
+embedded-sdmmc = "0.3"
+mpu6000 = "0.1.5"
+max7456 = { path = "../../../max7456" }
 nb = "0.1"
 panic-halt = "0.2"
 panic-semihosting = "0.5"
+rs-flight = { path = "../../" }
+sbus = "0.2.2"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 usb-device = "0.2"
 usbd-serial = "0.1.0"
-
-arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"]}
-
-chips = { path = "../../chips" }
-rs-flight = { path = "../../" }
-
-ascii-osd-hud = { path = "../../../ascii-osd-hud" }
-mpu6000 = "0.1.5"
-max7456 = { path = "../../../max7456" }
-bmp280 = { path = "../../../bmp280" }
-sbus = "0.2.2"
-embedded-sdmmc = "0.3.0"
 
 [[bin]]
 name = "omnibusf4sd"

@@ -2,7 +2,7 @@ use nalgebra::Vector3;
 
 use crate::datastructures::measurement::Altitude;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Value)]
 pub struct Measurement {
     pub x: i16,
     pub y: i16,
