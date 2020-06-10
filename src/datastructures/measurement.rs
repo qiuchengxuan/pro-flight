@@ -4,24 +4,24 @@ use nalgebra::Quaternion;
 
 pub const DEGREE_PER_DAG: f32 = 180.0 / core::f32::consts::PI;
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Value)]
 pub struct Euler {
-    pub phi: f32,   // roll
-    pub theta: f32, // pitch
-    pub psi: f32,   // yaw
+    pub phi: f32,
+    pub theta: f32,
+    pub psi: f32,
 }
 
-impl core::fmt::Display for Euler {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{{\"phi\":{},\"theta\":{},\"psi\":{}}}", self.phi, self.theta, self.psi)
-    }
+macro_rules! pow2 {
+    ($x:expr) => {
+        $x * $x
+    };
 }
 
-pub fn quaternion_to_euler(q: Quaternion<f32>) -> Euler {
+pub fn quaternion_to_euler(q: &Quaternion<f32>) -> Euler {
     let (i, j, k, w) = (q[0], q[1], q[2], q[3]);
-    let phi = (2.0 * (w * i + j * k)).atan2(1.0 - 2.0 * (i * i + j * j)) * DEGREE_PER_DAG;
-    let theta = (2.0 * (w * j - k * j)).asin() * DEGREE_PER_DAG;
-    let psi = (2.0 * (w * k + i * j)).atan2(1.0 - 2.0 * (j * j + k * k)) * DEGREE_PER_DAG;
+    let phi = (2.0 * (w * i + j * k)).atan2(1.0 - 2.0 * (pow2!(i) + pow2!(j))) * DEGREE_PER_DAG;
+    let theta = (2.0 * (w * j - i * k)).asin() * DEGREE_PER_DAG;
+    let psi = (2.0 * (w * k + i * j)).atan2(1.0 - 2.0 * (pow2!(j) + pow2!(k))) * DEGREE_PER_DAG;
     Euler { phi, theta, psi }
 }
 

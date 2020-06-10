@@ -64,10 +64,12 @@ fn dma1_stream7_transfer_spi3(buffer: &[u8]) {
 
 #[interrupt]
 unsafe fn DMA1_STREAM2() {
-    cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
-    let dma1 = &*stm32::DMA1::ptr();
-    dma1.hifcr.write(|w| w.bits(0x3D << 22)); // stream 7
-    dma1.lifcr.write(|w| w.bits(0x3D << 16)); // stream 2
+    cortex_m::interrupt::free(|_| {
+        cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
+        let dma1 = &*stm32::DMA1::ptr();
+        dma1.hifcr.write(|w| w.bits(0x3D << 22)); // stream 7
+        dma1.lifcr.write(|w| w.bits(0x3D << 16)); // stream 2
+    });
 
     let calibration = &*CALIBRATION.as_ptr();
     let raw_pressure = RawPressure::from_bytes(&DMA_BUFFER[2..]);
@@ -84,7 +86,9 @@ unsafe fn DMA1_STREAM2() {
 
 #[interrupt]
 unsafe fn TIM7() {
-    (&mut *TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
+    cortex_m::interrupt::free(|_| {
+        (&mut *TIM7.as_mut_ptr()).clear_interrupt(Event::TimeOut);
+    });
 
     { &mut *CS_OSD.as_mut_ptr() }.set_high().ok();
     { &mut *CS_BARO.as_mut_ptr() }.set_low().ok();

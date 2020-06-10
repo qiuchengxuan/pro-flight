@@ -20,6 +20,7 @@ extern crate usb_device;
 extern crate rs_flight;
 
 mod spi1_exti4_gyro;
+mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
 mod usb_serial;
 
@@ -27,8 +28,6 @@ use core::fmt::Write;
 use core::mem::MaybeUninit;
 
 use arrayvec::ArrayVec;
-use stm32f4xx_hal::gpio::Edge;
-use stm32f4xx_hal::gpio::ExtiPin;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
@@ -39,9 +38,11 @@ use rs_flight::components::logger::{self, Logger};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::components::telemetry;
 use rs_flight::datastructures::event::event_nop_handler;
-use rs_flight::hal::sensors::Temperature;
+use rs_flight::hal::sensors::{Acceleration, Temperature};
 use rs_flight::hal::AccelGyroHandler;
 use stm32f4xx_hal::delay::Delay;
+use stm32f4xx_hal::gpio::Edge;
+use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
@@ -136,7 +137,20 @@ fn main() -> ! {
     )
     .ok();
 
-    let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 256);
+    let calibration = Acceleration { x: 83, y: -2, z: 99, sensitive: 0.0 };
+    let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 256, calibration);
+
+    let mut int = gpio_b.pb7.into_pull_up_input();
+    int.make_interrupt_source(&mut peripherals.SYSCFG);
+    int.enable_interrupt(&mut peripherals.EXTI);
+    int.trigger_on_edge(&mut peripherals.EXTI, Edge::RISING_FALLING);
+    spi2_exti7_sdcard::init(
+        peripherals.SPI2,
+        (gpio_b.pb13, gpio_b.pb14, gpio_b.pb15),
+        gpio_b.pb12,
+        clocks,
+        int,
+    );
 
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,

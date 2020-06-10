@@ -18,7 +18,7 @@ enum-map = { version = "0.6.2", default-features = false }
 integer-sqrt = "0.1.3"
 max7456 = { path = "../max7456" }
 micromath = "1.0"
-mpu6000 = "0.1.5"
+mpu6000 = "0.1.7"
 nalgebra = { version = "0.18", default-features = false }
 nb = "0.1"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }

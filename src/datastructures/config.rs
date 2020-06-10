@@ -1,11 +1,6 @@
-#[derive(Value)]
-pub struct Calibration {
-    x: i32,
-    y: i32,
-    z: i32,
-}
+use crate::hal::sensors::Acceleration;
 
 #[derive(Value)]
 pub struct Config {
-    calibration: Calibration,
+    pub accel_calibration: Acceleration,
 }
