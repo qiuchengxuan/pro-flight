@@ -18,8 +18,7 @@ extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 #[macro_use]
-extern crate sval;
-extern crate sval_json;
+extern crate serde;
 
 #[macro_use]
 pub mod components;

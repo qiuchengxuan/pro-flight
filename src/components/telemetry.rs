@@ -16,7 +16,7 @@ impl Default for IMU {
     }
 }
 
-#[derive(Default, Value, Copy, Clone)]
+#[derive(Default, Copy, Clone, Serialize, Deserialize)]
 pub struct Attitude {
     roll: i16,
     pitch: i8,
@@ -28,7 +28,7 @@ impl Into<hud::Attitude> for Attitude {
     }
 }
 
-#[derive(Default, Value)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct TelemetryData {
     acceleration: Acceleration,
     gyro: Gyro,
@@ -104,7 +104,10 @@ impl TelemetryUnit {
 
 impl core::fmt::Display for TelemetryUnit {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        sval::fmt::debug(f, &self.data)
+        match serde_json::to_string_pretty(&self.data) {
+            Ok(string) => f.write_str(&string),
+            Err(_) => f.write_str(""),
+        }
     }
 }
 

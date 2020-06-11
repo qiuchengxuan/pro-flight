@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![feature(alloc_error_handler)]
 
 #[macro_use]
 extern crate cortex_m_rt;
@@ -24,9 +25,11 @@ mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
 mod usb_serial;
 
+use core::alloc::Layout;
 use core::fmt::Write;
 use core::mem::MaybeUninit;
 
+use alloc_cortex_m::CortexMHeap;
 use arrayvec::ArrayVec;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
@@ -53,10 +56,17 @@ static mut PANIC: bool = false;
 #[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
 static mut PANIC_FRAME: MaybeUninit<ExceptionFrame> = MaybeUninit::uninit();
+#[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
 #[link_section = ".uninit.STACKS"]
 static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
+#[link_section = ".uninit.STACKS"]
+#[link_section = ".ccmram"]
+static mut HEAP: [u8; 4096] = [0u8; 4096];
+
+#[global_allocator]
+static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
 #[entry]
 fn main() -> ! {
@@ -68,6 +78,7 @@ fn main() -> ! {
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
+    unsafe { ALLOCATOR.init(&HEAP as *const u8 as usize, HEAP.len()) }
     unsafe { LOG_BUFFER = core::mem::zeroed() };
     logger::init(unsafe { &mut LOG_BUFFER });
     if unsafe { PANIC } {
@@ -91,31 +102,13 @@ fn main() -> ! {
 
     cmdlet::init(valid_memory_address);
 
-    // let pb0_1 = (
-    //     gpio_b.pb0.into_alternate_af2(),
-    //     gpio_b.pb1.into_alternate_af2(),
-    // );
+    // let pb0_1 = (gpio_b.pb0.into_alternate_af2(), gpio_b.pb1.into_alternate_af2());
     // let (mut pwm1, mut pwm2) = pwm::tim3(peripherals.TIM3, pb0_1, clocks, 50.hz());
 
-    // let pwm3_4 = (
-    //     gpio_a.pa3.into_alternate_af1(),
-    //     gpio_a.pa2.into_alternate_af1(),
-    // );
-    // let pwm2 = pwm::tim2(peripherals.TIM2, pwm3_4, clocks, 20u32.khz());
-
-    // let pwm3 = pwm::tim5(
-    //     peripherals.TIM5,
-    //     gpio_a.pa1.into_alternate_af2(),
-    //     clocks,
-    //     20u32.khz(),
-    // );
-
-    // let pwm4 = pwm::tim1(
-    //     peripherals.TIM1,
-    //     gpio_a.pa8.into_alternate_af1(),
-    //     clocks,
-    //     20u32.khz(),
-    // );
+    // let pwm3_4 = (gpio_a.pa3.into_alternate_af1(), gpio_a.pa2.into_alternate_af1());
+    // let pwm2 = pwm::tim2(peripherals.TIM2, pwm3_4, clocks, 50.hz());
+    // let pwm3 = pwm::tim5(peripherals.TIM5, gpio_a.pa1.into_alternate_af2(), clocks, 50.khz());
+    // let pwm4 = pwm::tim1(peripherals.TIM1, gpio_a.pa8.into_alternate_af1(), clocks, 50.khz());
 
     let mut int = gpio_c.pc4.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
@@ -222,15 +215,25 @@ fn main() -> ! {
     }
 }
 
+unsafe fn panic_reboot() {
+    PANIC = true;
+    (&mut *DFU.as_mut_ptr()).reboot_into();
+}
+
+#[alloc_error_handler]
+unsafe fn oom(_: Layout) -> ! {
+    panic_reboot();
+    loop {}
+}
+
 #[exception]
 unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
-    PANIC = true;
     PANIC_FRAME = MaybeUninit::new(*ef);
-    (&mut *DFU.as_mut_ptr()).reboot_into();
+    panic_reboot();
     loop {}
 }
 
 #[exception]
 unsafe fn DefaultHandler(_irqn: i16) {
-    (&mut *DFU.as_mut_ptr()).reboot_into();
+    panic_reboot();
 }
