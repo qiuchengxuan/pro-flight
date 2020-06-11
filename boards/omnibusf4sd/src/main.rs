@@ -20,6 +20,7 @@ extern crate usb_device;
 #[macro_use]
 extern crate rs_flight;
 
+mod sdcard;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
@@ -137,13 +138,19 @@ fn main() -> ! {
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::RISING_FALLING);
-    spi2_exti7_sdcard::init(
+    let option = spi2_exti7_sdcard::init(
         peripherals.SPI2,
         (gpio_b.pb13, gpio_b.pb14, gpio_b.pb15),
         gpio_b.pb12,
         clocks,
         int,
     );
+
+    if let Some(tuple) = option {
+        let (mut controller, mut volume, mut root) = tuple;
+        let config = sdcard::read_json_file((&mut controller, &mut volume, &mut root));
+        log!("{}", serde_json::to_string_pretty(&config).ok().unwrap());
+    }
 
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,

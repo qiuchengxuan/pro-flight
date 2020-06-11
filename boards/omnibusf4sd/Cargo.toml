@@ -24,6 +24,8 @@ nb = "0.1"
 panic-halt = "0.2"
 panic-semihosting = "0.5"
 rs-flight = { path = "../../" }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 sbus = "0.2.2"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 usb-device = "0.2"

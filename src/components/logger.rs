@@ -53,7 +53,7 @@ impl fmt::Write for Logger {
 macro_rules! log {
     ($($arg:tt)*) => {
         write!(&mut Logger{}, $($arg)*).ok();
-        write!(&mut Logger{}, "\r\n").ok()
+        write!(&mut Logger{}, "\r\n").ok();
     };
 }
 

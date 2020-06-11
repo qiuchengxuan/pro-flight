@@ -88,8 +88,9 @@ impl TelemetryUnit {
         if self.initial_altitude == 0 {
             self.initial_altitude = self.data.altitude;
         }
-        self.data.altitude = event.to_sea_level_altitude().as_feet() as i16 / 10 * 10;
-        let vertical_speed = (self.data.altitude - self.prev_altitude) * 20 * 60;
+        let feet = event.to_sea_level_altitude().as_feet();
+        self.data.altitude = (feet as i16 + 5) / 10 * 10;
+        let vertical_speed = (self.data.altitude - self.prev_altitude) * 20 * 60 / 100 * 100;
         self.data.vertical_speed = (self.data.vertical_speed + vertical_speed) / 2;
     }
 
@@ -98,7 +99,7 @@ impl TelemetryUnit {
         let (x, y, z) = (acceleration.x as i32, acceleration.y as i32, acceleration.z as i32);
         let g_force = ((x * x + y * y + z * z) as u32).integer_sqrt();
         let g_force = (g_force as f32 / acceleration.sensitive * 100.0) as u16;
-        (g_force / 10 + ((g_force % 10) / 5)) as u8
+        ((g_force + 5) / 10) as u8
     }
 }
 
