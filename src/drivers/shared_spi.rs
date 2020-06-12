@@ -1,9 +1,7 @@
 use core::cell::{Cell, RefCell};
-use core::convert::Infallible;
 
 use embedded_hal::blocking::spi;
 use embedded_hal::digital::v2::OutputPin;
-use embedded_hal::spi::FullDuplex;
 
 // NOTE: thread unsafe
 pub struct SharedSpi<'a, E, SPI> {
@@ -23,6 +21,10 @@ impl<'a, E, SPI> SharedSpi<'a, E, SPI> {
             chip_selects: RefCell::new(chip_selects),
             owner: Cell::new(0),
         }
+    }
+
+    pub fn owner(&self, index: usize) -> bool {
+        self.owner.get() == index as isize
     }
 
     pub fn acquire(&self, index: usize) {
@@ -56,29 +58,6 @@ impl<'a, E, SPI> SharedSpi<'a, E, SPI> {
     }
 }
 
-pub struct VirtualChipSelect<'a, E, SPI> {
-    shared: &'a SharedSpi<'a, E, SPI>,
-    index: usize,
-}
-
-impl<'a, E, SPI> VirtualChipSelect<'a, E, SPI> {
-    pub fn new(shared: &'a SharedSpi<'a, E, SPI>, index: usize) -> Self {
-        Self { shared, index }
-    }
-}
-
-impl<'a, E, SPI> OutputPin for VirtualChipSelect<'a, E, SPI> {
-    type Error = Infallible;
-
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        Ok(self.shared.acquire(self.index))
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        Ok(self.shared.release(self.index))
-    }
-}
-
 pub struct VirtualSpi<'a, E, SPI> {
     shared: &'a SharedSpi<'a, E, SPI>,
     index: usize,
@@ -90,25 +69,32 @@ impl<'a, E, SPI> VirtualSpi<'a, E, SPI> {
     }
 }
 
-impl<'a, E, T, W, SPI> FullDuplex<W> for VirtualSpi<'a, T, SPI>
+impl<'a, E, T, SPI> spi::Write<u8> for VirtualSpi<'a, T, SPI>
 where
-    SPI: FullDuplex<W, Error = E>,
+    SPI: spi::Write<u8, Error = E>,
 {
     type Error = E;
 
-    fn send(&mut self, word: W) -> nb::Result<(), E> {
+    fn write(&mut self, bytes: &[u8]) -> Result<(), E> {
         self.shared.acquire(self.index);
-        let mut spi = self.shared.cell.borrow_mut();
-        spi.send(word)
-    }
-
-    fn read(&mut self) -> nb::Result<W, E> {
-        self.shared.acquire(self.index);
-        let mut spi = self.shared.cell.borrow_mut();
-        spi.read()
+        let result = self.shared.cell.borrow_mut().write(bytes);
+        if bytes.len() > 1 {
+            self.shared.release(self.index);
+        }
+        result
     }
 }
 
-impl<'a, W, E, SPI: FullDuplex<W>> spi::transfer::Default<W> for VirtualSpi<'a, E, SPI> {}
+impl<'a, E, T, SPI> spi::Transfer<u8> for VirtualSpi<'a, T, SPI>
+where
+    SPI: spi::Transfer<u8, Error = E>,
+{
+    type Error = E;
 
-impl<'a, W, E, SPI: FullDuplex<W>> spi::write::Default<W> for VirtualSpi<'a, E, SPI> {}
+    fn transfer<'b>(&mut self, bytes: &'b mut [u8]) -> Result<&'b [u8], E> {
+        self.shared.acquire(self.index);
+        let result = self.shared.cell.borrow_mut().transfer(bytes);
+        self.shared.release(self.index);
+        result
+    }
+}

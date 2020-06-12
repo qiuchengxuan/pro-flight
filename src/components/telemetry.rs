@@ -90,8 +90,9 @@ impl TelemetryUnit {
         }
         let feet = event.to_sea_level_altitude().as_feet();
         self.data.altitude = (feet as i16 + 5) / 10 * 10;
-        let vertical_speed = (self.data.altitude - self.prev_altitude) * 20 * 60 / 100 * 100;
-        self.data.vertical_speed = (self.data.vertical_speed + vertical_speed) / 2;
+        let vertical_speed = (self.data.altitude - self.prev_altitude) * 20 * 60;
+        let delta = (vertical_speed - self.data.vertical_speed) / 10;
+        self.data.vertical_speed = (self.data.vertical_speed + delta) / 100 * 100;
     }
 
     pub fn g_force(&self) -> u8 {
@@ -137,7 +138,7 @@ pub fn barometer_handler(event: Pressure) {
 }
 
 pub fn init(
-    gyro_accel_sample_rate: usize,
+    gyro_accel_sample_rate: u16,
     calibration_loop: u16,
     accel_calibration: Acceleration,
 ) -> &'static TelemetryUnit {

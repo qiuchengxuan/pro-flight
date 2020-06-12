@@ -2,7 +2,7 @@ use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
-use bmp280::bus::{DelayNs, SpiBus};
+use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::Register;
 use embedded_hal::digital::v2::OutputPin;
@@ -23,7 +23,7 @@ use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
 use rs_flight::drivers::bmp280::init as bmp280_init;
 use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
-use rs_flight::drivers::shared_spi::{SharedSpi, VirtualChipSelect, VirtualSpi};
+use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
 use rs_flight::hal::sensors::Pressure;
 
 static mut TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
@@ -150,8 +150,8 @@ pub fn init<'a>(
     let mut css: [&mut dyn OutputPin<Error = Infallible>; 2] = [&mut cs_baro, &mut cs_osd];
     let spi = SharedSpi::new(spi3, &mut css);
 
-    let mut virtual_cs = VirtualChipSelect::new(&spi, 0);
-    let bus = SpiBus::new(VirtualSpi::new(&spi, 0), &mut virtual_cs, TickDelay(clocks.sysclk().0));
+    let mut dummy_cs = DummyOutputPin {};
+    let bus = SpiBus::new(VirtualSpi::new(&spi, 0), &mut dummy_cs, TickDelay(clocks.sysclk().0));
     if let Some(calibration) = bmp280_init(bus, delay).ok().unwrap() {
         unsafe { CALIBRATION = MaybeUninit::new(calibration) };
     } else {

@@ -1,7 +1,7 @@
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use max7456::not_null_writer::NotNullWriter;
-use max7456::registers::{Standard, SyncMode};
+use max7456::registers::Standard;
 use max7456::MAX7456;
 
 type DmaConsumer = fn(&[u8]);
@@ -13,7 +13,6 @@ where
     let mut max7456 = MAX7456::new(bus);
     max7456.reset(delay)?;
     max7456.set_standard(Standard::PAL)?;
-    max7456.set_sync_mode(SyncMode::Internal)?;
     max7456.set_horizental_offset(8)?;
     max7456.enable_display(true)?;
     Ok(())

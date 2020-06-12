@@ -132,7 +132,7 @@ fn main() -> ! {
     .ok();
 
     let calibration = Acceleration { x: 83, y: -2, z: 99, sensitive: 0.0 };
-    let telemetry = telemetry::init(GYRO_SAMPLE_RATE, 256, calibration);
+    let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, calibration);
 
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
