@@ -1,7 +1,7 @@
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
 use ascii_osd_hud::telemetry::TelemetrySource;
-use ascii_osd_hud::AspectRatio;
+use ascii_osd_hud::{AspectRatio, PixelRatio};
 
 pub type ScreenConsumer = fn(&[[u8; 29]; 16]);
 
@@ -11,7 +11,12 @@ pub struct AsciiHud<'a> {
 }
 
 impl<'a> AsciiHud<'a> {
-    pub fn new(telemetry: &'a dyn TelemetrySource) -> Self {
+    pub fn new(
+        telemetry: &'a dyn TelemetrySource,
+        fov: u8,
+        pixel_ratio: PixelRatio,
+        aspect_ratio: AspectRatio,
+    ) -> Self {
         let symbol_table: SymbolTable = enum_map! {
             Symbol::Antenna => 1,
             Symbol::Battery => 144,
@@ -34,7 +39,7 @@ impl<'a> AsciiHud<'a> {
             Symbol::LineRight => 227,
             Symbol::LineRight1 => 228,
         };
-        let hud = HUD::new(telemetry, &symbol_table, 150, aspect_ratio!(5:4));
+        let hud = HUD::new(telemetry, &symbol_table, fov, pixel_ratio, aspect_ratio);
         Self { hud, screen: [[0u8; 29]; 16] }
     }
 

@@ -4,7 +4,6 @@
 extern crate ahrs;
 extern crate arrayvec;
 extern crate ascii;
-#[macro_use]
 extern crate ascii_osd_hud;
 extern crate bmp280;
 extern crate btoi;

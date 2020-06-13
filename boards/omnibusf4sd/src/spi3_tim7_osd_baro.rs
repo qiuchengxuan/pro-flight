@@ -2,6 +2,7 @@ use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
+use ascii_osd_hud::{AspectRatio, PixelRatio};
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::Register;
@@ -135,6 +136,8 @@ pub fn init<'a>(
     pa15: PA15<Input<Floating>>,
     pb3: PB3<Input<Floating>>,
     clocks: Clocks,
+    fov: u8,
+    aspect_ratio: AspectRatio,
     telemetry_source: &'static dyn TelemetrySource,
     baro_handler: EventHandler<Pressure>,
     delay: &mut Delay,
@@ -164,7 +167,12 @@ pub fn init<'a>(
     let mut timer = Timer::tim7(tim7, 50.hz(), clocks);
     timer.listen(Event::TimeOut);
     unsafe {
-        OSD = MaybeUninit::new(AsciiHud::new(telemetry_source));
+        OSD = MaybeUninit::new(AsciiHud::new(
+            telemetry_source,
+            fov,
+            pixel_ratio!(12:18),
+            aspect_ratio,
+        ));
         TIM7 = MaybeUninit::new(timer);
         CS_OSD = MaybeUninit::new(cs_osd);
         CS_BARO = MaybeUninit::new(cs_baro);

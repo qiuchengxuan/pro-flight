@@ -1,3 +1,5 @@
+use log::Level;
+
 use crate::hal::io::Read;
 use crate::hal::sensors::Axes;
 
@@ -6,9 +8,41 @@ pub struct Calibration {
     pub acceleration: Axes,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[repr(usize)]
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum LogLevel {
+    Error = 1,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl Default for LogLevel {
+    fn default() -> Self {
+        Self::Trace
+    }
+}
+
+impl Into<Level> for LogLevel {
+    fn into(self) -> Level {
+        match self {
+            LogLevel::Error => Level::Error,
+            LogLevel::Warn => Level::Warn,
+            LogLevel::Info => Level::Info,
+            LogLevel::Debug => Level::Debug,
+            LogLevel::Trace => Level::Trace,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
 pub struct Config {
+    pub log_level: LogLevel,
     pub calibration: Calibration,
+    pub fov: u8,
+    pub aspect_ratio: (u8, u8),
 }
 
 pub fn read_config<E>(reader: &mut dyn Read<Error = E>) -> Option<Config> {

@@ -3,12 +3,13 @@
 #![feature(alloc_error_handler)]
 
 #[macro_use]
-extern crate cortex_m_rt;
 extern crate ascii_osd_hud;
 extern crate bmp280;
 extern crate cast;
 extern crate chips;
 extern crate cortex_m;
+#[macro_use]
+extern crate cortex_m_rt;
 extern crate cortex_m_systick_countdown;
 extern crate embedded_sdmmc;
 #[macro_use]
@@ -160,6 +161,8 @@ fn main() -> ! {
         }
     };
 
+    let level: Level = config.log_level.into();
+    log::set_max_level(level.to_level_filter());
     let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, config.calibration);
 
     spi3_tim7_osd_baro::init(
@@ -169,6 +172,8 @@ fn main() -> ! {
         gpio_a.pa15,
         gpio_b.pb3,
         clocks,
+        config.fov,
+        config.aspect_ratio.into(),
         telemetry,
         telemetry::barometer_handler,
         &mut delay,
