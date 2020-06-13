@@ -4,16 +4,32 @@ use max7456::not_null_writer::NotNullWriter;
 use max7456::registers::Standard;
 use max7456::MAX7456;
 
+use crate::config::{self, OSD};
+
+impl From<config::Standard> for Standard {
+    fn from(standard: config::Standard) -> Standard {
+        match standard {
+            config::Standard::PAL => Standard::PAL,
+            config::Standard::NTSC => Standard::NTSC,
+        }
+    }
+}
+
 type DmaConsumer = fn(&[u8]);
 
-pub fn init<BUS, E>(bus: BUS, delay: &mut dyn DelayMs<u8>) -> Result<(), E>
+pub fn init<BUS, E>(bus: BUS, delay: &mut dyn DelayMs<u8>, config: &OSD) -> Result<(), E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
     let mut max7456 = MAX7456::new(bus);
     max7456.reset(delay)?;
-    max7456.set_standard(Standard::PAL)?;
-    max7456.set_horizental_offset(8)?;
+    max7456.set_standard(config.standard.into())?;
+    if config.offset.horizental != 0 {
+        max7456.set_horizental_offset(config.offset.horizental)?;
+    }
+    if config.offset.vertical != 0 {
+        max7456.set_vertical_offset(config.offset.vertical)?;
+    }
     max7456.enable_display(true)?;
     Ok(())
 }

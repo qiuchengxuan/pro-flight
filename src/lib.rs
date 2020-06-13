@@ -19,11 +19,12 @@ extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 #[macro_use]
-extern crate serde;
+extern crate sval;
+extern crate sval_json;
 
 #[macro_use]
 pub mod components;
-
+pub mod config;
 pub mod datastructures;
 pub mod drivers;
 pub mod hal;

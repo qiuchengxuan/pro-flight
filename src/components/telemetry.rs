@@ -5,7 +5,7 @@ use ascii_osd_hud::telemetry as hud;
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
-use crate::datastructures::config::Calibration;
+use crate::config::Accelerometer;
 use crate::datastructures::measurement::{quaternion_to_euler, DEGREE_PER_DAG};
 use crate::hal::sensors::{Acceleration, Axes, Gyro, Pressure};
 
@@ -17,7 +17,7 @@ impl Default for IMU {
     }
 }
 
-#[derive(Default, Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Value)]
 pub struct Attitude {
     roll: i16,
     pitch: i8,
@@ -29,7 +29,7 @@ impl Into<hud::Attitude> for Attitude {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Value)]
 pub struct TelemetryData {
     acceleration: Acceleration,
     gyro: Gyro,
@@ -43,8 +43,8 @@ pub struct TelemetryData {
 pub struct TelemetryUnit {
     imu: IMU,
     calibration_loop: u16,
-    accel_calibration: Axes,
-    gyro_calibration: Axes,
+    accelerometer_bias: Axes,
+    gyro_bias: Axes,
 
     counter: usize,
     calibrated: bool,
@@ -60,14 +60,14 @@ impl TelemetryUnit {
         self.counter += 1;
         if !self.calibrated {
             self.data.gyro = gyro;
-            self.gyro_calibration = self.gyro_calibration.average(&gyro.axes);
+            self.gyro_bias = self.gyro_bias.average(&gyro.axes);
             self.calibrated = self.counter >= self.calibration_loop as usize;
         }
 
         self.data.acceleration = acceleration;
         self.data.gyro = gyro;
-        self.data.acceleration.axes.calibrated(&self.accel_calibration);
-        self.data.gyro.axes.calibrated(&self.gyro_calibration);
+        self.data.acceleration.axes.calibrated(&self.accelerometer_bias);
+        self.data.gyro.axes.calibrated(&self.gyro_bias);
 
         let mut gyro: Vector3<f32> = self.data.gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
@@ -112,10 +112,8 @@ impl TelemetryUnit {
 
 impl core::fmt::Display for TelemetryUnit {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match serde_json::to_string_pretty(&self.data) {
-            Ok(string) => f.write_str(&string),
-            Err(_) => f.write_str(""),
-        }
+        sval_json::to_fmt(f, &self.data).ok();
+        Ok(())
     }
 }
 
@@ -146,14 +144,14 @@ pub fn barometer_handler(event: Pressure) {
 pub fn init(
     gyro_accel_sample_rate: u16,
     calibration_loop: u16,
-    calibration: Calibration,
+    config: &Accelerometer,
 ) -> &'static TelemetryUnit {
     let imu = IMU(Mahony::new(1.0 / gyro_accel_sample_rate as f32, 0.5, 0.0));
     unsafe {
         G_TELEMETRY_UNIT = MaybeUninit::new(TelemetryUnit {
             imu,
             calibration_loop,
-            accel_calibration: calibration.acceleration.into(),
+            accelerometer_bias: config.bias.into(),
             ..Default::default()
         });
         &*G_TELEMETRY_UNIT.as_ptr()

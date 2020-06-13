@@ -1,3 +1,4 @@
+use crate::config;
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
 use ascii_osd_hud::telemetry::TelemetrySource;
@@ -8,6 +9,12 @@ pub type ScreenConsumer = fn(&[[u8; 29]; 16]);
 pub struct AsciiHud<'a> {
     hud: HUD<'a>,
     screen: [[u8; 29]; 16],
+}
+
+impl From<config::AspectRatio> for AspectRatio {
+    fn from(aspect_ratio: config::AspectRatio) -> AspectRatio {
+        AspectRatio(aspect_ratio.0, aspect_ratio.1)
+    }
 }
 
 impl<'a> AsciiHud<'a> {

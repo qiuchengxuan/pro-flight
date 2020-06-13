@@ -1,0 +1,23 @@
+accelerometer:
+  bias:
+    x: 83
+    y: -1
+    z: 99
+  gain:
+    x: 4079
+    y: 4079
+    z: 4017
+osd:
+  fov: 150
+  aspect-ratio:
+    width: 16
+    height: 9
+  standard: PAL
+  offset:
+    horizental: 8
+    vertial: 0
+serials:
+  UART6:
+    baudrate: 115200
+gnss:
+  protocol: UBLOX

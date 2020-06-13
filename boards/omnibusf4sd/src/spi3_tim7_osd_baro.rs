@@ -2,7 +2,7 @@ use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
-use ascii_osd_hud::{AspectRatio, PixelRatio};
+use ascii_osd_hud::PixelRatio;
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::Register;
@@ -21,6 +21,7 @@ use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
 use rs_flight::components::ascii_hud::AsciiHud;
+use rs_flight::config::OSD;
 use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
 use rs_flight::drivers::bmp280::init as bmp280_init;
 use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
@@ -136,8 +137,7 @@ pub fn init<'a>(
     pa15: PA15<Input<Floating>>,
     pb3: PB3<Input<Floating>>,
     clocks: Clocks,
-    fov: u8,
-    aspect_ratio: AspectRatio,
+    config: &OSD,
     telemetry_source: &'static dyn TelemetrySource,
     baro_handler: EventHandler<Pressure>,
     delay: &mut Delay,
@@ -160,7 +160,7 @@ pub fn init<'a>(
     } else {
         return Ok(());
     }
-    max7456_init(VirtualSpi::new(&spi, 1), delay)?;
+    max7456_init(VirtualSpi::new(&spi, 1), delay, config)?;
 
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
     spi3.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
@@ -169,9 +169,9 @@ pub fn init<'a>(
     unsafe {
         OSD = MaybeUninit::new(AsciiHud::new(
             telemetry_source,
-            fov,
+            config.fov,
             pixel_ratio!(12:18),
-            aspect_ratio,
+            config.aspect_ratio.into(),
         ));
         TIM7 = MaybeUninit::new(timer);
         CS_OSD = MaybeUninit::new(cs_osd);

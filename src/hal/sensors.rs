@@ -2,7 +2,7 @@ use nalgebra::Vector3;
 
 use crate::datastructures::measurement::Altitude;
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
 pub struct Axes {
     pub x: i32,
     pub y: i32,
@@ -31,7 +31,7 @@ impl PartialOrd for Axes {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Value)]
 pub struct Measurement {
     pub axes: Axes,
     pub sensitive: i32,

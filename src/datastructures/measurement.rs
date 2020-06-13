@@ -4,7 +4,7 @@ use nalgebra::Quaternion;
 
 pub const DEGREE_PER_DAG: f32 = 180.0 / core::f32::consts::PI;
 
-#[derive(Default, Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Value)]
 pub struct Euler {
     pub phi: f32,
     pub theta: f32,

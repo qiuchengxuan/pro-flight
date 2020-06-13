@@ -44,7 +44,7 @@ use rs_flight::components::console::{self, Console};
 use rs_flight::components::logger::{self};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::components::telemetry;
-use rs_flight::datastructures::config::{read_config, Config};
+use rs_flight::config::{read_config, Config};
 use rs_flight::datastructures::event::event_nop_handler;
 use rs_flight::hal::sensors::Temperature;
 use rs_flight::hal::AccelGyroHandler;
@@ -149,11 +149,9 @@ fn main() -> ! {
     );
 
     let mut config: Config = Default::default();
-    match File::open("sdcard://config.cfg") {
+    match File::open("sdcard://config.yml") {
         Ok(mut file) => {
-            if let Some(cfg) = read_config(&mut file) {
-                config = cfg;
-            }
+            config = read_config(&mut file);
             file.close();
         }
         Err(e) => {
@@ -161,9 +159,7 @@ fn main() -> ! {
         }
     };
 
-    let level: Level = config.log_level.into();
-    log::set_max_level(level.to_level_filter());
-    let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, config.calibration);
+    let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, &config.accelerometer);
 
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,
@@ -172,8 +168,7 @@ fn main() -> ! {
         gpio_a.pa15,
         gpio_b.pb3,
         clocks,
-        config.fov,
-        config.aspect_ratio.into(),
+        &config.osd,
         telemetry,
         telemetry::barometer_handler,
         &mut delay,
