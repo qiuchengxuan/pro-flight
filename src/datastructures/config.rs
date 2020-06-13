@@ -1,15 +1,9 @@
 use crate::hal::io::Read;
-
-#[derive(Default, Serialize, Deserialize)]
-pub struct XYZ {
-    pub x: i16,
-    pub y: i16,
-    pub z: i16,
-}
+use crate::hal::sensors::Axes;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct Calibration {
-    pub acceleration: XYZ,
+    pub acceleration: Axes,
 }
 
 #[derive(Default, Serialize, Deserialize)]

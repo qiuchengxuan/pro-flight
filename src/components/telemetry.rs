@@ -7,7 +7,7 @@ use nalgebra::Vector3;
 
 use crate::datastructures::config::Calibration;
 use crate::datastructures::measurement::{quaternion_to_euler, DEGREE_PER_DAG};
-use crate::hal::sensors::{Acceleration, Gyro, Pressure};
+use crate::hal::sensors::{Acceleration, Axes, Gyro, Pressure};
 
 pub struct IMU(Mahony<f32>);
 
@@ -43,8 +43,8 @@ pub struct TelemetryData {
 pub struct TelemetryUnit {
     imu: IMU,
     calibration_loop: u16,
-    accel_calibration: Acceleration,
-    gyro_calibration: Gyro,
+    accel_calibration: Axes,
+    gyro_calibration: Axes,
 
     counter: usize,
     calibrated: bool,
@@ -60,11 +60,15 @@ impl TelemetryUnit {
         self.counter += 1;
         if !self.calibrated {
             self.data.gyro = gyro;
-            self.gyro_calibration = self.gyro_calibration.average(&gyro);
+            self.gyro_calibration = self.gyro_calibration.average(&gyro.axes);
             self.calibrated = self.counter >= self.calibration_loop as usize;
         }
-        self.data.acceleration = acceleration.calibrated(&self.accel_calibration);
-        self.data.gyro = gyro.calibrated(&self.gyro_calibration);
+
+        self.data.acceleration = acceleration;
+        self.data.gyro = gyro;
+        self.data.acceleration.axes.calibrated(&self.accel_calibration);
+        self.data.gyro.axes.calibrated(&self.gyro_calibration);
+
         let mut gyro: Vector3<f32> = self.data.gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
         match self.imu.0.update_imu(&gyro, &(acceleration.into())) {
@@ -98,9 +102,10 @@ impl TelemetryUnit {
 
     pub fn g_force(&self) -> u8 {
         let acceleration = self.data.acceleration;
-        let (x, y, z) = (acceleration.x as i32, acceleration.y as i32, acceleration.z as i32);
-        let g_force = ((x * x + y * y + z * z) as u32).integer_sqrt();
-        let g_force = (g_force as f32 / acceleration.sensitive * 100.0) as u16;
+        let axes = acceleration.axes;
+        let (x, y, z) = (axes.x as i32, axes.y as i32, axes.z as i32);
+        let g_force = (x * x + y * y + z * z).integer_sqrt();
+        let g_force = (g_force / acceleration.sensitive * 100) as u16;
         ((g_force + 5) / 10) as u8
     }
 }
@@ -144,17 +149,11 @@ pub fn init(
     calibration: Calibration,
 ) -> &'static TelemetryUnit {
     let imu = IMU(Mahony::new(1.0 / gyro_accel_sample_rate as f32, 0.5, 0.0));
-    let acceleration = calibration.acceleration;
     unsafe {
         G_TELEMETRY_UNIT = MaybeUninit::new(TelemetryUnit {
             imu,
             calibration_loop,
-            accel_calibration: Acceleration {
-                x: acceleration.x,
-                y: acceleration.y,
-                z: acceleration.z,
-                sensitive: 1.0,
-            },
+            accel_calibration: calibration.acceleration.into(),
             ..Default::default()
         });
         &*G_TELEMETRY_UNIT.as_ptr()

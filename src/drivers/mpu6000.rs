@@ -3,23 +3,28 @@ use mpu6000::bus::Bus;
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
 use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
 
-use crate::hal::sensors::Measurement;
+use crate::hal::sensors::{Axes, Measurement};
+
+pub const ACCELEROMETER_SENSITIVE: AccelerometerSensitive =
+    accelerometer_sensitive!(+/-4g, 8192/LSB);
+pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
     fn into(self) -> Measurement {
-        Measurement { x: self.x, y: self.y, z: self.z, sensitive: self.sensitive.into() }
+        let axes = Axes { x: self.x as i32, y: self.y as i32, z: self.z as i32 };
+        let sensitive: f32 = ACCELEROMETER_SENSITIVE.into();
+        Measurement { axes, sensitive: sensitive as i32 }
     }
 }
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<GyroSensitive> {
     fn into(self) -> Measurement {
-        Measurement { x: self.x, y: self.y, z: self.z, sensitive: self.sensitive.into() }
+        let axes =
+            Axes { x: (self.x as i32) << 8, y: (self.y as i32) << 8, z: (self.z as i32) << 8 };
+        let sensitive: f32 = GYRO_SENSITIVE.into();
+        Measurement { axes, sensitive: (sensitive * 256.0) as i32 }
     }
 }
-
-pub const ACCELEROMETER_SENSITIVE: AccelerometerSensitive =
-    accelerometer_sensitive!(+/-4g, 8192/LSB);
-pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 
 pub fn init<E, BUS, D>(bus: BUS, sample_rate: u16, delay: &mut D) -> Result<bool, E>
 where

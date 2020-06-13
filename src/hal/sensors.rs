@@ -2,45 +2,26 @@ use nalgebra::Vector3;
 
 use crate::datastructures::measurement::Altitude;
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Measurement {
-    pub x: i16,
-    pub y: i16,
-    pub z: i16,
-    pub sensitive: f32,
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+pub struct Axes {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
 }
 
-impl core::fmt::Display for Measurement {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(
-            f,
-            "{{\"x\":{},\"y\":{},\"z\":{},\"sensitive\":{}}}",
-            self.x, self.y, self.z, self.sensitive
-        )
-    }
-}
-
-impl Measurement {
+impl Axes {
     pub fn average(self: &Self, other: &Self) -> Self {
-        Self {
-            x: ((self.x as i32 + other.x as i32) / 2) as i16,
-            y: ((self.y as i32 + other.y as i32) / 2) as i16,
-            z: ((self.z as i32 + other.z as i32) / 2) as i16,
-            sensitive: other.sensitive,
-        }
+        Self { x: (self.x + other.x) / 2, y: (self.y + other.y) / 2, z: (self.z + other.z) / 2 }
     }
 
-    pub fn calibrated(self, calibration: &Self) -> Self {
-        Self {
-            x: self.x - calibration.x,
-            y: self.y - calibration.y,
-            z: self.z - calibration.z,
-            sensitive: self.sensitive,
-        }
+    pub fn calibrated(&mut self, calibration: &Self) {
+        self.x -= calibration.x;
+        self.y -= calibration.y;
+        self.z -= calibration.z;
     }
 }
 
-impl PartialOrd for Measurement {
+impl PartialOrd for Axes {
     fn partial_cmp(self: &Self, other: &Self) -> Option<core::cmp::Ordering> {
         if self.x > other.x || self.y > other.y || self.z > other.z {
             Some(core::cmp::Ordering::Greater)
@@ -50,12 +31,24 @@ impl PartialOrd for Measurement {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Measurement {
+    pub axes: Axes,
+    pub sensitive: i32,
+}
+
+impl PartialOrd for Measurement {
+    fn partial_cmp(self: &Self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.axes.partial_cmp(&other.axes)
+    }
+}
+
 impl Into<(f32, f32, f32)> for Measurement {
     fn into(self) -> (f32, f32, f32) {
         (
-            self.x as f32 / self.sensitive,
-            self.y as f32 / self.sensitive,
-            self.z as f32 / self.sensitive,
+            (self.axes.x as f32 / self.sensitive as f32),
+            (self.axes.y as f32 / self.sensitive as f32),
+            (self.axes.z as f32 / self.sensitive as f32),
         )
     }
 }
@@ -63,16 +56,16 @@ impl Into<(f32, f32, f32)> for Measurement {
 impl Into<Vector3<f32>> for Measurement {
     fn into(self) -> Vector3<f32> {
         Vector3::new(
-            self.x as f32 / self.sensitive,
-            self.y as f32 / self.sensitive,
-            self.z as f32 / self.sensitive,
+            self.axes.x as f32 / self.sensitive as f32,
+            self.axes.y as f32 / self.sensitive as f32,
+            self.axes.z as f32 / self.sensitive as f32,
         )
     }
 }
 
 impl Default for Measurement {
     fn default() -> Self {
-        Self { x: 0, y: 0, z: 0, sensitive: 1.0 }
+        Self { axes: Default::default(), sensitive: 1 }
     }
 }
 
