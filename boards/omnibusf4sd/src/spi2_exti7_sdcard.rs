@@ -1,10 +1,8 @@
-use core::fmt::Write;
 use core::mem::MaybeUninit;
 
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::spi::MODE_3;
 use embedded_sdmmc::{Controller, Directory, SdMmcSpi, TimeSource, Timestamp, Volume, VolumeIdx};
-use rs_flight::components::logger::Logger;
 use stm32f4xx_hal::gpio::gpiob::{PB12, PB13, PB14, PB15, PB7};
 use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::gpio::{Floating, Input, PullUp};
@@ -34,9 +32,9 @@ unsafe fn EXTI9_5() {
     });
 
     if pin.is_low().ok().unwrap() {
-        log!("SD CARD INSERTED");
+        debug!("SD CARD INSERTED");
     } else {
-        log!("SD CARD EJECTED");
+        debug!("SD CARD EJECTED");
     }
 }
 

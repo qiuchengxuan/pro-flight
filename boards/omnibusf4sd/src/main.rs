@@ -11,6 +11,8 @@ extern crate chips;
 extern crate cortex_m;
 extern crate cortex_m_systick_countdown;
 extern crate embedded_sdmmc;
+#[macro_use]
+extern crate log;
 extern crate max7456;
 extern crate mpu6000;
 extern crate nb;
@@ -36,9 +38,10 @@ use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
+use log::Level;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
-use rs_flight::components::logger::{self, Logger};
+use rs_flight::components::logger::{self};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::components::telemetry;
 use rs_flight::datastructures::event::event_nop_handler;
@@ -81,13 +84,13 @@ fn main() -> ! {
 
     unsafe { ALLOCATOR.init(&HEAP as *const u8 as usize, HEAP.len()) }
     unsafe { LOG_BUFFER = core::mem::zeroed() };
-    logger::init(unsafe { &mut LOG_BUFFER });
+    logger::init(unsafe { &mut LOG_BUFFER }, Level::Trace);
     if unsafe { PANIC } {
         unsafe { PANIC = false };
-        log!("Last panic at pc {:x}", unsafe { &*PANIC_FRAME.as_ptr() }.pc);
+        warn!("Last panic at pc {:x}", unsafe { &*PANIC_FRAME.as_ptr() }.pc);
     }
-    log!("hclk: {}mhz", clocks.hclk().0 / 1000_000);
-    log!("stack top: {:x}", cortex_m::register::msp::read());
+    info!("hclk: {}mhz", clocks.hclk().0 / 1000_000);
+    info!("stack top: {:x}", cortex_m::register::msp::read());
 
     unsafe {
         let rcc = &*stm32::RCC::ptr();
@@ -149,7 +152,7 @@ fn main() -> ! {
     if let Some(tuple) = option {
         let (mut controller, mut volume, mut root) = tuple;
         let config = sdcard::read_json_file((&mut controller, &mut volume, &mut root));
-        log!("{}", serde_json::to_string_pretty(&config).ok().unwrap());
+        info!("{}", serde_json::to_string_pretty(&config).ok().unwrap());
     }
 
     spi3_tim7_osd_baro::init(

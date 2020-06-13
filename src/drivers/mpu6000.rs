@@ -1,11 +1,8 @@
-use core::fmt::Write;
-
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 use mpu6000::bus::Bus;
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
 use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
 
-use crate::components::logger::Logger;
 use crate::hal::sensors::Measurement;
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
@@ -34,7 +31,7 @@ where
     if !mpu6000.verify()? {
         return Ok(false);
     }
-    log!("MPU6000 detected");
+    info!("MPU6000 detected");
     mpu6000.set_sleep(false)?;
     delay.delay_us(15u8);
     mpu6000.set_i2c_disable(true)?;

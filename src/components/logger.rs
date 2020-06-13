@@ -1,10 +1,13 @@
-use core::fmt;
+use core::fmt::{Result, Write};
 use core::sync::atomic::{AtomicPtr, Ordering};
+
+use log::{Level, Log, Metadata, Record};
 
 static mut LOG_BUFFER: &'static mut [u8] = &mut [0u8; 0];
 static mut INDEX: AtomicPtr<usize> = AtomicPtr::new(0 as *mut usize);
+static mut LEVEL: Level = Level::Trace;
 
-pub struct Logger;
+pub struct Logger {}
 
 impl Logger {
     fn allocate(&self, len: usize) -> usize {
@@ -20,8 +23,8 @@ impl Logger {
     }
 }
 
-impl fmt::Write for Logger {
-    fn write_char(&mut self, c: char) -> fmt::Result {
+impl Write for Logger {
+    fn write_char(&mut self, c: char) -> Result {
         let buffer = unsafe { &mut LOG_BUFFER };
         if buffer.len() == 0 {
             return Ok(());
@@ -31,7 +34,7 @@ impl fmt::Write for Logger {
         Ok(())
     }
 
-    fn write_str(&mut self, s: &str) -> fmt::Result {
+    fn write_str(&mut self, s: &str) -> Result {
         let buffer = unsafe { &mut LOG_BUFFER };
         let bytes = s.as_bytes();
         if buffer.len() <= bytes.len() {
@@ -49,16 +52,35 @@ impl fmt::Write for Logger {
     }
 }
 
-#[macro_export]
-macro_rules! log {
-    ($($arg:tt)*) => {
-        write!(&mut Logger{}, $($arg)*).ok();
-        write!(&mut Logger{}, "\r\n").ok();
-    };
+impl Log for Logger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= unsafe { LEVEL }
+    }
+
+    fn log(&self, record: &Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let level_char = match record.level() {
+            Level::Error => 'E',
+            Level::Warn => 'W',
+            Level::Info => 'I',
+            Level::Debug => 'D',
+            Level::Trace => 'T',
+        };
+        write!(&mut Logger {}, "{}: {}\r\n", level_char, record.args()).ok();
+    }
+
+    fn flush(&self) {}
 }
 
-pub fn init(buffer: &'static mut [u8]) {
-    unsafe { LOG_BUFFER = buffer }
+pub fn init(buffer: &'static mut [u8], level: Level) {
+    unsafe {
+        LOG_BUFFER = buffer;
+        LEVEL = level
+    }
+    log::set_logger(&Logger {}).ok();
+    log::set_max_level(level.to_level_filter());
 }
 
 pub struct LogReader((usize, usize));
@@ -96,13 +118,12 @@ pub fn reader() -> LogReader {
 mod test {
     #[test]
     fn write_log() {
-        use super::Logger;
-        use core::fmt::Write;
+        use log::{info, Level};
 
         static mut BUFFER: [u8; 100] = [0u8; 100];
-        super::init(unsafe { &mut BUFFER });
-        log!("test a");
-        log!("test b");
-        assert_eq!(super::reader().next().unwrap(), b"test a\r\ntest b\r\n");
+        super::init(unsafe { &mut BUFFER }, Level::Trace);
+        info!("test a");
+        info!("test b");
+        assert_eq!(super::reader().next().unwrap(), b"I: test a\r\nI: test b\r\n");
     }
 }

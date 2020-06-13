@@ -12,6 +12,8 @@ extern crate btoi;
 extern crate enum_map;
 extern crate embedded_sdmmc;
 extern crate integer_sqrt;
+#[macro_use]
+extern crate log;
 extern crate micromath;
 #[macro_use]
 extern crate mpu6000;
