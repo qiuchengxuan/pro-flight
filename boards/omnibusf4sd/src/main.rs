@@ -22,7 +22,6 @@ extern crate usb_device;
 #[macro_use]
 extern crate rs_flight;
 
-mod sdcard;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
@@ -44,9 +43,11 @@ use rs_flight::components::console::{self, Console};
 use rs_flight::components::logger::{self};
 use rs_flight::components::sysled::Sysled;
 use rs_flight::components::telemetry;
+use rs_flight::datastructures::config::{read_config, Config};
 use rs_flight::datastructures::event::event_nop_handler;
-use rs_flight::hal::sensors::{Acceleration, Temperature};
+use rs_flight::hal::sensors::Temperature;
 use rs_flight::hal::AccelGyroHandler;
+use rs_flight::sys::fs::File;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::Edge;
 use stm32f4xx_hal::gpio::ExtiPin;
@@ -134,14 +135,11 @@ fn main() -> ! {
     )
     .ok();
 
-    let calibration = Acceleration { x: 83, y: -2, z: 99, sensitive: 0.0 };
-    let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, calibration);
-
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::RISING_FALLING);
-    let option = spi2_exti7_sdcard::init(
+    spi2_exti7_sdcard::init(
         peripherals.SPI2,
         (gpio_b.pb13, gpio_b.pb14, gpio_b.pb15),
         gpio_b.pb12,
@@ -149,11 +147,20 @@ fn main() -> ! {
         int,
     );
 
-    if let Some(tuple) = option {
-        let (mut controller, mut volume, mut root) = tuple;
-        let config = sdcard::read_json_file((&mut controller, &mut volume, &mut root));
-        info!("{}", serde_json::to_string_pretty(&config).ok().unwrap());
-    }
+    let mut config: Config = Default::default();
+    match File::open("sdcard://config.cfg") {
+        Ok(mut file) => {
+            if let Some(cfg) = read_config(&mut file) {
+                config = cfg;
+            }
+            file.close();
+        }
+        Err(e) => {
+            warn!("{:?}", e);
+        }
+    };
+
+    let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, config.calibration);
 
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,

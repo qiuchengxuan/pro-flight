@@ -5,6 +5,7 @@ use ascii_osd_hud::telemetry as hud;
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
+use crate::datastructures::config::Calibration;
 use crate::datastructures::measurement::{quaternion_to_euler, DEGREE_PER_DAG};
 use crate::hal::sensors::{Acceleration, Gyro, Pressure};
 
@@ -140,14 +141,20 @@ pub fn barometer_handler(event: Pressure) {
 pub fn init(
     gyro_accel_sample_rate: u16,
     calibration_loop: u16,
-    accel_calibration: Acceleration,
+    calibration: Calibration,
 ) -> &'static TelemetryUnit {
     let imu = IMU(Mahony::new(1.0 / gyro_accel_sample_rate as f32, 0.5, 0.0));
+    let acceleration = calibration.acceleration;
     unsafe {
         G_TELEMETRY_UNIT = MaybeUninit::new(TelemetryUnit {
             imu,
             calibration_loop,
-            accel_calibration,
+            accel_calibration: Acceleration {
+                x: acceleration.x,
+                y: acceleration.y,
+                z: acceleration.z,
+                sensitive: 1.0,
+            },
             ..Default::default()
         });
         &*G_TELEMETRY_UNIT.as_ptr()

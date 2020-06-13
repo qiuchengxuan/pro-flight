@@ -29,10 +29,3 @@ stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 
 [lib]
 name = "rs_flight"
-
-[profile.release]
-panic = "abort"
-codegen-units = 1 # better optimizations
-debug = true # symbols are nice and they don't increase the size on Flash
-lto = true # better optimizations
-# opt-level = "z"

@@ -1,8 +1,10 @@
+use crate::hal::io::Read;
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct XYZ {
-    x: i16,
-    y: i16,
-    z: i16,
+    pub x: i16,
+    pub y: i16,
+    pub z: i16,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -15,9 +17,9 @@ pub struct Config {
     pub calibration: Calibration,
 }
 
-pub fn read_config<F: Fn(&mut [u8]) -> usize>(reader: F) -> Option<Config> {
+pub fn read_config<E>(reader: &mut dyn Read<Error = E>) -> Option<Config> {
     let mut buffer = [0u8; 1024];
-    let size = reader(&mut buffer);
+    let size = reader.read(&mut buffer).ok().unwrap_or(0);
     if size == 0 {
         return None;
     }

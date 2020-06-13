@@ -28,6 +28,7 @@ pub mod components;
 pub mod datastructures;
 pub mod drivers;
 pub mod hal;
+pub mod sys;
 
 #[cfg(test)]
 extern crate std;
