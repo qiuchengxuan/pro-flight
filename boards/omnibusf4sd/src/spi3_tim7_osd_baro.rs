@@ -3,6 +3,7 @@ use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
 use ascii_osd_hud::PixelRatio;
+
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::Register;
@@ -22,7 +23,7 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::config::OSD;
-use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
+use rs_flight::datastructures::ring_buffer::{RingBuffer, RingBufferReader};
 use rs_flight::drivers::bmp280::init as bmp280_init;
 use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
 use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
@@ -35,7 +36,7 @@ static mut CS_OSD: MaybeUninit<PA15<Output<PushPull>>> = MaybeUninit::uninit();
 static mut CS_BARO: MaybeUninit<PB3<Output<PushPull>>> = MaybeUninit::uninit();
 static mut CALIBRATION: MaybeUninit<Calibration> = MaybeUninit::uninit();
 static mut DMA_BUFFER: [u8; 8] = [0u8; 8];
-static mut BARO_HANDLER: EventHandler<Pressure> = event_nop_handler;
+static mut RING_BUFFER: MaybeUninit<RingBuffer<Pressure>> = MaybeUninit::uninit();
 
 pub struct TickDelay(u32);
 
@@ -77,7 +78,8 @@ unsafe fn DMA1_STREAM2() {
     let raw_pressure = RawPressure::from_bytes(&DMA_BUFFER[2..]);
     let t_fine = RawTemperature::from_bytes(&DMA_BUFFER[5..]).t_fine(calibration);
     let pressure = raw_pressure.compensated(t_fine, calibration);
-    BARO_HANDLER(Pressure(pressure));
+    let ring_buffer = &mut *RING_BUFFER.as_mut_ptr();
+    ring_buffer.write(Pressure(pressure));
 
     { &mut *CS_BARO.as_mut_ptr() }.set_high().ok();
     { &mut *CS_OSD.as_mut_ptr() }.set_low().ok();
@@ -130,6 +132,13 @@ unsafe fn TIM7() {
     cr.write(|w| w.chsel().bits(0).dir().memory_to_peripheral().en().enabled());
 }
 
+pub fn init_ring() -> RingBufferReader<'static, Pressure> {
+    #[link_section = ".ccmram"]
+    static mut BUFFER: [Pressure; 8] = [Pressure(0); 8];
+    unsafe { RING_BUFFER = MaybeUninit::new(RingBuffer::new(&mut BUFFER)) };
+    RingBufferReader::new(unsafe { &*RING_BUFFER.as_ptr() })
+}
+
 pub fn init<'a>(
     spi3: stm32::SPI3,
     tim7: stm32::TIM7,
@@ -139,9 +148,8 @@ pub fn init<'a>(
     clocks: Clocks,
     config: &OSD,
     telemetry_source: &'static dyn TelemetrySource,
-    baro_handler: EventHandler<Pressure>,
     delay: &mut Delay,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     let mut cs_osd = pa15.into_push_pull_output();
     let mut cs_baro = pb3.into_push_pull_output();
     let (pc10, pc11, pc12) = spi3_pins;
@@ -158,7 +166,7 @@ pub fn init<'a>(
     if let Some(calibration) = bmp280_init(bus, delay).ok().unwrap() {
         unsafe { CALIBRATION = MaybeUninit::new(calibration) };
     } else {
-        return Ok(());
+        return Ok(false);
     }
     max7456_init(VirtualSpi::new(&spi, 1), delay, config)?;
 
@@ -176,12 +184,11 @@ pub fn init<'a>(
         TIM7 = MaybeUninit::new(timer);
         CS_OSD = MaybeUninit::new(cs_osd);
         CS_BARO = MaybeUninit::new(cs_baro);
-        BARO_HANDLER = baro_handler;
     }
 
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA1_STREAM2) }
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::TIM7);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::TIM7) }
-    Ok(())
+    Ok(true)
 }

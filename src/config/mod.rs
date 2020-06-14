@@ -32,7 +32,8 @@ impl FromYAML for Axes {
         }
     }
 }
-#[derive(Default)]
+
+#[derive(Default, Debug)]
 pub struct Config {
     pub accelerometer: Accelerometer,
     pub aspect_ratio: AspectRatio,

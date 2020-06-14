@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::hal::io::Read;
 
 #[derive(Copy, Clone)]
@@ -60,6 +62,7 @@ pub struct Media {
     pub open: fn(path: &str, options: OpenOptions) -> Result<FileDescriptor, Error>,
     pub close: fn(fd: FileDescriptor),
     pub read: fn(fd: &FileDescriptor, buf: &mut [u8]) -> Result<usize, Error>,
+    pub write: fn(fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, Error>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -75,10 +78,13 @@ fn no_close(_: FileDescriptor) {}
 fn no_read(_: &FileDescriptor, _: &mut [u8]) -> Result<usize, Error> {
     Ok(0)
 }
+fn no_write(_: &FileDescriptor, _: &[u8]) -> Result<usize, Error> {
+    Ok(0)
+}
 
 macro_rules! no_media {
     () => {
-        Media { open: no_open, close: no_close, read: no_read }
+        Media { open: no_open, close: no_close, read: no_read, write: no_write }
     };
 }
 
@@ -117,6 +123,31 @@ impl Read for File {
             (medias[self.schema as usize].read)(&fd, buf)
         } else {
             Ok(0)
+        }
+    }
+}
+
+impl fmt::Write for File {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        let medias = unsafe { &MEDIAS };
+        if let Some(fd) = &self.fd {
+            match (medias[self.schema as usize].write)(&fd, &[c as u8]) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(fmt::Error),
+            }
+        } else {
+            Err(fmt::Error)
+        }
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        if let Some(fd) = &self.fd {
+            let medias = unsafe { &MEDIAS };
+            let write = medias[self.schema as usize].write;
+            (write)(&fd, s.as_bytes()).map_err(|_| fmt::Error)?;
+            Ok(())
+        } else {
+            Err(fmt::Error)
         }
     }
 }

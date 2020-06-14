@@ -1,7 +1,7 @@
 use super::yaml::{ByteIter, Entry, FromYAML};
 use crate::hal::sensors::Axes;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Accelerometer {
     pub bias: Axes,
     pub gain: Axes,

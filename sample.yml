@@ -20,4 +20,4 @@ serials:
   UART6:
     baudrate: 115200
 gnss:
-  protocol: UBLOX
+  protocol: NMEA

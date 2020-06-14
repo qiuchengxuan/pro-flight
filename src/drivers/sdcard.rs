@@ -99,6 +99,17 @@ impl<'a, D: BlockDevice, T: TimeSource> Sdcard<'a, D, T> {
         }
     }
 
+    pub fn write(&mut self, fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, fs::Error> {
+        if let Some(file) = &mut self.files[fd.0] {
+            match self.controller.write(&mut self.volume, file, bytes) {
+                Ok(size) => Ok(size),
+                Err(_) => Err(fs::Error::Generic),
+            }
+        } else {
+            Err(fs::Error::NotFound)
+        }
+    }
+
     pub fn destroy(&mut self) {
         if let Some(root) = self.root.take() {
             self.controller.close_dir(&self.volume, root);

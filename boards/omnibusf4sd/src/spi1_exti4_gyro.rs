@@ -2,12 +2,13 @@ use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use mpu6000::bus::{self, DelayNs, SpiBus};
-use mpu6000::measurement::{Measurement, Temperature};
+use mpu6000::measurement;
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
-use rs_flight::datastructures::event::{event_nop_handler, EventHandler};
+
+use rs_flight::datastructures::ring_buffer::{RingBuffer, RingBufferReader};
 use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
-use rs_flight::hal::{sensors, AccelGyroHandler};
+use rs_flight::hal::sensors::{Acceleration, Gyro, Temperature};
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
 use stm32f4xx_hal::gpio::gpioc::PC4;
@@ -33,13 +34,14 @@ impl DelayNs<u16> for TickDelay {
 }
 
 type SpiError = bus::SpiError<Error, Error, Infallible>;
+type AccelGyro = (Acceleration, Gyro);
+
 static mut CS: MaybeUninit<PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut INT: MaybeUninit<PC4<Input<PullUp>>> = MaybeUninit::uninit();
 #[export_name = "GYRO_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 16] = [0u8; 16];
-
-static mut ACCEL_GYRO_HANDLER: AccelGyroHandler = event_nop_handler;
-static mut TEMPERATURE_HANDLER: EventHandler<sensors::Temperature<i16>> = event_nop_handler;
+static mut ACCEL_GYRO_RING: MaybeUninit<RingBuffer<AccelGyro>> = MaybeUninit::uninit();
+static mut TEMPERATURE_RING: MaybeUninit<RingBuffer<Temperature>> = MaybeUninit::uninit();
 
 #[interrupt]
 unsafe fn EXTI4() {
@@ -93,13 +95,32 @@ unsafe fn DMA2_STREAM0() {
     });
 
     let buf = &DMA_BUFFER;
-    let acceleration = Measurement::from_bytes(&buf[1..], ACCELEROMETER_SENSITIVE);
-    let temperature = Temperature(i16::from_be_bytes([buf[7], buf[8]]));
-    let gyro = Measurement::from_bytes(&buf[9..], GYRO_SENSITIVE);
-    ACCEL_GYRO_HANDLER((acceleration.into(), gyro.into()));
-    TEMPERATURE_HANDLER(temperature.centi_celcius());
-
+    let acceleration = measurement::Measurement::from_bytes(&buf[1..], ACCELEROMETER_SENSITIVE);
+    let temperature = measurement::Temperature(i16::from_be_bytes([buf[7], buf[8]]));
+    let gyro = measurement::Measurement::from_bytes(&buf[9..], GYRO_SENSITIVE);
+    let ring_buffer = &mut *ACCEL_GYRO_RING.as_mut_ptr();
+    ring_buffer.write((acceleration.into(), gyro.into()));
+    let ring_buffer = &mut *TEMPERATURE_RING.as_mut_ptr();
+    ring_buffer.write(temperature.0);
     { &mut *CS.as_mut_ptr() }.set_high().ok();
+}
+
+pub fn init_accel_gyro_ring() -> RingBufferReader<'static, AccelGyro> {
+    #[link_section = ".ccmram"]
+    static mut ACCEL_GYRO_BUFFER: MaybeUninit<[AccelGyro; 40]> = MaybeUninit::uninit();
+    unsafe {
+        ACCEL_GYRO_RING = MaybeUninit::new(RingBuffer::new(&mut *ACCEL_GYRO_BUFFER.as_mut_ptr()))
+    };
+    RingBufferReader::new(unsafe { &*ACCEL_GYRO_RING.as_ptr() })
+}
+
+pub fn init_temperature_ring() -> RingBufferReader<'static, Temperature> {
+    #[link_section = ".ccmram"]
+    static mut TEMPERATURE_BUFFER: MaybeUninit<[Temperature; 40]> = MaybeUninit::uninit();
+    unsafe {
+        TEMPERATURE_RING = MaybeUninit::new(RingBuffer::new(&mut *TEMPERATURE_BUFFER.as_mut_ptr()));
+    }
+    RingBufferReader::new(unsafe { &*TEMPERATURE_RING.as_ptr() })
 }
 
 pub fn init(
@@ -108,10 +129,9 @@ pub fn init(
     pa4: PA4<Input<Floating>>,
     int: PC4<Input<PullUp>>,
     clocks: Clocks,
-    event_handlers: (AccelGyroHandler, EventHandler<sensors::Temperature<i16>>),
     delay: &mut Delay,
     sample_rate: u16,
-) -> Result<(), SpiError> {
+) -> Result<bool, SpiError> {
     let mut cs = pa4.into_push_pull_output();
     let (pa5, pa6, pa7) = spi1_pins;
     let sclk = pa5.into_alternate_af5();
@@ -122,7 +142,7 @@ pub fn init(
     let spi1 = Spi::spi1(spi1, (sclk, miso, mosi), SPI_MODE, freq, clocks);
     let bus = SpiBus::new(spi1, &mut cs, TickDelay(clocks.sysclk().0));
     if !mpu6000_init(bus, sample_rate, delay)? {
-        return Ok(());
+        return Ok(false);
     }
 
     let freq: stm32f4xx_hal::time::Hertz = 20.mhz().into();
@@ -141,17 +161,14 @@ pub fn init(
     spi1.cr1.modify(|_, w| w.br().bits(br));
     spi1.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
 
-    let (accel_gyro_handler, temperature_handler) = event_handlers;
     unsafe {
         CS = MaybeUninit::new(cs);
         INT = MaybeUninit::new(int);
-        ACCEL_GYRO_HANDLER = accel_gyro_handler;
-        TEMPERATURE_HANDLER = temperature_handler;
     }
 
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM0);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA2_STREAM0) }
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI4);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::EXTI4) }
-    Ok(())
+    Ok(true)
 }

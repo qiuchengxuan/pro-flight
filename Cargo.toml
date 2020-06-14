@@ -20,9 +20,10 @@ integer-sqrt = "0.1.3"
 log = "0.4"
 max7456 = { path = "../max7456" }
 micromath = "1.0"
-mpu6000 = "0.1.7"
+mpu6000 = { path = "../mpu6000" }
 nalgebra = { version = "0.18", default-features = false }
 nb = "0.1"
+nmea0183 = "0.2.3"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }
 sval_json = "0.5"

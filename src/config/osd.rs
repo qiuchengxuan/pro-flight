@@ -68,12 +68,23 @@ impl FromYAML for Offset {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OSD {
     pub fov: u8,
     pub aspect_ratio: AspectRatio,
     pub standard: Standard,
     pub offset: Offset,
+}
+
+impl Default for OSD {
+    fn default() -> Self {
+        Self {
+            fov: 120,
+            aspect_ratio: AspectRatio(16, 9),
+            standard: Standard::default(),
+            offset: Offset::default(),
+        }
+    }
 }
 
 impl FromYAML for OSD {

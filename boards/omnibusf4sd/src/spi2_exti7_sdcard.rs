@@ -38,6 +38,10 @@ fn read(fd: &FileDescriptor, buf: &mut [u8]) -> Result<usize, Error> {
     unsafe { SDCARD.as_mut().unwrap() }.read(fd, buf)
 }
 
+fn write(fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, Error> {
+    unsafe { SDCARD.as_mut().unwrap() }.write(fd, bytes)
+}
+
 fn probe_sdcard() {
     let controller = unsafe { &mut *CONTROLLER.as_mut_ptr() };
     match controller.device().init() {
@@ -50,7 +54,7 @@ fn probe_sdcard() {
     unsafe {
         SDCARD = Sdcard::new(controller);
         if SDCARD.is_some() {
-            set_media(Schema::Sdcard, Media { open, close, read });
+            set_media(Schema::Sdcard, Media { open, close, read, write });
         }
     }
 }

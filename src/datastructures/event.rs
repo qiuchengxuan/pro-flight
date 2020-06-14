@@ -1,3 +1,17 @@
-pub type EventHandler<T> = fn(item: T);
+use core::marker::PhantomData;
 
-pub fn event_nop_handler<T>(_: T) {}
+pub trait EventHandler<T> {
+    fn handle(&mut self, event: T);
+}
+
+pub struct EventNopHandler<T>(PhantomData<T>);
+
+impl<T> EventNopHandler<T> {
+    pub fn new() -> Self {
+        Self(PhantomData {})
+    }
+}
+
+impl<T> EventHandler<T> for EventNopHandler<T> {
+    fn handle(&mut self, _: T) {}
+}

@@ -1,6 +1,5 @@
 #![no_main]
 #![no_std]
-#![feature(alloc_error_handler)]
 
 #[macro_use]
 extern crate ascii_osd_hud;
@@ -17,7 +16,6 @@ extern crate log;
 extern crate max7456;
 extern crate mpu6000;
 extern crate nb;
-extern crate panic_semihosting;
 extern crate stm32f4xx_hal;
 extern crate usb_device;
 #[macro_use]
@@ -28,27 +26,25 @@ mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
 mod usb_serial;
 
-use core::alloc::Layout;
 use core::fmt::Write;
 use core::mem::MaybeUninit;
+use core::panic::PanicInfo;
 
-use alloc_cortex_m::CortexMHeap;
 use arrayvec::ArrayVec;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use log::Level;
+use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
+use rs_flight::components::imu::IMU;
 use rs_flight::components::logger::{self};
 use rs_flight::components::sysled::Sysled;
-use rs_flight::components::telemetry;
+use rs_flight::components::telemetry::TelemetryUnit;
 use rs_flight::config::{read_config, Config};
-use rs_flight::datastructures::event::event_nop_handler;
-use rs_flight::hal::sensors::Temperature;
-use rs_flight::hal::AccelGyroHandler;
-use rs_flight::sys::fs::File;
+use rs_flight::sys::fs::{File, OpenOptions};
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::Edge;
 use stm32f4xx_hal::gpio::ExtiPin;
@@ -67,12 +63,8 @@ static mut PANIC_FRAME: MaybeUninit<ExceptionFrame> = MaybeUninit::uninit();
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
 #[link_section = ".uninit.STACKS"]
 static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
-#[link_section = ".uninit.STACKS"]
-#[link_section = ".ccmram"]
-static mut HEAP: [u8; 4096] = [0u8; 4096];
 
-#[global_allocator]
-static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
+static mut TELEMETRY: MaybeUninit<TelemetryUnit> = MaybeUninit::uninit();
 
 #[entry]
 fn main() -> ! {
@@ -84,7 +76,6 @@ fn main() -> ! {
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
-    unsafe { ALLOCATOR.init(&HEAP as *const u8 as usize, HEAP.len()) }
     unsafe { LOG_BUFFER = core::mem::zeroed() };
     logger::init(unsafe { &mut LOG_BUFFER }, Level::Trace);
     if unsafe { PANIC } {
@@ -116,26 +107,6 @@ fn main() -> ! {
     // let pwm3 = pwm::tim5(peripherals.TIM5, gpio_a.pa1.into_alternate_af2(), clocks, 50.khz());
     // let pwm4 = pwm::tim1(peripherals.TIM1, gpio_a.pa8.into_alternate_af1(), clocks, 50.khz());
 
-    let mut int = gpio_c.pc4.into_pull_up_input();
-    int.make_interrupt_source(&mut peripherals.SYSCFG);
-    int.enable_interrupt(&mut peripherals.EXTI);
-    int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
-    let handlers = (
-        telemetry::accel_gyro_handler as AccelGyroHandler,
-        event_nop_handler as fn(_: Temperature<i16>),
-    );
-    spi1_exti4_gyro::init(
-        peripherals.SPI1,
-        (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7),
-        gpio_a.pa4,
-        int,
-        clocks,
-        handlers,
-        &mut delay,
-        GYRO_SAMPLE_RATE as u16,
-    )
-    .ok();
-
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
@@ -159,7 +130,31 @@ fn main() -> ! {
         }
     };
 
-    let telemetry = telemetry::init(GYRO_SAMPLE_RATE as u16, 256, &config.accelerometer);
+    let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
+    spi1_exti4_gyro::init_temperature_ring();
+    let imu = IMU::new(accel_gyro_ring, GYRO_SAMPLE_RATE as u16, &config.accelerometer, 256);
+
+    let mut int = gpio_c.pc4.into_pull_up_input();
+    int.make_interrupt_source(&mut peripherals.SYSCFG);
+    int.enable_interrupt(&mut peripherals.EXTI);
+    int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
+    spi1_exti4_gyro::init(
+        peripherals.SPI1,
+        (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7),
+        gpio_a.pa4,
+        int,
+        clocks,
+        &mut delay,
+        GYRO_SAMPLE_RATE as u16,
+    )
+    .ok();
+
+    let vbat = gpio_c.pc2.into_analog();
+
+    let baro_ring = spi3_tim7_osd_baro::init_ring();
+    let altimeter = Altimeter::new(baro_ring.clone());
+    unsafe { TELEMETRY = MaybeUninit::new(TelemetryUnit::new(imu, altimeter)) };
+    let telemetry = unsafe { &*TELEMETRY.as_ptr() };
 
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,
@@ -170,7 +165,6 @@ fn main() -> ! {
         clocks,
         &config.osd,
         telemetry,
-        telemetry::barometer_handler,
         &mut delay,
     )
     .ok();
@@ -212,8 +206,10 @@ fn main() -> ! {
                 for s in logger::reader() {
                     console::write(&mut serial, s).ok();
                 }
+            } else if line == *b"show config" {
+                console!(&mut serial, "{:?}\n", &config);
             } else if line == *b"telemetry" {
-                console!(&mut serial, "{}\n", telemetry);
+                console!(&mut serial, "{}\n", unsafe { &*TELEMETRY.as_ptr() }.get_data());
             } else if line.starts_with(b"read ") {
                 cmdlet::read(line, &mut serial);
             } else if line.starts_with(b"dump ") {
@@ -237,14 +233,30 @@ unsafe fn panic_reboot() {
     (&mut *DFU.as_mut_ptr()).reboot_into();
 }
 
-#[alloc_error_handler]
-unsafe fn oom(_: Layout) -> ! {
+#[panic_handler]
+unsafe fn panic(info: &PanicInfo) -> ! {
+    let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
+    match option.open("sdcard://panic.log") {
+        Ok(mut file) => {
+            write!(file, "{:?}", info).ok();
+            file.close();
+        }
+        Err(_) => (),
+    }
     panic_reboot();
     loop {}
 }
 
 #[exception]
 unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
+    let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
+    match option.open("sdcard://panic.log") {
+        Ok(mut file) => {
+            write!(file, "{:?}", ef).ok();
+            file.close();
+        }
+        Err(_) => (),
+    }
     PANIC_FRAME = MaybeUninit::new(*ef);
     panic_reboot();
     loop {}

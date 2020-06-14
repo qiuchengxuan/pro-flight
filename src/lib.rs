@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(maybe_uninit_uninit_array)]
+#![feature(trait_alias)]
 
 extern crate ahrs;
 extern crate arrayvec;

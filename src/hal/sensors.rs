@@ -71,9 +71,9 @@ impl Default for Measurement {
 
 pub type Acceleration = Measurement;
 pub type Gyro = Measurement;
-pub type Temperature<T> = T;
+pub type Temperature = i16;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct Pressure(pub u32); // unit of Pa
 
 impl Pressure {
