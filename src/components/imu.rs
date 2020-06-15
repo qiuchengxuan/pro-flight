@@ -45,6 +45,7 @@ impl<'a> IMU<'a> {
         while let Some((acceleration, gyro)) = self.reader.read() {
             self.counter += 1;
             if !self.calibrated {
+                // TODO: bypass calibration
                 self.gyro = gyro;
                 self.gyro_bias = self.gyro_bias.average(&gyro.axes);
                 self.calibrated = self.counter >= self.calibration_loop as usize;

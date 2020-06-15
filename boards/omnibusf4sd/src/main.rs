@@ -21,6 +21,7 @@ extern crate usb_device;
 #[macro_use]
 extern crate rs_flight;
 
+mod adc2_vbat;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
@@ -36,28 +37,20 @@ use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use log::Level;
-use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
-use rs_flight::components::imu::IMU;
 use rs_flight::components::logger::{self};
-use rs_flight::components::sysled::Sysled;
-use rs_flight::components::telemetry::TelemetryUnit;
+use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::{read_config, Config};
 use rs_flight::sys::fs::{File, OpenOptions};
 use stm32f4xx_hal::delay::Delay;
-use stm32f4xx_hal::gpio::Edge;
-use stm32f4xx_hal::gpio::ExtiPin;
+use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
+const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
-#[link_section = ".uninit.STACKS"]
-static mut PANIC: bool = false;
-#[link_section = ".uninit.STACKS"]
-#[link_section = ".ccmram"]
-static mut PANIC_FRAME: MaybeUninit<ExceptionFrame> = MaybeUninit::uninit();
 #[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
 static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
@@ -78,11 +71,10 @@ fn main() -> ! {
 
     unsafe { LOG_BUFFER = core::mem::zeroed() };
     logger::init(unsafe { &mut LOG_BUFFER }, Level::Trace);
-    if unsafe { PANIC } {
-        unsafe { PANIC = false };
-        warn!("Last panic at pc {:x}", unsafe { &*PANIC_FRAME.as_ptr() }.pc);
-    }
-    info!("hclk: {}mhz", clocks.hclk().0 / 1000_000);
+
+    let (hclk, pclk1, pclk2) =
+        (clocks.hclk().0 / MHZ, clocks.pclk1().0 / MHZ, clocks.pclk2().0 / MHZ);
+    info!("hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", hclk, pclk1, pclk2);
     info!("stack top: {:x}", cortex_m::register::msp::read());
 
     unsafe {
@@ -98,14 +90,6 @@ fn main() -> ! {
     let gpio_c = peripherals.GPIOC.split();
 
     cmdlet::init(valid_memory_address);
-
-    // let pb0_1 = (gpio_b.pb0.into_alternate_af2(), gpio_b.pb1.into_alternate_af2());
-    // let (mut pwm1, mut pwm2) = pwm::tim3(peripherals.TIM3, pb0_1, clocks, 50.hz());
-
-    // let pwm3_4 = (gpio_a.pa3.into_alternate_af1(), gpio_a.pa2.into_alternate_af1());
-    // let pwm2 = pwm::tim2(peripherals.TIM2, pwm3_4, clocks, 50.hz());
-    // let pwm3 = pwm::tim5(peripherals.TIM5, gpio_a.pa1.into_alternate_af2(), clocks, 50.khz());
-    // let pwm4 = pwm::tim1(peripherals.TIM1, gpio_a.pa8.into_alternate_af1(), clocks, 50.khz());
 
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
@@ -130,6 +114,14 @@ fn main() -> ! {
         }
     };
 
+    // let pb0_1 = (gpio_b.pb0.into_alternate_af2(), gpio_b.pb1.into_alternate_af2());
+    // let (mut pwm1, mut pwm2) = pwm::tim3(peripherals.TIM3, pb0_1, clocks, 50.hz());
+
+    // let pwm3_4 = (gpio_a.pa3.into_alternate_af1(), gpio_a.pa2.into_alternate_af1());
+    // let pwm2 = pwm::tim2(peripherals.TIM2, pwm3_4, clocks, 50.hz());
+    // let pwm3 = pwm::tim5(peripherals.TIM5, gpio_a.pa1.into_alternate_af2(), clocks, 50.khz());
+    // let pwm4 = pwm::tim1(peripherals.TIM1, gpio_a.pa8.into_alternate_af1(), clocks, 50.khz());
+
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();
     let imu = IMU::new(accel_gyro_ring, GYRO_SAMPLE_RATE as u16, &config.accelerometer, 256);
@@ -149,11 +141,12 @@ fn main() -> ! {
     )
     .ok();
 
-    let vbat = gpio_c.pc2.into_analog();
+    let battery = BatterySource::new(adc2_vbat::init(peripherals.ADC2, gpio_c.pc2));
 
     let baro_ring = spi3_tim7_osd_baro::init_ring();
     let altimeter = Altimeter::new(baro_ring.clone());
-    unsafe { TELEMETRY = MaybeUninit::new(TelemetryUnit::new(imu, altimeter)) };
+    let telemetry = TelemetryUnit::new(imu, altimeter, battery, &config.battery);
+    unsafe { TELEMETRY = MaybeUninit::new(telemetry) };
     let telemetry = unsafe { &*TELEMETRY.as_ptr() };
 
     spi3_tim7_osd_baro::init(
@@ -228,11 +221,6 @@ fn main() -> ! {
     }
 }
 
-unsafe fn panic_reboot() {
-    PANIC = true;
-    (&mut *DFU.as_mut_ptr()).reboot_into();
-}
-
 #[panic_handler]
 unsafe fn panic(info: &PanicInfo) -> ! {
     let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
@@ -243,7 +231,7 @@ unsafe fn panic(info: &PanicInfo) -> ! {
         }
         Err(_) => (),
     }
-    panic_reboot();
+    (&mut *DFU.as_mut_ptr()).reboot_into();
     loop {}
 }
 
@@ -257,12 +245,11 @@ unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
         }
         Err(_) => (),
     }
-    PANIC_FRAME = MaybeUninit::new(*ef);
-    panic_reboot();
+    (&mut *DFU.as_mut_ptr()).reboot_into();
     loop {}
 }
 
 #[exception]
 unsafe fn DefaultHandler(_irqn: i16) {
-    panic_reboot();
+    (&mut *DFU.as_mut_ptr()).reboot_into();
 }

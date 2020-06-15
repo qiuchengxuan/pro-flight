@@ -5,7 +5,10 @@ use ascii_osd_hud::telemetry as hud;
 
 use crate::components::altimeter::Altimeter;
 use crate::components::imu::IMU;
+use crate::components::BatterySource;
+use crate::config;
 use crate::datastructures::measurement::Euler;
+use crate::hal::sensors::Battery;
 
 #[derive(Default, Copy, Clone, Value)]
 pub struct Attitude {
@@ -39,6 +42,7 @@ pub struct TelemetryData {
     heading: u16,
     vertical_speed: i16,
     g_force: u8,
+    battery: Battery,
 }
 
 impl core::fmt::Display for TelemetryData {
@@ -48,25 +52,33 @@ impl core::fmt::Display for TelemetryData {
     }
 }
 
-pub struct TelemetryUnit<'a> {
-    imu: RefCell<IMU<'a>>,
-    altimeter: RefCell<Altimeter<'a>>,
+pub struct TelemetrySource<'a> {
+    imu: IMU<'a>,
+    altimeter: Altimeter<'a>,
+    battery: BatterySource<'a>,
+}
 
+pub struct TelemetryUnit<'a> {
+    source: RefCell<TelemetrySource<'a>>,
     initial_altitude: Cell<i16>,
+    cells: Cell<u8>,
 }
 
 impl<'a> TelemetryUnit<'a> {
     pub fn get_data(&self) -> TelemetryData {
-        if let Some(mut imu) = self.imu.try_borrow_mut().ok() {
-            imu.update();
+        if let Some(mut source) = self.source.try_borrow_mut().ok() {
+            source.imu.update();
+            source.altimeter.update();
         }
-        if let Some(mut altimeter) = self.altimeter.try_borrow_mut().ok() {
-            altimeter.update();
-        }
-        let imu = self.imu.borrow();
-        let altimeter = self.altimeter.borrow();
+        let source = self.source.borrow();
+        let imu = &source.imu;
+        let altimeter = &source.altimeter;
         if self.initial_altitude.get() == 0 {
             self.initial_altitude.set(altimeter.altitude())
+        }
+        let battery = source.battery.read();
+        if self.cells.get() == 0 {
+            self.cells.set(core::cmp::min(battery.0 / 4200 + 1, 8) as u8)
         }
         let euler = imu.get_zyx_euler();
         TelemetryData {
@@ -75,6 +87,7 @@ impl<'a> TelemetryUnit<'a> {
             heading: ((-euler.psi as isize + 360) % 360) as u16,
             vertical_speed: altimeter.vertical_speed(),
             g_force: imu.g_force(),
+            battery: battery / self.cells.get() as u16,
         }
     }
 }
@@ -85,6 +98,7 @@ impl<'a> hud::TelemetrySource for TelemetryUnit<'a> {
         hud::Telemetry {
             altitude: data.altitude,
             attitude: data.attitude.into(),
+            battery: data.battery.percentage(),
             heading: data.heading,
             g_force: data.g_force,
             height: data.altitude - self.initial_altitude.get(),
@@ -95,11 +109,16 @@ impl<'a> hud::TelemetrySource for TelemetryUnit<'a> {
 }
 
 impl<'a> TelemetryUnit<'a> {
-    pub fn new(imu: IMU<'a>, altimeter: Altimeter<'a>) -> Self {
+    pub fn new(
+        imu: IMU<'a>,
+        altimeter: Altimeter<'a>,
+        battery: BatterySource<'a>,
+        config: &config::Battery,
+    ) -> Self {
         Self {
-            imu: RefCell::new(imu),
-            altimeter: RefCell::new(altimeter),
+            source: RefCell::new(TelemetrySource { imu, altimeter, battery }),
             initial_altitude: Default::default(),
+            cells: Cell::new(config.cells),
         }
     }
 }

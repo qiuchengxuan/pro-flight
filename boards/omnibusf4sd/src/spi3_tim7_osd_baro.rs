@@ -108,17 +108,10 @@ unsafe fn TIM7() {
     stream.par.write(|w| w.pa().bits(data_register));
     let m0ar = &stream.m0ar;
     m0ar.write(|w| w.m0a().bits(DMA_BUFFER.as_ptr() as u32));
+    #[rustfmt::skip]
     stream.cr.write(|w| {
-        w.chsel()
-            .bits(0)
-            .minc()
-            .incremented()
-            .dir()
-            .peripheral_to_memory()
-            .tcie()
-            .enabled()
-            .en()
-            .enabled()
+        w.chsel().bits(0).minc().incremented().dir().peripheral_to_memory()
+            .tcie().enabled().en().enabled()
     });
 
     static READ_REG: [u8; 1] = [Register::PressureMsb as u8 | 0x80];

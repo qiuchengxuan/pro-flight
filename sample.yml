@@ -7,8 +7,15 @@ accelerometer:
     x: 4079
     y: 4079
     z: 4017
+battery:
+  cells: 3
+  min-cell-voltage: 330
+  max-cell-voltage: 420
+  warning-cell-voltage: 350
+gnss:
+  protocol: NMEA
 osd:
-  fov: 150
+  fov: 145
   aspect-ratio:
     width: 16
     height: 9
@@ -19,5 +26,3 @@ osd:
 serials:
   UART6:
     baudrate: 115200
-gnss:
-  protocol: NMEA

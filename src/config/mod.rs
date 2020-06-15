@@ -1,3 +1,4 @@
+pub mod battery;
 pub mod osd;
 pub mod sensor;
 pub mod yaml;
@@ -7,6 +8,7 @@ use btoi::btoi;
 use crate::hal::io::Read;
 use crate::hal::sensors::Axes;
 
+pub use battery::Battery;
 pub use osd::{AspectRatio, Offset, Standard, OSD};
 pub use sensor::Accelerometer;
 use yaml::{ByteIter, Entry, FromYAML};
@@ -37,18 +39,20 @@ impl FromYAML for Axes {
 pub struct Config {
     pub accelerometer: Accelerometer,
     pub aspect_ratio: AspectRatio,
+    pub battery: Battery,
     pub osd: OSD,
 }
 
 impl FromYAML for Config {
     fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteIter<'a>) {
-        for _ in 0..3 {
+        loop {
             match byte_iter.next(indent) {
                 Entry::Key(key) => match key {
                     b"accelerometer" => self.accelerometer.from_yaml(indent + 2, byte_iter),
+                    b"battery" => self.battery.from_yaml(indent + 2, byte_iter),
                     b"aspect-ratio" => self.aspect_ratio.from_yaml(indent + 2, byte_iter),
                     b"osd" => self.osd.from_yaml(indent + 2, byte_iter),
-                    _ => return,
+                    _ => byte_iter.skip(indent),
                 },
                 _ => return,
             }
@@ -87,7 +91,7 @@ mod test {
         config.from_yaml(0, &mut ByteIter::from(&buffer[..size]));
         assert_eq!(config.accelerometer.bias, Axes { x: 83, y: -1, z: 99 });
         let osd = OSD {
-            fov: 150,
+            fov: 145,
             aspect_ratio: AspectRatio(16, 9),
             standard: Standard::PAL,
             offset: Offset { horizental: 8, vertical: 0 },

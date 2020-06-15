@@ -13,12 +13,12 @@ impl Default for AspectRatio {
 
 impl FromYAML for AspectRatio {
     fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteIter<'a>) {
-        for _ in 0..2 {
+        loop {
             match byte_iter.next(indent) {
                 Entry::KeyValue(key, value) => match key {
                     b"width" => self.0 = btoi(value).ok().unwrap_or(16),
                     b"height" => self.1 = btoi(value).ok().unwrap_or(9),
-                    _ => return,
+                    _ => continue,
                 },
                 _ => return,
             }
@@ -89,17 +89,17 @@ impl Default for OSD {
 
 impl FromYAML for OSD {
     fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteIter<'a>) {
-        for _ in 0..4 {
+        loop {
             match byte_iter.next(indent) {
                 Entry::Key(key) => match key {
                     b"offset" => self.offset.from_yaml(indent + 2, byte_iter),
                     b"aspect-ratio" => self.aspect_ratio.from_yaml(indent + 2, byte_iter),
-                    _ => return,
+                    _ => byte_iter.skip(indent),
                 },
                 Entry::KeyValue(key, value) => match key {
                     b"standard" => self.standard = Standard::from(value),
                     b"fov" => self.fov = btoi(value).unwrap_or(150),
-                    _ => return,
+                    _ => byte_iter.skip(indent),
                 },
                 _ => return,
             }

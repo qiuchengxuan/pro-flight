@@ -10,3 +10,13 @@ pub mod imu;
 pub mod monitor;
 pub mod sysled;
 pub mod telemetry;
+
+use crate::datastructures::U16DataReader;
+use crate::hal::sensors::Battery;
+
+pub use altimeter::Altimeter;
+pub use imu::IMU;
+pub use sysled::Sysled;
+pub use telemetry::TelemetryUnit;
+
+pub type BatterySource<'a> = U16DataReader<'a, Battery>;

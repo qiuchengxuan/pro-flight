@@ -55,20 +55,29 @@ impl<'a> ByteIter<'a> {
         &self.0[..index + 1]
     }
 
-    pub fn next(&mut self, indent: usize) -> Entry<'a> {
-        if self.0.len() == 0 {
-            return Entry::None;
-        }
+    pub fn next_non_blank_line(&mut self) -> Option<(&'a [u8], usize)> {
         let mut line = self.next_line();
         let mut num_space = num_leading_space(line);
         while is_blank_line(&line[num_space..]) {
             if line.len() == 0 {
-                return Entry::None;
+                return None;
             }
             self.0 = &self.0[line.len()..];
             line = self.next_line();
             num_space = num_leading_space(line);
         }
+        Some((line, num_space))
+    }
+
+    pub fn next(&mut self, indent: usize) -> Entry<'a> {
+        if self.0.len() == 0 {
+            return Entry::None;
+        }
+
+        let (mut line, num_space) = match self.next_non_blank_line() {
+            Some(tuple) => tuple,
+            None => return Entry::None,
+        };
 
         if num_space != indent {
             return Entry::None;
@@ -98,6 +107,19 @@ impl<'a> ByteIter<'a> {
             return Entry::Key(key);
         }
         return Entry::KeyValue(key, value);
+    }
+
+    pub fn skip(&mut self, indent: usize) {
+        while self.0.len() > 0 {
+            let (line, num_space) = match self.next_non_blank_line() {
+                Some(tuple) => tuple,
+                None => return,
+            };
+            if num_space <= indent {
+                return;
+            }
+            self.0 = &self.0[line.len()..];
+        }
     }
 }
 
