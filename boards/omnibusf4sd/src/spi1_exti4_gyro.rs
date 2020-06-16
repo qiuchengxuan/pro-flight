@@ -61,7 +61,7 @@ unsafe fn EXTI4() {
     stream.ndtr.write(|w| w.ndt().bits(DMA_BUFFER.len() as u16));
     stream.par.write(|w| w.pa().bits(data_register));
     let m0ar = &stream.m0ar;
-    m0ar.write(|w| w.m0a().bits(DMA_BUFFER.as_ptr() as u32));
+    m0ar.write(|w| w.m0a().bits(DMA_BUFFER.as_ptr() as u32 + 1));
     #[rustfmt::skip]
     stream.cr.write(|w| {
         w.chsel().bits(3).minc().incremented().dir().peripheral_to_memory()
@@ -87,10 +87,10 @@ unsafe fn DMA2_STREAM0() {
         dma2.lifcr.write(|w| w.bits(0x3D << 22 | 0x3D));
     });
 
-    let buf = &DMA_BUFFER;
-    let acceleration = measurement::Measurement::from_bytes(&buf[1..], ACCELEROMETER_SENSITIVE);
-    let temperature = measurement::Temperature(i16::from_be_bytes([buf[7], buf[8]]));
-    let gyro = measurement::Measurement::from_bytes(&buf[9..], GYRO_SENSITIVE);
+    let buf: &[i16; 8] = core::mem::transmute(&DMA_BUFFER);
+    let acceleration = measurement::Measurement::from_array(&buf[1..], ACCELEROMETER_SENSITIVE);
+    let temperature = measurement::Temperature(i16::from_be(buf[4]));
+    let gyro = measurement::Measurement::from_array(&buf[5..], GYRO_SENSITIVE);
     let ring_buffer = &mut *ACCEL_GYRO_RING.as_mut_ptr();
     ring_buffer.write((acceleration.into(), gyro.into()));
     let ring_buffer = &mut *TEMPERATURE_RING.as_mut_ptr();
