@@ -1,20 +1,21 @@
 use core::fmt::{Result, Write};
-use core::sync::atomic::{AtomicPtr, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use log::{Level, Log, Metadata, Record};
 
 static mut LOG_BUFFER: &'static mut [u8] = &mut [0u8; 0];
-static mut INDEX: AtomicPtr<usize> = AtomicPtr::new(0 as *mut usize);
+static mut WRITE_INDEX: AtomicUsize = AtomicUsize::new(0);
 static mut LEVEL: Level = Level::Trace;
 
 pub struct Logger {}
 
 impl Logger {
     fn allocate(&self, len: usize) -> usize {
-        let mut index = unsafe { INDEX.load(Ordering::Relaxed) };
+        let mut index = unsafe { WRITE_INDEX.load(Ordering::Relaxed) };
         loop {
-            let new_index = (index as usize + len) as *mut usize;
-            let current = unsafe { INDEX.compare_and_swap(index, new_index, Ordering::Relaxed) };
+            let new_index = index + len;
+            let current =
+                unsafe { WRITE_INDEX.compare_and_swap(index, new_index, Ordering::Relaxed) };
             if current == index {
                 return index as usize;
             }
@@ -61,14 +62,21 @@ impl Log for Logger {
         if !self.enabled(record.metadata()) {
             return;
         }
-        let level_char = match record.level() {
-            Level::Error => 'E',
-            Level::Warn => 'W',
-            Level::Info => 'I',
-            Level::Debug => 'D',
-            Level::Trace => 'T',
+        let level = match record.level() {
+            Level::Error => "ERROR",
+            Level::Warn => "WARN ",
+            Level::Info => "INFO ",
+            Level::Debug => "DEBUG",
+            Level::Trace => "TRACE",
         };
-        write!(&mut Logger {}, "{}: {}\r\n", level_char, record.args()).ok();
+        match (record.file(), record.line()) {
+            (Some(file), Some(line)) => {
+                let file = file.rsplitn(2, "/").next().unwrap_or("?.rs");
+                write!(&mut Logger {}, "{} {}:{} {}\r\n", level, file, line, record.args())
+            }
+            (_, _) => write!(&mut Logger {}, "{}: {}\r\n", level, record.args()),
+        }
+        .ok();
     }
 
     fn flush(&self) {}
@@ -90,40 +98,30 @@ impl Iterator for LogReader {
 
     fn next(&mut self) -> Option<&'static [u8]> {
         let (index, count) = self.0;
-        let log_size = unsafe { LOG_BUFFER.len() };
-        if index <= log_size {
+        let log_buffer = unsafe { &LOG_BUFFER };
+        if index <= log_buffer.len() {
             if count == 0 {
-                self.0 = (index, count + 1);
+                self.0 = (index, 1);
                 return Some(unsafe { &LOG_BUFFER[..index] });
             } else {
                 return None;
             }
         }
         if count == 0 {
-            self.0 = (index, count + 1);
-            return Some(unsafe { &LOG_BUFFER[index..] });
+            self.0 = (index, 1);
+            let bytes = unsafe { &LOG_BUFFER[index % log_buffer.len()..] };
+            return bytes.splitn(1, |&b| b == '\n' as u8).next();
         } else if count == 1 {
-            self.0 = (index, count + 1);
-            return Some(unsafe { &LOG_BUFFER[..index] });
+            self.0 = (index, 2);
+            return Some(unsafe { &LOG_BUFFER[..index % log_buffer.len()] });
         }
         None
     }
 }
 
 pub fn reader() -> LogReader {
-    let index = unsafe { INDEX.load(Ordering::Relaxed) as usize };
-    LogReader((index, 0))
-}
-
-mod test {
-    #[test]
-    fn write_log() {
-        use log::{info, Level};
-
-        static mut BUFFER: [u8; 100] = [0u8; 100];
-        super::init(unsafe { &mut BUFFER }, Level::Trace);
-        info!("test a");
-        info!("test b");
-        assert_eq!(super::reader().next().unwrap(), b"I: test a\r\nI: test b\r\n");
+    unsafe {
+        let index = WRITE_INDEX.load(Ordering::Relaxed);
+        LogReader((index, 0))
     }
 }

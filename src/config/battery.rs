@@ -1,6 +1,6 @@
 use btoi::btoi;
 
-use super::{ByteIter, Entry, FromYAML};
+use super::yaml::{ByteIter, Entry, FromYAML};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Battery {

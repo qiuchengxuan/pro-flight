@@ -16,18 +16,21 @@ extern crate log;
 extern crate max7456;
 extern crate mpu6000;
 extern crate nb;
-extern crate stm32f4xx_hal;
-extern crate usb_device;
 #[macro_use]
 extern crate rs_flight;
+extern crate sbus_parser;
+extern crate stm32f4xx_hal;
+extern crate usb_device;
 
 mod adc2_vbat;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
+mod usart1;
+mod usart6;
 mod usb_serial;
 
-use core::fmt::Write;
+use core::fmt::{Debug, Write};
 use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 
@@ -41,7 +44,10 @@ use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::logger::{self};
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
-use rs_flight::config::{read_config, Config};
+use rs_flight::config::{read_config, Config, SerialConfig};
+use rs_flight::drivers::uart::Device;
+use rs_flight::hal::io::Write as _;
+use rs_flight::hal::receiver::{NoReceiver, Receiver};
 use rs_flight::sys::fs::{File, OpenOptions};
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
@@ -114,6 +120,8 @@ fn main() -> ! {
         }
     };
 
+    let mut receiver: &dyn Receiver = &NoReceiver {};
+
     // let pb0_1 = (gpio_b.pb0.into_alternate_af2(), gpio_b.pb1.into_alternate_af2());
     // let (mut pwm1, mut pwm2) = pwm::tim3(peripherals.TIM3, pb0_1, clocks, 50.hz());
 
@@ -178,6 +186,29 @@ fn main() -> ! {
 
     let (mut serial, mut device) = usb_serial::init(usb);
 
+    if let Some(config) = config.serials.get(b"USART1") {
+        if let SerialConfig::GNSS(baudrate) = config {
+            let count_down = MillisCountDown::new(&systick);
+            usart1::init(peripherals.USART1, gpio_a.pa9, gpio_a.pa10, baudrate, clocks, count_down);
+        }
+    }
+
+    if let Some(config) = config.serials.get(b"USART6") {
+        if let SerialConfig::SBUS(sbus_config) = config {
+            if sbus_config.rx_inverted {
+                gpio_c.pc8.into_push_pull_output().set_high().ok();
+                debug!("USART6 rx inverted");
+            }
+        }
+        let count_down = MillisCountDown::new(&systick);
+        let pins = (gpio_c.pc6, gpio_c.pc7);
+        let device = usart6::init(peripherals.USART6, pins, &config, clocks, count_down);
+        match device {
+            Device::SBUS(r) => receiver = r,
+            _ => (),
+        }
+    }
+
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         sysled.check_toggle().unwrap();
@@ -193,14 +224,14 @@ fn main() -> ! {
         if line.len() > 0 {
             if line == *b"dfu" {
                 unsafe { &mut *DFU.as_mut_ptr() }.reboot_into();
-            } else if line == *b"reboot" {
+            } else if line.starts_with(b"reboot") {
                 cortex_m::peripheral::SCB::sys_reset();
-            } else if line == *b"logread" {
+            } else if line.starts_with(b"logread") {
                 for s in logger::reader() {
                     console::write(&mut serial, s).ok();
                 }
-            } else if line == *b"show config" {
-                console!(&mut serial, "{:?}\n", &config);
+            } else if line == *b"receiver" {
+                console!(&mut serial, "{:?}\n", receiver);
             } else if line == *b"telemetry" {
                 console!(&mut serial, "{}\n", unsafe { &*TELEMETRY.as_ptr() }.get_data());
             } else if line.starts_with(b"read ") {
@@ -221,30 +252,31 @@ fn main() -> ! {
     }
 }
 
-#[panic_handler]
-unsafe fn panic(info: &PanicInfo) -> ! {
+fn write_panic_file<T: Debug>(any: T) {
     let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
     match option.open("sdcard://panic.log") {
         Ok(mut file) => {
-            write!(file, "{:?}", info).ok();
+            log::set_max_level(Level::Info.to_level_filter());
+            write!(file, "{:?}", any).ok();
+            for s in logger::reader() {
+                file.write(s).ok();
+            }
             file.close();
         }
         Err(_) => (),
     }
+}
+
+#[panic_handler]
+unsafe fn panic(info: &PanicInfo) -> ! {
+    write_panic_file(info);
     (&mut *DFU.as_mut_ptr()).reboot_into();
     loop {}
 }
 
 #[exception]
 unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
-    let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
-    match option.open("sdcard://panic.log") {
-        Ok(mut file) => {
-            write!(file, "{:?}", ef).ok();
-            file.close();
-        }
-        Err(_) => (),
-    }
+    write_panic_file(ef);
     (&mut *DFU.as_mut_ptr()).reboot_into();
     loop {}
 }

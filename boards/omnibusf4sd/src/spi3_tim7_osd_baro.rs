@@ -9,6 +9,13 @@ use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::Register;
 use embedded_hal::digital::v2::OutputPin;
 use max7456::SPI_MODE;
+use rs_flight::components::ascii_hud::AsciiHud;
+use rs_flight::config::OSD;
+use rs_flight::datastructures::ring_buffer::{RingBuffer, RingBufferReader};
+use rs_flight::drivers::bmp280::init as bmp280_init;
+use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
+use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
+use rs_flight::hal::sensors::Pressure;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa::PA15;
 use stm32f4xx_hal::gpio::gpiob::PB3;
@@ -20,14 +27,6 @@ use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
-
-use rs_flight::components::ascii_hud::AsciiHud;
-use rs_flight::config::OSD;
-use rs_flight::datastructures::ring_buffer::{RingBuffer, RingBufferReader};
-use rs_flight::drivers::bmp280::init as bmp280_init;
-use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
-use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
-use rs_flight::hal::sensors::Pressure;
 
 static mut TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
 #[link_section = ".ccmram"]
@@ -102,8 +101,7 @@ unsafe fn TIM7() {
     let dma1 = &*(stm32::DMA1::ptr());
     dma1.hifcr.write(|w| w.bits(0x3D << 22)); // stream 7
     dma1.lifcr.write(|w| w.bits(0x3D << 16)); // stream 2
-                                              // dma1 channel 0 stream 2 rx
-    let stream = &dma1.st[2];
+    let stream = &dma1.st[2]; // dma1 channel 0 stream 2 rx
     stream.ndtr.write(|w| w.ndt().bits(DMA_BUFFER.len() as u16));
     stream.par.write(|w| w.pa().bits(data_register));
     let m0ar = &stream.m0ar;

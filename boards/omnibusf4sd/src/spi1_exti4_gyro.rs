@@ -10,8 +10,8 @@ use rs_flight::datastructures::ring_buffer::{RingBuffer, RingBufferReader};
 use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
 use rs_flight::hal::sensors::{Acceleration, Gyro, Temperature};
 use stm32f4xx_hal::delay::Delay;
-use stm32f4xx_hal::gpio::gpioa::{PA4, PA5, PA6, PA7};
-use stm32f4xx_hal::gpio::gpioc::PC4;
+use stm32f4xx_hal::gpio::gpioa;
+use stm32f4xx_hal::gpio::gpioc;
 use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::gpio::{Floating, Input, Output, PullUp, PushPull};
 use stm32f4xx_hal::interrupt;
@@ -36,8 +36,8 @@ impl DelayNs<u16> for TickDelay {
 type SpiError = bus::SpiError<Error, Error, Infallible>;
 type AccelGyro = (Acceleration, Gyro);
 
-static mut CS: MaybeUninit<PA4<Output<PushPull>>> = MaybeUninit::uninit();
-static mut INT: MaybeUninit<PC4<Input<PullUp>>> = MaybeUninit::uninit();
+static mut CS: MaybeUninit<gpioa::PA4<Output<PushPull>>> = MaybeUninit::uninit();
+static mut INT: MaybeUninit<gpioc::PC4<Input<PullUp>>> = MaybeUninit::uninit();
 #[export_name = "GYRO_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 16] = [0u8; 16];
 static mut ACCEL_GYRO_RING: MaybeUninit<RingBuffer<AccelGyro>> = MaybeUninit::uninit();
@@ -65,7 +65,7 @@ unsafe fn EXTI4() {
     #[rustfmt::skip]
     stream.cr.write(|w| {
         w.chsel().bits(3).minc().incremented().dir().peripheral_to_memory()
-            .tcie().enabled().en().enabled()
+            .pburst().incr16().tcie().enabled().en().enabled()
     });
 
     static READ_REG: [u8; 1] = [Register::AccelerometerXHigh as u8 | 0x80];
@@ -76,7 +76,7 @@ unsafe fn EXTI4() {
     stream.par.write(|w| w.pa().bits(data_register));
     stream.m0ar.write(|w| w.m0a().bits(READ_REG.as_ptr() as u32));
     let cr = &stream.cr;
-    cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().en().enabled());
+    cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().pburst().incr16().en().enabled());
 }
 
 #[interrupt]
@@ -116,11 +116,17 @@ pub fn init_temperature_ring() -> RingBufferReader<'static, Temperature> {
     RingBufferReader::new(unsafe { &*TEMPERATURE_RING.as_ptr() })
 }
 
+type PA4 = gpioa::PA4<Input<Floating>>;
+type PA5 = gpioa::PA5<Input<Floating>>;
+type PA6 = gpioa::PA6<Input<Floating>>;
+type PA7 = gpioa::PA7<Input<Floating>>;
+type PC4 = gpioc::PC4<Input<PullUp>>;
+
 pub fn init(
     spi1: stm32::SPI1,
-    spi1_pins: (PA5<Input<Floating>>, PA6<Input<Floating>>, PA7<Input<Floating>>),
-    pa4: PA4<Input<Floating>>,
-    int: PC4<Input<PullUp>>,
+    spi1_pins: (PA5, PA6, PA7),
+    pa4: PA4,
+    int: PC4,
     clocks: Clocks,
     delay: &mut Delay,
     sample_rate: u16,

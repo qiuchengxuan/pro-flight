@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::hal::io::Read;
+use crate::hal::io::{Read, Write};
 
 #[derive(Copy, Clone)]
 pub struct OpenOptions {
@@ -54,7 +54,6 @@ pub enum Error {
     Generic,
 }
 
-#[derive(Debug)]
 pub struct FileDescriptor(pub usize);
 
 #[derive(Copy, Clone)]
@@ -96,7 +95,6 @@ impl Default for Media {
 
 static mut MEDIAS: [Media; 2] = [no_media!(), no_media!()];
 
-#[derive(Debug)]
 pub struct File {
     schema: Schema,
     fd: Option<FileDescriptor>,
@@ -121,6 +119,18 @@ impl Read for File {
         let medias = unsafe { &MEDIAS };
         if let Some(fd) = &self.fd {
             (medias[self.schema as usize].read)(&fd, buf)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+impl Write for File {
+    type Error = Error;
+    fn write(&mut self, bytes: &[u8]) -> Result<usize, Error> {
+        let medias = unsafe { &MEDIAS };
+        if let Some(fd) = &self.fd {
+            (medias[self.schema as usize].write)(&fd, bytes)
         } else {
             Ok(0)
         }

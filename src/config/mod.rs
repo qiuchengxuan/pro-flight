@@ -1,6 +1,7 @@
 pub mod battery;
 pub mod osd;
 pub mod sensor;
+pub mod serial;
 pub mod yaml;
 
 use btoi::btoi;
@@ -11,6 +12,7 @@ use crate::hal::sensors::Axes;
 pub use battery::Battery;
 pub use osd::{AspectRatio, Offset, Standard, OSD};
 pub use sensor::Accelerometer;
+pub use serial::{SerialConfig, Serials};
 use yaml::{ByteIter, Entry, FromYAML};
 
 impl FromYAML for Axes {
@@ -35,12 +37,13 @@ impl FromYAML for Axes {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct Config {
     pub accelerometer: Accelerometer,
     pub aspect_ratio: AspectRatio,
     pub battery: Battery,
     pub osd: OSD,
+    pub serials: Serials,
 }
 
 impl FromYAML for Config {
@@ -52,6 +55,7 @@ impl FromYAML for Config {
                     b"battery" => self.battery.from_yaml(indent + 2, byte_iter),
                     b"aspect-ratio" => self.aspect_ratio.from_yaml(indent + 2, byte_iter),
                     b"osd" => self.osd.from_yaml(indent + 2, byte_iter),
+                    b"serials" => self.serials.from_yaml(indent + 2, byte_iter),
                     _ => byte_iter.skip(indent),
                 },
                 _ => return,
@@ -61,7 +65,7 @@ impl FromYAML for Config {
 }
 
 pub fn read_config<E>(reader: &mut dyn Read<Error = E>) -> Config {
-    let mut buffer = [0u8; 1024];
+    let mut buffer = [0u8; 4096];
     let size = reader.read(&mut buffer).ok().unwrap_or(0);
     let mut config = Config::default();
     if size > 0 {

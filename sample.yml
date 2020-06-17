@@ -12,8 +12,6 @@ battery:
   min-cell-voltage: 330
   max-cell-voltage: 420
   warning-cell-voltage: 350
-gnss:
-  protocol: NMEA
 osd:
   fov: 145
   aspect-ratio:
@@ -24,5 +22,11 @@ osd:
     horizental: 8
     vertial: 0
 serials:
-  UART6:
-    baudrate: 115200
+  USART1:
+    type: GNSS
+    baudrate: 38400
+    protocol: NMEA
+  USART6:
+    type: SBUS
+    rx-inverted: false
+    half-duplex: false

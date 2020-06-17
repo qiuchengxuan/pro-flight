@@ -128,7 +128,7 @@ pub trait FromYAML {
 }
 
 pub trait ToYAML {
-    fn to_writer<W: Write>(self, w: W);
+    fn to_writer<W: Write>(self, indent: usize, w: W);
 }
 
 mod test {
