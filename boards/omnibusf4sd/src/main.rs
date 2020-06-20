@@ -23,6 +23,7 @@ extern crate stm32f4xx_hal;
 extern crate usb_device;
 
 mod adc2_vbat;
+mod pwm;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_tim7_osd_baro;
@@ -121,6 +122,10 @@ fn main() -> ! {
     };
 
     let mut receiver: &dyn Receiver = &NoReceiver {};
+
+    let pwms = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
+    let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
+    pwm::init(pwms, pins, clocks);
 
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();

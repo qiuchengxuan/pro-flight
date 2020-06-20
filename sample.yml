@@ -28,5 +28,12 @@ serials:
   USART6:
     type: SBUS
     fast: false
-    rx-inverted: false
+    rx-inverted: true
     half-duplex: false
+receiver:
+  channel-map:
+    - channel: 2
+      servo: 0
+servos:
+  0:
+    center: 0

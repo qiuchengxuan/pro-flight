@@ -15,12 +15,9 @@ impl<E, P: ToggleableOutputPin<Error = E>, C: CountDown<Time = Duration>> Sysled
     }
 
     pub fn check_toggle(&mut self) -> Result<(), E> {
-        match self.count_down.wait() {
-            Ok(_) => {
-                self.pin.toggle()?;
-                self.count_down.start(Duration::from_millis(100));
-            }
-            Err(_) => (),
+        if self.count_down.wait().is_ok() {
+            self.pin.toggle()?;
+            self.count_down.start(Duration::from_millis(100))
         }
         Ok(())
     }
