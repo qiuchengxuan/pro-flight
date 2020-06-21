@@ -3,13 +3,13 @@ use nalgebra::Vector3;
 use crate::datastructures::measurement::Altitude;
 
 #[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
-pub struct Axes {
+pub struct Axis {
     pub x: i32,
     pub y: i32,
     pub z: i32,
 }
 
-impl Axes {
+impl Axis {
     pub fn average(self: &Self, other: &Self) -> Self {
         Self { x: (self.x + other.x) / 2, y: (self.y + other.y) / 2, z: (self.z + other.z) / 2 }
     }
@@ -21,7 +21,7 @@ impl Axes {
     }
 }
 
-impl PartialOrd for Axes {
+impl PartialOrd for Axis {
     fn partial_cmp(self: &Self, other: &Self) -> Option<core::cmp::Ordering> {
         if self.x > other.x || self.y > other.y || self.z > other.z {
             Some(core::cmp::Ordering::Greater)
@@ -33,7 +33,7 @@ impl PartialOrd for Axes {
 
 #[derive(Copy, Clone, PartialEq, Value)]
 pub struct Measurement {
-    pub axes: Axes,
+    pub axes: Axis,
     pub sensitive: i32,
 }
 

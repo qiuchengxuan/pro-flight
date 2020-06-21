@@ -1,23 +1,23 @@
 use core::fmt::{Result, Write};
 
-use crate::hal::sensors::Axes;
+use crate::hal::sensors::Axis;
 
 use super::yaml::{ByteStream, Entry, FromYAML, ToYAML};
 
 #[derive(Default, Debug)]
 pub struct Accelerometer {
-    pub bias: Axes,
-    pub gain: Axes,
+    pub bias: Axis,
+    pub gain: Axis,
 }
 
 impl FromYAML for Accelerometer {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
         loop {
-            match byte_iter.next(indent) {
-                Entry::Key(key) => match key {
-                    b"bias" => self.bias.from_yaml(indent + 1, byte_iter),
-                    b"gain" => self.gain.from_yaml(indent + 1, byte_iter),
-                    _ => byte_iter.skip(indent),
+            match byte_stream.next(indent) {
+                Some(Entry::Key(key)) => match key {
+                    b"bias" => self.bias.from_yaml(indent + 1, byte_stream),
+                    b"gain" => self.gain.from_yaml(indent + 1, byte_stream),
+                    _ => byte_stream.skip(indent),
                 },
                 _ => return,
             }

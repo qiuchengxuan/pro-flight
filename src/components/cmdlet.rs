@@ -55,7 +55,9 @@ pub fn read<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
                 }
                 b"readf" => {
                     let value = unsafe { *(address as *const f32) };
-                    console!(serial, "Result: {}\r\n", value);
+                    let mut buffer = ryu::Buffer::new();
+                    let printed = buffer.format(value);
+                    console!(serial, "Result: {}\r\n", printed);
                 }
                 _ => {
                     let value = unsafe { *(address as *const u32) };

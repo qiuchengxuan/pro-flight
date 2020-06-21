@@ -5,15 +5,15 @@ use nalgebra::Vector3;
 use crate::config::Accelerometer;
 use crate::datastructures::measurement::{quaternion_to_euler, Euler, DEGREE_PER_DAG};
 use crate::datastructures::ring_buffer::RingBufferReader;
-use crate::hal::sensors::{Acceleration, Axes, Gyro};
+use crate::hal::sensors::{Acceleration, Axis, Gyro};
 
 pub struct IMU<'a> {
     reader: RingBufferReader<'a, (Acceleration, Gyro)>,
-    accelerometer_bias: Axes,
+    accelerometer_bias: Axis,
     calibration_loop: u16,
 
     ahrs: Mahony<f32>,
-    gyro_bias: Axes,
+    gyro_bias: Axis,
     acceleration: Acceleration,
     gyro: Gyro,
     counter: usize,

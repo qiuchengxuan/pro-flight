@@ -30,10 +30,22 @@ serials:
     fast: false
     rx-inverted: true
     half-duplex: false
-receiver:
-  channel-map:
-    - channel: 2
-      servo: 0
-servos:
-  0:
-    center: 0
+pwms:
+  - name: PWM1
+    type: motor
+    rate: 400
+  - name: PWM2
+    type: motor
+    rate: 400
+  - name: PWM3
+    type: servo
+    reversed: false
+  - name: PWM4
+    type: servo
+    reversed: false
+  - name: PWM5
+    type: servo
+    reversed: false
+  - name: PWM6
+    type: servo
+    reversed: false

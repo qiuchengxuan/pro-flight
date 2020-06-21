@@ -8,6 +8,7 @@ pub mod ascii_hud;
 pub mod cmdlet;
 pub mod imu;
 pub mod monitor;
+pub mod panic;
 pub mod servo_mixer;
 pub mod sysled;
 pub mod telemetry;

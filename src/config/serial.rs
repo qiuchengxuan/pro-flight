@@ -39,13 +39,13 @@ impl ToYAML for SerialConfig {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
         self.write_indent(indent, w)?;
         match self {
-            SerialConfig::None => writeln!(w, "type: NONE"),
-            SerialConfig::GNSS(baudrate) => {
+            Self::None => writeln!(w, "type: NONE"),
+            Self::GNSS(baudrate) => {
                 writeln!(w, "type: GNSS")?;
                 self.write_indent(indent, w)?;
                 writeln!(w, "baudrate: {}", baudrate)
             }
-            SerialConfig::SBUS(sbus) => {
+            Self::SBUS(sbus) => {
                 writeln!(w, "type: SBUS")?;
                 self.write_indent(indent, w)?;
                 writeln!(w, "fast: {}", sbus.fast)?;
@@ -63,21 +63,21 @@ const MAX_SERIAL_CONFIGS: usize = 5;
 pub struct Serials {
     name_buffer: [u8; 6 * MAX_SERIAL_CONFIGS],
     configs: [(usize, SerialConfig); MAX_SERIAL_CONFIGS],
-    num_config: u8,
+    pub num_config: u8,
 }
 
 impl Default for Serials {
     fn default() -> Self {
         Self {
             name_buffer: [0u8; 6 * MAX_SERIAL_CONFIGS],
-            configs: [(0, SerialConfig::default()); MAX_SERIAL_CONFIGS],
+            configs: [(0, SerialConfig::None); MAX_SERIAL_CONFIGS],
             num_config: 0u8,
         }
     }
 }
 
 impl Serials {
-    pub fn get(&self, name: &'static [u8]) -> Option<SerialConfig> {
+    pub fn get(&self, name: &[u8]) -> Option<SerialConfig> {
         let mut index = 0;
         for i in 0..self.num_config as usize {
             let (length, config) = self.configs[i];
@@ -90,15 +90,15 @@ impl Serials {
     }
 }
 
-fn to_serial_config<'a>(indent: usize, byte_iter: &'a mut ByteStream) -> SerialConfig {
+fn to_serial_config<'a>(indent: usize, byte_stream: &'a mut ByteStream) -> SerialConfig {
     let mut type_string: &[u8] = &[];
     let mut baudrate = 0;
     let mut fast = false;
     let mut rx_inverted = false;
     let mut half_duplex = false;
     loop {
-        match byte_iter.next(indent) {
-            Entry::KeyValue(key, value) => match key {
+        match byte_stream.next(indent) {
+            Some(Entry::KeyValue(key, value)) => match key {
                 b"type" => type_string = value,
                 b"baudrate" => baudrate = btoi(value).ok().unwrap_or(0),
                 b"fast" => fast = value == b"true",
@@ -106,7 +106,7 @@ fn to_serial_config<'a>(indent: usize, byte_iter: &'a mut ByteStream) -> SerialC
                 b"half-duplex" => half_duplex = value == b"true",
                 _ => continue,
             },
-            Entry::Key(_) => byte_iter.skip(indent),
+            Some(Entry::Key(_)) => byte_stream.skip(indent),
             _ => break,
         }
     }
@@ -118,20 +118,20 @@ fn to_serial_config<'a>(indent: usize, byte_iter: &'a mut ByteStream) -> SerialC
 }
 
 impl FromYAML for Serials {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &'a mut ByteStream) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &'a mut ByteStream) {
         let mut index = 0;
         loop {
-            match byte_iter.next(indent) {
-                Entry::Key(key) => {
+            match byte_stream.next(indent) {
+                Some(Entry::Key(key)) => {
                     if self.num_config as usize >= MAX_SERIAL_CONFIGS {
-                        byte_iter.skip(indent);
+                        byte_stream.skip(indent);
                     }
                     if key.len() > self.name_buffer.len() - index {
-                        byte_iter.skip(indent);
+                        byte_stream.skip(indent);
                     }
                     let name = &mut self.name_buffer[index..index + key.len()];
                     name.copy_from_slice(key);
-                    let config = to_serial_config(indent + 1, byte_iter);
+                    let config = to_serial_config(indent + 1, byte_stream);
                     self.configs[self.num_config as usize] = (key.len(), config);
 
                     index += key.len();

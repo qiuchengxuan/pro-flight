@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
-use crate::hal::receiver::Receiver;
+use crate::hal::receiver::{Receiver, ReceiverInput};
 
 #[derive(Default, Debug)]
 pub struct SbusReceiver {
@@ -57,16 +57,12 @@ impl Receiver for SbusReceiver {
         self.sequence.load(Ordering::Relaxed)
     }
 
-    fn num_channel(&self) -> usize {
-        18
-    }
-
-    fn get_channel(&self, index: usize) -> u16 {
-        match index {
-            0..=15 => self.data.channels[index],
-            16 => self.data.channel17 as u16,
-            17 => self.data.channel18 as u16,
-            _ => 0,
+    fn get_input(&self) -> ReceiverInput {
+        ReceiverInput {
+            throttle: self.data.channels[2] << 5,
+            roll: (self.data.channels[0] << 5) as i16,
+            pitch: (self.data.channels[1] << 5) as i16,
+            yaw: (self.data.channels[3] << 5) as i16,
         }
     }
 }

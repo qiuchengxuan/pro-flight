@@ -24,17 +24,17 @@ impl Default for Battery {
 }
 
 impl FromYAML for Battery {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
         loop {
-            match byte_iter.next(indent) {
-                Entry::KeyValue(key, value) => match key {
+            match byte_stream.next(indent) {
+                Some(Entry::KeyValue(key, value)) => match key {
                     b"cells" => self.cells = btoi(value).ok().unwrap_or_default(),
                     b"min-cell-voltage" => self.min_cell_voltage = btoi(value).ok().unwrap_or(3300),
                     b"max-cell-voltage" => self.max_cell_voltage = btoi(value).ok().unwrap_or(4200),
                     b"warning-cell-voltage" => {
                         self.warning_cell_voltage = btoi(value).ok().unwrap_or(3500)
                     }
-                    _ => byte_iter.skip(indent),
+                    _ => byte_stream.skip(indent),
                 },
                 _ => return,
             }

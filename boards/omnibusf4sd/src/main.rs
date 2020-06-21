@@ -31,7 +31,7 @@ mod usart1;
 mod usart6;
 mod usb_serial;
 
-use core::fmt::{Debug, Write};
+use core::fmt::Write;
 use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 
@@ -44,13 +44,13 @@ use log::Level;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::logger::{self};
+use rs_flight::components::panic::write_panic_file;
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::yaml::ToYAML;
 use rs_flight::config::{read_config, Config, SerialConfig};
 use rs_flight::drivers::uart::Device;
-use rs_flight::hal::io::Write as _;
 use rs_flight::hal::receiver::{NoReceiver, Receiver};
-use rs_flight::sys::fs::{File, OpenOptions};
+use rs_flight::sys::fs::File;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
@@ -125,7 +125,7 @@ fn main() -> ! {
 
     let pwms = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    pwm::init(pwms, pins, clocks);
+    pwm::init(pwms, pins, clocks, &config.pwms);
 
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();
@@ -185,8 +185,9 @@ fn main() -> ! {
 
     if let Some(config) = config.serials.get(b"USART1") {
         if let SerialConfig::GNSS(baudrate) = config {
+            let pins = (gpio_a.pa9, gpio_a.pa10);
             let count_down = MillisCountDown::new(&systick);
-            usart1::init(peripherals.USART1, gpio_a.pa9, gpio_a.pa10, baudrate, clocks, count_down);
+            usart1::init(peripherals.USART1, pins, baudrate, clocks, count_down);
         }
     }
 
@@ -197,8 +198,8 @@ fn main() -> ! {
                 debug!("USART6 rx inverted");
             }
         }
-        let count_down = MillisCountDown::new(&systick);
         let pins = (gpio_c.pc6, gpio_c.pc7);
+        let count_down = MillisCountDown::new(&systick);
         let device = usart6::init(peripherals.USART6, pins, &config, clocks, count_down);
         match device {
             Device::SBUS(r) => receiver = r,
@@ -228,7 +229,7 @@ fn main() -> ! {
                     console::write(&mut serial, s).ok();
                 }
             } else if line == *b"receiver" {
-                console!(&mut serial, "{:?}\n", receiver);
+                console!(&mut serial, "{}\n", receiver.get_input());
             } else if line == *b"telemetry" {
                 console!(&mut serial, "{}\n", unsafe { &*TELEMETRY.as_ptr() }.get_data());
             } else if line.starts_with(b"read") {
@@ -246,21 +247,6 @@ fn main() -> ! {
         }
         console!(&mut serial, "# ");
         vec.clear();
-    }
-}
-
-fn write_panic_file<T: Debug>(any: T) {
-    let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
-    match option.open("sdcard://panic.log") {
-        Ok(mut file) => {
-            log::set_max_level(Level::Info.to_level_filter());
-            write!(file, "{:?}", any).ok();
-            for s in logger::reader() {
-                file.write(s).ok();
-            }
-            file.close();
-        }
-        Err(_) => (),
     }
 }
 

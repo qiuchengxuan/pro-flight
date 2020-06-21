@@ -1,13 +1,26 @@
 pub type Percentage = u8;
 
-pub trait Receiver: core::fmt::Debug {
-    fn rssi(&self) -> Percentage;
-    fn get_sequence(&self) -> usize;
-    fn num_channel(&self) -> usize;
-    fn get_channel(&self, index: usize) -> u16;
+#[derive(Default, Value)]
+pub struct ReceiverInput {
+    pub throttle: u16,
+    pub roll: i16,
+    pub pitch: i16,
+    pub yaw: i16,
 }
 
-#[derive(Debug)]
+impl core::fmt::Display for ReceiverInput {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        sval_json::to_fmt(f, self).ok();
+        Ok(())
+    }
+}
+
+pub trait Receiver {
+    fn rssi(&self) -> u8;
+    fn get_sequence(&self) -> usize;
+    fn get_input(&self) -> ReceiverInput;
+}
+
 pub struct NoReceiver;
 
 impl Receiver for NoReceiver {
@@ -19,11 +32,7 @@ impl Receiver for NoReceiver {
         0
     }
 
-    fn num_channel(&self) -> usize {
-        0
-    }
-
-    fn get_channel(&self, _: usize) -> u16 {
-        0
+    fn get_input(&self) -> ReceiverInput {
+        ReceiverInput::default()
     }
 }

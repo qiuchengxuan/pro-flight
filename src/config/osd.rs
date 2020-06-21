@@ -14,10 +14,10 @@ impl Default for AspectRatio {
 }
 
 impl FromYAML for AspectRatio {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
         loop {
-            match byte_iter.next(indent) {
-                Entry::KeyValue(key, value) => match key {
+            match byte_stream.next(indent) {
+                Some(Entry::KeyValue(key, value)) => match key {
                     b"width" => self.0 = btoi(value).ok().unwrap_or(16),
                     b"height" => self.1 = btoi(value).ok().unwrap_or(9),
                     _ => continue,
@@ -76,10 +76,10 @@ pub struct Offset {
 }
 
 impl FromYAML for Offset {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
         for _ in 0..2 {
-            match byte_iter.next(indent) {
-                Entry::KeyValue(key, value) => match key {
+            match byte_stream.next(indent) {
+                Some(Entry::KeyValue(key, value)) => match key {
                     b"horizental" => self.horizental = btoi(value).ok().unwrap_or(0),
                     b"vertical" => self.vertical = btoi(value).ok().unwrap_or(0),
                     _ => return,
@@ -120,18 +120,18 @@ impl Default for OSD {
 }
 
 impl FromYAML for OSD {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
         loop {
-            match byte_iter.next(indent) {
-                Entry::Key(key) => match key {
-                    b"offset" => self.offset.from_yaml(indent + 1, byte_iter),
-                    b"aspect-ratio" => self.aspect_ratio.from_yaml(indent + 1, byte_iter),
-                    _ => byte_iter.skip(indent),
+            match byte_stream.next(indent) {
+                Some(Entry::Key(key)) => match key {
+                    b"offset" => self.offset.from_yaml(indent + 1, byte_stream),
+                    b"aspect-ratio" => self.aspect_ratio.from_yaml(indent + 1, byte_stream),
+                    _ => byte_stream.skip(indent),
                 },
-                Entry::KeyValue(key, value) => match key {
+                Some(Entry::KeyValue(key, value)) => match key {
                     b"standard" => self.standard = Standard::from(value),
                     b"fov" => self.fov = btoi(value).unwrap_or(150),
-                    _ => byte_iter.skip(indent),
+                    _ => byte_stream.skip(indent),
                 },
                 _ => return,
             }

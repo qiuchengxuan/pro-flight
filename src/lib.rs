@@ -19,6 +19,7 @@ extern crate micromath;
 extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
+extern crate ryu;
 extern crate sbus_parser;
 #[macro_use]
 extern crate sval;
