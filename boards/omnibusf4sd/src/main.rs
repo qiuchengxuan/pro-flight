@@ -44,6 +44,7 @@ use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::logger::{self};
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
+use rs_flight::config::yaml::ToYAML;
 use rs_flight::config::{read_config, Config, SerialConfig};
 use rs_flight::drivers::uart::Device;
 use rs_flight::hal::io::Write as _;
@@ -52,7 +53,6 @@ use rs_flight::sys::fs::{File, OpenOptions};
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
-use stm32f4xx_hal::pwm;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 const MHZ: u32 = 1000_000;
@@ -121,14 +121,6 @@ fn main() -> ! {
     };
 
     let mut receiver: &dyn Receiver = &NoReceiver {};
-
-    // let pb0_1 = (gpio_b.pb0.into_alternate_af2(), gpio_b.pb1.into_alternate_af2());
-    // let (mut pwm1, mut pwm2) = pwm::tim3(peripherals.TIM3, pb0_1, clocks, 50.hz());
-
-    // let pwm3_4 = (gpio_a.pa3.into_alternate_af1(), gpio_a.pa2.into_alternate_af1());
-    // let pwm2 = pwm::tim2(peripherals.TIM2, pwm3_4, clocks, 50.hz());
-    // let pwm3 = pwm::tim5(peripherals.TIM5, gpio_a.pa1.into_alternate_af2(), clocks, 50.khz());
-    // let pwm4 = pwm::tim1(peripherals.TIM1, gpio_a.pa8.into_alternate_af1(), clocks, 50.khz());
 
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();
@@ -234,15 +226,15 @@ fn main() -> ! {
                 console!(&mut serial, "{:?}\n", receiver);
             } else if line == *b"telemetry" {
                 console!(&mut serial, "{}\n", unsafe { &*TELEMETRY.as_ptr() }.get_data());
-            } else if line.starts_with(b"read ") {
+            } else if line.starts_with(b"read") {
                 cmdlet::read(line, &mut serial);
             } else if line.starts_with(b"dump ") {
                 cmdlet::dump(line, &mut serial);
-            } else if line.starts_with(b"readf ") {
-                cmdlet::readf(line, &mut serial);
             } else if line.starts_with(b"write ") {
                 let mut count_down = MillisCountDown::new(&systick);
                 cmdlet::write(line, &mut serial, &mut count_down);
+            } else if line.starts_with(b"show config") {
+                config.write_to(0, &mut Console(&mut serial)).ok();
             } else {
                 console!(&mut serial, "unknown input\n");
             }

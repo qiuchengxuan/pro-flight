@@ -13,20 +13,20 @@ battery:
   max-cell-voltage: 420
   warning-cell-voltage: 350
 osd:
-  fov: 145
   aspect-ratio:
     width: 16
     height: 9
-  standard: PAL
+  fov: 145
   offset:
     horizental: 8
-    vertial: 0
+    vertical: 0
+  standard: PAL
 serials:
   USART1:
     type: GNSS
     baudrate: 38400
-    protocol: NMEA
   USART6:
     type: SBUS
+    fast: false
     rx-inverted: false
     half-duplex: false

@@ -44,22 +44,23 @@ pub fn dump<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
 }
 
 pub fn read<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
-    if let Some(word) = line[5..].split(|b| *b == ' ' as u8).next() {
-        if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
-            if unsafe { MEMORY_ADDRESS_VALIDATOR }(address) {
-                let value = unsafe { *(address as *const u32) };
-                console!(serial, "Result: {:x}\r\n", value);
-            }
-        }
-    }
-}
-
-pub fn readf<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
-    if let Some(word) = line[6..].split(|b| *b == ' ' as u8).next() {
-        if let Some(address) = btoi_radix::<u32>(word, 16).ok() {
-            if unsafe { MEMORY_ADDRESS_VALIDATOR }(address) {
-                let value = unsafe { *(address as *const f32) };
-                console!(serial, "Result: {}\r\n", value);
+    let mut split = line.split(|b| *b == ' ' as u8);
+    let read = split.next().unwrap_or(b"read");
+    if let Some(address) = split.next().map(|s| btoi_radix::<u32>(s, 16).ok()).flatten() {
+        if unsafe { MEMORY_ADDRESS_VALIDATOR }(address) {
+            match read {
+                b"readx" => {
+                    let value = unsafe { *(address as *const u32) };
+                    console!(serial, "Result: {:x}\n", value);
+                }
+                b"readf" => {
+                    let value = unsafe { *(address as *const f32) };
+                    console!(serial, "Result: {}\r\n", value);
+                }
+                _ => {
+                    let value = unsafe { *(address as *const u32) };
+                    console!(serial, "Result: {}\n", value);
+                }
             }
         }
     }

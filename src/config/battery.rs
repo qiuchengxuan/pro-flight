@@ -1,6 +1,8 @@
+use core::fmt::{Result, Write};
+
 use btoi::btoi;
 
-use super::yaml::{ByteIter, Entry, FromYAML};
+use super::yaml::{ByteStream, Entry, FromYAML, ToYAML};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Battery {
@@ -22,7 +24,7 @@ impl Default for Battery {
 }
 
 impl FromYAML for Battery {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteIter<'a>) {
+    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>) {
         loop {
             match byte_iter.next(indent) {
                 Entry::KeyValue(key, value) => match key {
@@ -37,5 +39,44 @@ impl FromYAML for Battery {
                 _ => return,
             }
         }
+    }
+}
+
+impl ToYAML for Battery {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+        self.write_indent(indent, w)?;
+        writeln!(w, "cells: {}", self.cells)?;
+        self.write_indent(indent, w)?;
+        writeln!(w, "min-cell-voltage: {}", self.min_cell_voltage)?;
+        self.write_indent(indent, w)?;
+        writeln!(w, "max-cell-voltage: {}", self.max_cell_voltage)?;
+        self.write_indent(indent, w)?;
+        writeln!(w, "warning-cell-voltage: {}", self.warning_cell_voltage)
+    }
+}
+
+mod test {
+    #[cfg(test)]
+    extern crate std;
+
+    #[test]
+    fn test_write() -> core::fmt::Result {
+        use std::string::String;
+        use std::string::ToString;
+
+        use super::Battery;
+        use crate::config::yaml::ToYAML;
+
+        let mut buf = String::new();
+        let battery = Battery::default();
+        battery.write_to(0, &mut buf)?;
+        let expected = "\
+        cells: 0\n\
+        min-cell-voltage: 3300\n\
+        max-cell-voltage: 4200\n\
+        warning-cell-voltage: 3500\n\
+        ";
+        assert_eq!(expected, buf.to_string());
+        Ok(())
     }
 }

@@ -72,9 +72,9 @@ impl Log for Logger {
         match (record.file(), record.line()) {
             (Some(file), Some(line)) => {
                 let file = file.rsplitn(2, "/").next().unwrap_or("?.rs");
-                write!(&mut Logger {}, "{} {}:{} {}\r\n", level, file, line, record.args())
+                writeln!(&mut Logger {}, "{} {}:{} {}", level, file, line, record.args())
             }
-            (_, _) => write!(&mut Logger {}, "{}: {}\r\n", level, record.args()),
+            (_, _) => writeln!(&mut Logger {}, "{}: {}", level, record.args()),
         }
         .ok();
     }

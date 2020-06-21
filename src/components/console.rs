@@ -61,6 +61,9 @@ where
 
 pub fn write<WE, S: Write<u8, Error = WE>>(serial: &mut S, output: &[u8]) -> nb::Result<(), WE> {
     for &b in output.iter() {
+        if b == '\n' as u8 {
+            serial.write('\r' as u8)?;
+        }
         serial.write(b)?;
     }
     Ok(())

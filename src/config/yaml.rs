@@ -1,8 +1,10 @@
-use core::fmt::Write;
+use core::fmt::{Result, Write};
 
-pub struct ByteIter<'a>(&'a [u8]);
+pub const INDENT_WIDTH: usize = 2;
 
-impl<'a> From<&'a [u8]> for ByteIter<'a> {
+pub struct ByteStream<'a>(&'a [u8]);
+
+impl<'a> From<&'a [u8]> for ByteStream<'a> {
     fn from(bytes: &'a [u8]) -> Self {
         Self(bytes)
     }
@@ -48,7 +50,7 @@ pub fn is_blank_line(bytes: &[u8]) -> bool {
     bytes.iter().all(|&b| is_blank(b))
 }
 
-impl<'a> ByteIter<'a> {
+impl<'a> ByteStream<'a> {
     #[inline]
     fn next_line(&self) -> &'a [u8] {
         let index = self.0.iter().position(|&b| b == '\n' as u8).unwrap_or(self.0.len() - 1);
@@ -79,7 +81,7 @@ impl<'a> ByteIter<'a> {
             None => return Entry::None,
         };
 
-        if num_space != indent {
+        if num_space != indent * INDENT_WIDTH {
             return Entry::None;
         }
 
@@ -115,7 +117,7 @@ impl<'a> ByteIter<'a> {
                 Some(tuple) => tuple,
                 None => return,
             };
-            if num_space <= indent {
+            if num_space <= indent * INDENT_WIDTH {
                 return;
             }
             self.0 = &self.0[line.len()..];
@@ -124,23 +126,30 @@ impl<'a> ByteIter<'a> {
 }
 
 pub trait FromYAML {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteIter<'a>);
+    fn from_yaml<'a>(&mut self, indent: usize, byte_iter: &mut ByteStream<'a>);
 }
 
 pub trait ToYAML {
-    fn to_writer<W: Write>(self, indent: usize, w: W);
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result;
+
+    fn write_indent<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+        for _ in 0..indent * INDENT_WIDTH / 2 {
+            write!(w, "  ")?
+        }
+        Ok(())
+    }
 }
 
 mod test {
     #[test]
     fn test_entry() {
-        use super::{ByteIter, Entry};
+        use super::{ByteStream, Entry};
 
         let bytes = b"test:\n  a: 0\n";
-        let mut iter = ByteIter::from(&bytes[..]);
+        let mut iter = ByteStream::from(&bytes[..]);
         let entry = iter.next(0);
         assert_eq!(Entry::Key(b"test"), entry);
-        let entry = iter.next(2);
+        let entry = iter.next(1);
         assert_eq!(Entry::KeyValue(b"a", b"0"), entry);
     }
 }
