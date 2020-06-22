@@ -2,7 +2,7 @@
 authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "omnibusf4sd"
+name = "omnibusf4v3"
 version = "0.1.0"
 
 [dependencies]
@@ -31,7 +31,7 @@ usb-device = "0.2"
 usbd-serial = "0.1.0"
 
 [[bin]]
-name = "omnibusf4sd"
+name = "omnibusf4v3"
 test = false
 bench = false
 

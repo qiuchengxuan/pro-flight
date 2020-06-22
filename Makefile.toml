@@ -1,18 +1,18 @@
-[tasks.omnibusf4sd-elf]
+[tasks.omnibusf4v3-elf]
 script = [
 '''
 #!/usr/bin/env bash
-cd boards/omnibusf4sd
+cd boards/omnibusf4v3
 cargo build --release
 cd -
 '''
 ]
 
-[tasks.omnibusf4sd]
+[tasks.omnibusf4v3]
 command = "arm-none-eabi-objcopy"
 args = [
     "-O", "binary",
-    "boards/omnibusf4sd/target/thumbv7em-none-eabihf/release/omnibusf4sd",
-    "omnibusf4sd.bin",
+    "boards/omnibusf4v3/target/thumbv7em-none-eabihf/release/omnibusf4v3",
+    "omnibusf4v3.bin",
 ]
-dependencies = ["omnibusf4sd-elf"]
+dependencies = ["omnibusf4v3-elf"]
