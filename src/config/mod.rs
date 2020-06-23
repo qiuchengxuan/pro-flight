@@ -14,7 +14,7 @@ use crate::hal::sensors::Axis;
 
 pub use battery::Battery;
 pub use osd::{AspectRatio, Offset, Standard, OSD};
-pub use pwm::{MotorConfig, PwmConfig, PwmConfigs, ServoConfig};
+pub use pwm::{MotorConfig, PwmConfigs, ServoConfig, PWM};
 pub use sensor::Accelerometer;
 pub use serial::{SerialConfig, Serials};
 use yaml::{ByteStream, Entry, FromYAML, ToYAML};

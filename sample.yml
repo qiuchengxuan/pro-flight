@@ -31,21 +31,21 @@ serials:
     rx-inverted: true
     half-duplex: false
 pwms:
-  - name: PWM1
+  PWM1:
     type: motor
     rate: 400
-  - name: PWM2
+  PWM2:
     type: motor
     rate: 400
-  - name: PWM3
+  PWM3:
     type: servo
     reversed: false
-  - name: PWM4
+  PWM4:
     type: servo
     reversed: false
-  - name: PWM5
+  PWM5:
     type: servo
     reversed: false
-  - name: PWM6
+  PWM6:
     type: servo
     reversed: false

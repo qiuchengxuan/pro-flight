@@ -125,7 +125,7 @@ fn main() -> ! {
 
     let pwms = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    pwm::init(pwms, pins, clocks, &config.pwms);
+    let pwm6 = pwm::init(pwms, pins, clocks, &config.pwms);
 
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();

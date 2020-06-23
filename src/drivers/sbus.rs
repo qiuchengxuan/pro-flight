@@ -2,7 +2,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
-use crate::hal::receiver::{Receiver, ReceiverInput};
+use crate::hal::controller::{ControlSurfaceInput, Controller, ThrottleInput};
+use crate::hal::receiver::Receiver;
 
 #[derive(Default, Debug)]
 pub struct SbusReceiver {
@@ -48,6 +49,21 @@ impl SbusReceiver {
     }
 }
 
+impl Controller for SbusReceiver {
+    fn get_throttle(&self) -> ThrottleInput {
+        let throttle = self.data.channels[2] << 5;
+        ThrottleInput(throttle, throttle)
+    }
+
+    fn get_input(&self) -> ControlSurfaceInput {
+        ControlSurfaceInput {
+            roll: self.data.channels[0] as i16 - (1 << 10),
+            pitch: self.data.channels[1] as i16 - (1 << 10),
+            yaw: self.data.channels[3] as i16 - (1 << 10),
+        }
+    }
+}
+
 impl Receiver for SbusReceiver {
     fn rssi(&self) -> u8 {
         self.loss_rate
@@ -55,14 +71,5 @@ impl Receiver for SbusReceiver {
 
     fn get_sequence(&self) -> usize {
         self.sequence.load(Ordering::Relaxed)
-    }
-
-    fn get_input(&self) -> ReceiverInput {
-        ReceiverInput {
-            throttle: self.data.channels[2] << 5,
-            roll: (self.data.channels[0] << 5) as i16,
-            pitch: (self.data.channels[1] << 5) as i16,
-            yaw: (self.data.channels[3] << 5) as i16,
-        }
     }
 }
