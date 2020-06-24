@@ -2,7 +2,7 @@ use core::fmt::{Result, Write};
 
 use crate::hal::sensors::Axis;
 
-use super::yaml::{ByteStream, Entry, FromYAML, ToYAML};
+use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Default, Debug)]
 pub struct Accelerometer {
@@ -11,17 +11,17 @@ pub struct Accelerometer {
 }
 
 impl FromYAML for Accelerometer {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
-        loop {
-            match byte_stream.next(indent) {
-                Some(Entry::Key(key)) => match key {
-                    b"bias" => self.bias.from_yaml(indent + 1, byte_stream),
-                    b"gain" => self.gain.from_yaml(indent + 1, byte_stream),
-                    _ => byte_stream.skip(indent),
-                },
-                _ => return,
+    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
+        let mut bias = Axis::default();
+        let mut gain = Axis::default();
+        while let Some(key) = parser.next_entry() {
+            match key {
+                "bias" => bias = Axis::from_yaml(parser),
+                "gain" => gain = Axis::from_yaml(parser),
+                _ => continue,
             }
         }
+        Self { bias, gain }
     }
 }
 
@@ -34,25 +34,5 @@ impl ToYAML for Accelerometer {
         self.write_indent(indent, w)?;
         writeln!(w, "gain:")?;
         self.gain.write_to(indent + 1, w)
-    }
-}
-
-mod test {
-    #[cfg(test)]
-    extern crate std;
-
-    #[test]
-    fn test_write() -> core::fmt::Result {
-        use std::string::{String, ToString};
-
-        use super::Accelerometer;
-        use crate::config::yaml::ToYAML;
-
-        let mut buf = String::new();
-        let accelerometer = Accelerometer::default();
-        accelerometer.write_to(0, &mut buf)?;
-        let expected = "bias:\n  x: 0\n  y: 0\n  z: 0\ngain:\n  x: 0\n  y: 0\n  z: 0";
-        assert_eq!(expected.trim(), buf.to_string().trim());
-        Ok(())
     }
 }

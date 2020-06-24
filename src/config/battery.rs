@@ -2,7 +2,7 @@ use core::fmt::{Result, Write};
 
 use btoi::btoi;
 
-use super::yaml::{ByteStream, Entry, FromYAML, ToYAML};
+use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Battery {
@@ -24,21 +24,22 @@ impl Default for Battery {
 }
 
 impl FromYAML for Battery {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
-        loop {
-            match byte_stream.next(indent) {
-                Some(Entry::KeyValue(key, value)) => match key {
-                    b"cells" => self.cells = btoi(value).ok().unwrap_or_default(),
-                    b"min-cell-voltage" => self.min_cell_voltage = btoi(value).ok().unwrap_or(3300),
-                    b"max-cell-voltage" => self.max_cell_voltage = btoi(value).ok().unwrap_or(4200),
-                    b"warning-cell-voltage" => {
-                        self.warning_cell_voltage = btoi(value).ok().unwrap_or(3500)
-                    }
-                    _ => byte_stream.skip(indent),
-                },
-                _ => return,
+    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
+        let mut cells: u8 = 0;
+        let mut min_cell_voltage: u16 = 3300;
+        let mut max_cell_voltage: u16 = 4200;
+        let mut warning_cell_voltage: u16 = 3500;
+        while let Some((key, value)) = parser.next_key_value() {
+            let value = btoi::<u16>(value.as_bytes()).ok();
+            match key {
+                "cells" => cells = value.unwrap_or(0) as u8,
+                "min-cell-voltage" => min_cell_voltage = value.unwrap_or(3300),
+                "max-cell-voltage" => max_cell_voltage = value.unwrap_or(4200),
+                "warning-cell-voltage" => warning_cell_voltage = value.unwrap_or(3500),
+                _ => continue,
             }
         }
+        Self { cells, min_cell_voltage, max_cell_voltage, warning_cell_voltage }
     }
 }
 
@@ -52,31 +53,5 @@ impl ToYAML for Battery {
         writeln!(w, "max-cell-voltage: {}", self.max_cell_voltage)?;
         self.write_indent(indent, w)?;
         writeln!(w, "warning-cell-voltage: {}", self.warning_cell_voltage)
-    }
-}
-
-mod test {
-    #[cfg(test)]
-    extern crate std;
-
-    #[test]
-    fn test_write() -> core::fmt::Result {
-        use std::string::String;
-        use std::string::ToString;
-
-        use super::Battery;
-        use crate::config::yaml::ToYAML;
-
-        let mut buf = String::new();
-        let battery = Battery::default();
-        battery.write_to(0, &mut buf)?;
-        let expected = "\
-        cells: 0\n\
-        min-cell-voltage: 3300\n\
-        max-cell-voltage: 4200\n\
-        warning-cell-voltage: 3500\n\
-        ";
-        assert_eq!(expected, buf.to_string());
-        Ok(())
     }
 }

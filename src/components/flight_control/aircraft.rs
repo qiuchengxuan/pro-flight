@@ -1,4 +1,4 @@
-use crate::hal::controller::{ControlSurfaceInput, ThrottleInput};
+use crate::hal::controller::ControlInput;
 
 pub enum PWMType {
     Motor1,
@@ -12,5 +12,5 @@ pub enum PWMType {
 }
 
 pub trait Aircraft {
-    fn control(&mut self, throttle: ThrottleInput, control: ControlSurfaceInput);
+    fn control(&mut self, input: ControlInput);
 }

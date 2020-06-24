@@ -32,3 +32,6 @@ sval_json = "0.5"
 
 [lib]
 name = "rs_flight"
+
+[dev-dependencies]
+pretty_assertions = "0.4"

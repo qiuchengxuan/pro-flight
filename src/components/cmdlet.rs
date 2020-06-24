@@ -1,7 +1,7 @@
 use core::fmt::Write;
 use core::time::Duration;
 
-use btoi::btoi_radix;
+use btoi::{btoi, btoi_radix};
 use embedded_hal::serial;
 use embedded_hal::timer::CountDown;
 
@@ -35,7 +35,7 @@ pub fn dump<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
     }
     let mut size: usize = 0;
     if let Some(word) = iter.next() {
-        if let Some(sz) = btoi_radix::<usize>(word, 10).ok() {
+        if let Some(sz) = btoi(word).ok() {
             size = sz
         }
     }

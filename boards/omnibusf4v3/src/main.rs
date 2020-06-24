@@ -125,7 +125,7 @@ fn main() -> ! {
 
     let pwms = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    let pwm6 = pwm::init(pwms, pins, clocks, &config.pwms);
+    pwm::init(pwms, pins, clocks, &config.outputs);
 
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();
@@ -183,7 +183,7 @@ fn main() -> ! {
 
     let (mut serial, mut device) = usb_serial::init(usb);
 
-    if let Some(config) = config.serials.get(b"USART1") {
+    if let Some(config) = config.serials.get("USART1") {
         if let SerialConfig::GNSS(baudrate) = config {
             let pins = (gpio_a.pa9, gpio_a.pa10);
             let count_down = MillisCountDown::new(&systick);
@@ -191,7 +191,7 @@ fn main() -> ! {
         }
     }
 
-    if let Some(config) = config.serials.get(b"USART6") {
+    if let Some(config) = config.serials.get("USART6") {
         if let SerialConfig::SBUS(sbus_config) = config {
             if sbus_config.rx_inverted {
                 gpio_c.pc8.into_push_pull_output().set_high().ok();

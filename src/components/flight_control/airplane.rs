@@ -1,9 +1,9 @@
 use crate::drivers::pwm::{dummy_pwm, PWM};
-use crate::hal::controller::{ControlSurfaceInput, ThrottleInput};
+use crate::hal::controller::ControlInput;
 
 use super::aircraft::Aircraft;
 
-pub struct FixedWing<'a> {
+pub struct Airplane<'a> {
     motors: [&'a mut dyn PWM; 2],
     aileron_left: &'a mut dyn PWM,
     aileron_right: &'a mut dyn PWM,
@@ -11,7 +11,7 @@ pub struct FixedWing<'a> {
     rudder: &'a mut dyn PWM,
 }
 
-impl<'a> Default for FixedWing<'a> {
+impl<'a> Default for Airplane<'a> {
     fn default() -> Self {
         Self {
             motors: [dummy_pwm(), dummy_pwm()],
@@ -29,7 +29,7 @@ fn set_angle(servo: &mut dyn PWM, value: i16) {
     servo.set_duty(servo.get_max_duty() / 2 + adder as u16);
 }
 
-impl<'a> FixedWing<'a> {
+impl<'a> Airplane<'a> {
     pub fn set_motors(&mut self, pwms: [&'a mut dyn PWM; 2]) {
         self.motors = pwms;
     }
@@ -51,12 +51,12 @@ impl<'a> FixedWing<'a> {
     }
 }
 
-impl<'a> Aircraft for FixedWing<'a> {
-    fn control(&mut self, throttle: ThrottleInput, control: ControlSurfaceInput) {
+impl<'a> Aircraft for Airplane<'a> {
+    fn control(&mut self, control: ControlInput) {
         let max_duty = self.motors[0].get_max_duty() as u32;
-        self.motors[0].set_duty((max_duty * throttle.0 as u32 / u16::MAX as u32) as u16);
+        self.motors[0].set_duty((max_duty * control.throttle as u32 / u16::MAX as u32) as u16);
         let max_duty = self.motors[1].get_max_duty() as u32;
-        self.motors[1].set_duty((max_duty * throttle.1 as u32 / u16::MAX as u32) as u16);
+        self.motors[1].set_duty((max_duty * control.throttle as u32 / u16::MAX as u32) as u16);
 
         set_angle(self.aileron_left, control.roll);
         set_angle(self.aileron_right, -control.roll);

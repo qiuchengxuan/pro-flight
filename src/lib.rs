@@ -35,3 +35,7 @@ pub mod sys;
 
 #[cfg(test)]
 extern crate std;
+
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;

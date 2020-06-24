@@ -1,27 +1,25 @@
+use core::cmp::min;
 use core::fmt::{Result, Write};
 
-pub const INDENT_WIDTH: usize = 2;
+pub const INDENT_WIDTH: u16 = 2;
 
-pub struct ByteStream<'a> {
-    bytes: &'a [u8],
-    skip_once_list_mark: bool,
+pub struct YamlParser<'a> {
+    string: &'a str,
+    indent: u16,
+    unindent: u16,
 }
 
-impl<'a> From<&'a [u8]> for ByteStream<'a> {
+impl<'a> From<&'a [u8]> for YamlParser<'a> {
     fn from(bytes: &'a [u8]) -> Self {
-        Self { bytes, skip_once_list_mark: false }
+        let string = unsafe { core::str::from_utf8_unchecked(bytes) };
+        Self { string, indent: 0u16, unindent: 0u16 }
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum Entry<'a> {
-    Key(&'a [u8]),
-    ListEntry,
-    KeyValue(&'a [u8], &'a [u8]),
-}
-
-pub fn is_blank(b: u8) -> bool {
-    b == ' ' as u8 || b == '\r' as u8 || b == '\n' as u8
+impl<'a> From<&'a str> for YamlParser<'a> {
+    fn from(string: &'a str) -> Self {
+        Self { string, indent: 0u16, unindent: 0u16 }
+    }
 }
 
 pub fn strip<'a>(bytes: &'a [u8]) -> &'a [u8] {
@@ -37,108 +35,162 @@ pub fn strip<'a>(bytes: &'a [u8]) -> &'a [u8] {
     bytes
 }
 
-impl<'a> ByteStream<'a> {
-    fn next_non_blank_line(&mut self) -> Option<&'a [u8]> {
-        while self.bytes.len() > 0 {
-            let mut split = self.bytes.splitn(2, |&b| b == '\n' as u8);
-            match split.next() {
-                Some(line) => {
-                    if !line.iter().all(|&b| is_blank(b)) {
-                        return Some(line);
-                    }
-                    self.bytes = split.next().unwrap_or(&[]);
-                }
-                None => return None,
+impl<'a> YamlParser<'a> {
+    fn next_non_blank_line(&mut self) -> Option<&'a str> {
+        let mut split = self.string.split('\n');
+        while let Some(line) = split.next() {
+            if line.trim_start().is_empty() {
+                self.string = &self.string[min(line.len() + 1, self.string.len())..];
+                continue;
             }
+            return Some(line);
         }
         None
     }
 
-    fn next_indent_matched_line(&mut self, indent: usize) -> Option<&'a [u8]> {
+    fn leave(&mut self) {
+        if self.indent == 0 {
+            return;
+        }
+        self.indent -= INDENT_WIDTH;
+        while !self.string.is_empty() {
+            let line = match self.next_non_blank_line() {
+                Some(line) => line,
+                None => break,
+            };
+
+            let num_leading_space = line.find(|c: char| !c.is_whitespace()).unwrap_or(0);
+            if num_leading_space <= self.indent as usize {
+                break;
+            }
+            if self.string.len() != line.len() {
+                self.string = &self.string[line.len() + 1..];
+            } else {
+                self.string = &"";
+            }
+        }
+    }
+
+    fn enter(&mut self, length: usize) {
+        self.string = &self.string[length..];
+        self.indent += INDENT_WIDTH;
+    }
+
+    fn next_indent_matched_line(&mut self) -> Option<&'a str> {
         let line = match self.next_non_blank_line() {
             Some(line) => line,
             None => return None,
         };
-        if line.len() <= indent || is_blank(line[indent]) {
+        let indent = (self.indent - self.unindent) as usize;
+        self.unindent = 0;
+
+        if !line[..indent].trim_start().is_empty() {
             return None;
         }
-        let num_space = (&line[..indent]).iter().filter(|&&b| b == ' ' as u8).count();
-        if num_space == indent {
-            return Some(line);
+        self.string = &self.string[indent as usize..];
+        Some(&line[indent..])
+    }
+
+    pub fn next_entry(&mut self) -> Option<&'a str> {
+        if let Some(line) = self.next_indent_matched_line() {
+            if let Some(key) = line.splitn(2, ':').next() {
+                self.enter(key.len() + 1);
+                return Some(key.trim().trim_matches('"'));
+            }
         }
-        let has_list_mark = &line[indent - 2..indent] == b"- ";
-        if self.skip_once_list_mark && num_space == indent - 1 && has_list_mark {
-            self.skip_once_list_mark = false;
-            return Some(line);
-        }
+        self.leave();
         None
     }
 
-    pub fn next(&mut self, indent: usize) -> Option<Entry<'a>> {
-        let mut line = match self.next_indent_matched_line(indent * INDENT_WIDTH) {
+    pub fn next_list_begin(&mut self) -> bool {
+        let line = match self.next_non_blank_line() {
             Some(line) => line,
-            None => return None,
+            None => {
+                self.leave();
+                return false;
+            }
         };
 
-        if line[indent * INDENT_WIDTH..].starts_with(b"- ") {
-            return Some(Entry::ListEntry);
-        }
-        if self.bytes.len() != line.len() {
-            self.bytes = &self.bytes[line.len() + 1..];
-        } else {
-            self.bytes = &[];
+        if !line[..self.indent as usize].trim_start().is_empty() {
+            self.leave();
+            return false;
         }
 
-        line = &line[indent * INDENT_WIDTH..];
-        let mut split = line.split(|&b| b == ':' as u8);
-        let key = match split.next() {
-            Some(key) => strip(key),
-            None => return None,
-        };
-
-        let value = match split.next() {
-            Some(value) => strip(value),
-            None => return Some(Entry::Key(key)),
-        };
-        if value.len() == 0 {
-            return Some(Entry::Key(key));
+        if !line[self.indent as usize..].starts_with("- ") {
+            self.leave();
+            return false;
         }
-        return Some(Entry::KeyValue(key, value));
+        self.unindent = self.indent + INDENT_WIDTH;
+        self.string = &self.string[(self.indent + INDENT_WIDTH) as usize..];
+        self.indent += INDENT_WIDTH;
+        true
     }
 
-    pub fn skip(&mut self, indent: usize) {
-        while self.bytes.len() > 0 {
-            let line = match self.next_non_blank_line() {
-                Some(line) => line,
-                None => return,
-            };
+    pub fn next_value(&mut self) -> Option<&'a str> {
+        self.unindent = 0;
 
-            let num_leading_space = line.iter().position(|&b| b != ' ' as u8).unwrap_or(0);
-            if num_leading_space <= indent * INDENT_WIDTH {
-                return;
-            }
-            if self.bytes.len() != line.len() {
-                self.bytes = &self.bytes[line.len() + 1..];
-            } else {
-                self.bytes = &[];
+        let mut split = self.string.splitn(2, '\n');
+        if let Some(line) = split.next() {
+            self.string = split.next().unwrap_or_default();
+            if !line.trim_start().is_empty() {
+                self.leave();
+                return Some(line.trim().trim_matches('"'));
             }
         }
+        self.leave();
+        None
     }
 
-    pub fn skip_once_list_mark(&mut self) {
-        self.skip_once_list_mark = true;
+    pub fn next_key_value(&mut self) -> Option<(&'a str, &'a str)> {
+        let line = match self.next_indent_matched_line() {
+            Some(line) => line,
+            None => {
+                self.leave();
+                return None;
+            }
+        };
+        self.string = &self.string[line.len()..];
+
+        let mut splitter = line.splitn(2, ':');
+        if let Some(key) = splitter.next() {
+            if let Some(value) = splitter.next() {
+                return Some((key.trim().trim_matches('"'), value.trim().trim_matches('"')));
+            }
+        }
+        self.leave();
+        None
+    }
+
+    pub fn next_list_value(&mut self) -> Option<&'a str> {
+        let line = match self.next_indent_matched_line() {
+            Some(line) => line,
+            None => {
+                self.leave();
+                return None;
+            }
+        };
+        if line.starts_with("- ") {
+            self.string = &self.string[line.len()..];
+            return Some((&line[INDENT_WIDTH as usize..]).trim().trim_matches('"'));
+        }
+        self.leave();
+        None
+    }
+
+    pub fn skip(&mut self) {
+        self.leave()
     }
 }
 
 pub trait FromYAML {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>);
+    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self;
 }
 
 pub trait ToYAML {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result;
 
     fn write_indent<W: Write>(&self, indent: usize, w: &mut W) -> Result {
-        for _ in 0..indent * INDENT_WIDTH / 2 {
+        for _ in 0..indent * INDENT_WIDTH as usize / 2 {
             write!(w, "  ")?
         }
         Ok(())
@@ -147,14 +199,46 @@ pub trait ToYAML {
 
 mod test {
     #[test]
-    fn test_entry() {
-        use super::{ByteStream, Entry};
+    fn test_yaml_parser() {
+        use super::YamlParser;
 
-        let bytes = b"test:\n  a: 0\n";
-        let mut stream = ByteStream::from(&bytes[..]);
-        let entry = stream.next(0);
-        assert_eq!(Some(Entry::Key(b"test")), entry);
-        let entry = stream.next(1);
-        assert_eq!(Some(Entry::KeyValue(b"a", b"0")), entry);
+        let string = "\
+        \ndict:\
+        \n  entry-a: a\
+        \n  entry-b: b\
+        \nmulti-level-dict:\
+        \n  level1:\
+        \n    level2: lv2\
+        \nempty-list: []\
+        \nlist:\
+        \n  - list-a\
+        \n  - list-b\
+        \nlist-entry:\
+        \n  - entry-a: a\
+        \n  - entry-b: b\n";
+        let mut stream = YamlParser::from(&string[..]);
+        assert_eq!(Some("dict"), stream.next_entry());
+        assert_eq!(Some(("entry-a", "a")), stream.next_key_value());
+        assert_eq!(Some(("entry-b", "b")), stream.next_key_value());
+        assert_eq!(None, stream.next_key_value());
+        assert_eq!(Some("multi-level-dict"), stream.next_entry());
+        assert_eq!(Some("level1"), stream.next_entry());
+        assert_eq!(Some(("level2", "lv2")), stream.next_key_value());
+        assert_eq!(None, stream.next_key_value());
+        assert_eq!(None, stream.next_entry());
+        assert_eq!(Some("empty-list"), stream.next_entry());
+        assert_eq!(None, stream.next_list_value());
+        assert_eq!(Some("list"), stream.next_entry());
+        assert_eq!(Some("list-a"), stream.next_list_value());
+        assert_eq!(Some("list-b"), stream.next_list_value());
+        assert_eq!(None, stream.next_list_value());
+        assert_eq!(Some("list-entry"), stream.next_entry());
+        assert_eq!(true, stream.next_list_begin());
+        assert_eq!(Some(("entry-a", "a")), stream.next_key_value());
+        assert_eq!(None, stream.next_key_value());
+        assert_eq!(true, stream.next_list_begin());
+        assert_eq!(Some(("entry-b", "b")), stream.next_key_value());
+        assert_eq!(None, stream.next_key_value());
+        assert_eq!(false, stream.next_list_begin());
     }
 }

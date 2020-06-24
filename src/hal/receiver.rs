@@ -1,4 +1,4 @@
-use super::controller::{ControlSurfaceInput, Controller, ThrottleInput};
+use super::controller::{ControlInput, Controller};
 
 pub type Percentage = u8;
 
@@ -10,12 +10,8 @@ pub trait Receiver: Controller {
 pub struct NoReceiver;
 
 impl Controller for NoReceiver {
-    fn get_throttle(&self) -> ThrottleInput {
-        ThrottleInput::default()
-    }
-
-    fn get_input(&self) -> ControlSurfaceInput {
-        ControlSurfaceInput::default()
+    fn get_input(&self) -> ControlInput {
+        ControlInput::default()
     }
 }
 

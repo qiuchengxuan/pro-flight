@@ -1,9 +1,43 @@
 use core::fmt::{Result, Write};
 
-use ascii::AsciiStr;
 use btoi::btoi;
 
-use super::yaml::{ByteStream, Entry, FromYAML, ToYAML};
+use super::yaml::{FromYAML, ToYAML, YamlParser};
+
+#[derive(PartialEq, Copy, Clone)]
+pub enum Identifier {
+    UART(u8),
+    USART(u8),
+}
+
+impl From<&str> for Identifier {
+    fn from(name: &str) -> Identifier {
+        if name.starts_with("USART") {
+            return Identifier::USART(btoi(name[5..].as_bytes()).ok().unwrap_or(0));
+        } else if name.starts_with("UART") {
+            return Identifier::UART(btoi(name[4..].as_bytes()).ok().unwrap_or(0));
+        }
+        Identifier::UART(0)
+    }
+}
+
+impl Into<bool> for Identifier {
+    fn into(self) -> bool {
+        match self {
+            Self::UART(index) => index > 0,
+            Self::USART(index) => index > 0,
+        }
+    }
+}
+
+impl core::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            Self::USART(index) => write!(f, "USART{}", index),
+            Self::UART(index) => write!(f, "UART{}", index),
+        }
+    }
+}
 
 #[derive(PartialEq, Copy, Clone)]
 pub struct SbusConfig {
@@ -23,19 +57,38 @@ impl SbusConfig {
 }
 
 #[derive(PartialEq, Copy, Clone)]
-pub enum SerialConfig {
+pub enum Config {
     None,
     GNSS(u32),
     SBUS(SbusConfig),
 }
 
-impl Default for SerialConfig {
-    fn default() -> Self {
-        Self::None
+impl FromYAML for Config {
+    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
+        let mut type_string: &str = &"";
+        let mut baudrate = 0;
+        let mut fast = false;
+        let mut rx_inverted = false;
+        let mut half_duplex = false;
+        while let Some((key, value)) = parser.next_key_value() {
+            match key {
+                "type" => type_string = value,
+                "baudrate" => baudrate = btoi(value.as_bytes()).ok().unwrap_or(0),
+                "fast" => fast = value == "true",
+                "rx-inverted" => rx_inverted = value == "true",
+                "half-duplex" => half_duplex = value == "true",
+                _ => continue,
+            }
+        }
+        match type_string {
+            "SBUS" => Config::SBUS(SbusConfig { fast, rx_inverted, half_duplex }),
+            "GNSS" => Config::GNSS(baudrate),
+            _ => Config::None,
+        }
     }
 }
 
-impl ToYAML for SerialConfig {
+impl ToYAML for Config {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
         self.write_indent(indent, w)?;
         match self {
@@ -60,135 +113,60 @@ impl ToYAML for SerialConfig {
 
 const MAX_SERIAL_CONFIGS: usize = 5;
 
-pub struct Serials {
-    name_buffer: [u8; 6 * MAX_SERIAL_CONFIGS],
-    configs: [(usize, SerialConfig); MAX_SERIAL_CONFIGS],
-    pub num_config: u8,
-}
+pub struct Serials([(Identifier, Config); MAX_SERIAL_CONFIGS]);
 
 impl Default for Serials {
     fn default() -> Self {
-        Self {
-            name_buffer: [0u8; 6 * MAX_SERIAL_CONFIGS],
-            configs: [(0, SerialConfig::None); MAX_SERIAL_CONFIGS],
-            num_config: 0u8,
-        }
+        Self([(Identifier::UART(0), Config::None); MAX_SERIAL_CONFIGS])
     }
 }
 
 impl Serials {
-    pub fn get(&self, name: &[u8]) -> Option<SerialConfig> {
-        let mut index = 0;
-        for i in 0..self.num_config as usize {
-            let (length, config) = self.configs[i];
-            if &self.name_buffer[index..index + length] == name {
-                return Some(config);
+    pub fn get(&self, name: &str) -> Option<Config> {
+        let identifier = Identifier::from(name);
+        if identifier.into() {
+            for &(id, config) in self.0.iter() {
+                if id == identifier {
+                    return Some(config);
+                }
             }
-            index += length;
         }
         None
     }
-}
 
-fn to_serial_config<'a>(indent: usize, byte_stream: &'a mut ByteStream) -> SerialConfig {
-    let mut type_string: &[u8] = &[];
-    let mut baudrate = 0;
-    let mut fast = false;
-    let mut rx_inverted = false;
-    let mut half_duplex = false;
-    loop {
-        match byte_stream.next(indent) {
-            Some(Entry::KeyValue(key, value)) => match key {
-                b"type" => type_string = value,
-                b"baudrate" => baudrate = btoi(value).ok().unwrap_or(0),
-                b"fast" => fast = value == b"true",
-                b"rx-inverted" => rx_inverted = value == b"true",
-                b"half-duplex" => half_duplex = value == b"true",
-                _ => continue,
-            },
-            Some(Entry::Key(_)) => byte_stream.skip(indent),
-            _ => break,
-        }
-    }
-    match type_string {
-        b"SBUS" => SerialConfig::SBUS(SbusConfig { fast, rx_inverted, half_duplex }),
-        b"GNSS" => SerialConfig::GNSS(baudrate),
-        _ => SerialConfig::None,
+    pub fn len(&self) -> usize {
+        self.0.iter().filter(|&&(id, _)| id.into()).count()
     }
 }
 
 impl FromYAML for Serials {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &'a mut ByteStream) {
+    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
+        let mut serials = Self::default();
         let mut index = 0;
-        loop {
-            match byte_stream.next(indent) {
-                Some(Entry::Key(key)) => {
-                    if self.num_config as usize >= MAX_SERIAL_CONFIGS {
-                        byte_stream.skip(indent);
-                    }
-                    if key.len() > self.name_buffer.len() - index {
-                        byte_stream.skip(indent);
-                    }
-                    let name = &mut self.name_buffer[index..index + key.len()];
-                    name.copy_from_slice(key);
-                    let config = to_serial_config(indent + 1, byte_stream);
-                    self.configs[self.num_config as usize] = (key.len(), config);
-
-                    index += key.len();
-                    self.num_config += 1;
-                }
-                _ => return,
+        while let Some(key) = parser.next_entry() {
+            if index >= MAX_SERIAL_CONFIGS {
+                parser.skip();
+            }
+            let id = Identifier::from(key);
+            let config = Config::from_yaml(parser);
+            if id.into() {
+                serials.0[index] = (id, config);
+                index += 1
             }
         }
+        serials
     }
 }
 
 impl ToYAML for Serials {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
-        let mut index = 0;
-        for i in 0..self.num_config {
-            self.write_indent(indent, w)?;
-            let (size, config) = self.configs[i as usize];
-            let name_bytes = &self.name_buffer[index..index + size];
-            let string = unsafe { AsciiStr::from_ascii_unchecked(name_bytes) };
-            writeln!(w, "{}:", string)?;
-            config.write_to(indent + 1, w)?;
-            index += size;
+        for &(id, config) in self.0.iter() {
+            if id.into() {
+                self.write_indent(indent, w)?;
+                writeln!(w, "{}:", id)?;
+                config.write_to(indent + 1, w)?;
+            }
         }
-        Ok(())
-    }
-}
-
-mod test {
-    #[cfg(test)]
-    extern crate std;
-
-    #[test]
-    fn test_write() -> core::fmt::Result {
-        use std::string::String;
-        use std::string::ToString;
-
-        use super::{SbusConfig, SerialConfig, Serials};
-        use crate::config::yaml::ToYAML;
-
-        let mut buf = String::new();
-        let mut serials = Serials::default();
-        serials.name_buffer[..12].copy_from_slice(b"USART1USART6");
-        serials.configs[0] = (6, SerialConfig::GNSS(38400));
-        let sbus_config = SbusConfig { fast: false, rx_inverted: true, half_duplex: false };
-        serials.configs[1] = (6, SerialConfig::SBUS(sbus_config));
-        serials.num_config = 2;
-        serials.write_to(0, &mut buf)?;
-        let expected = "\
-        \nUSART1:\
-        \n  type: GNSS\
-        \n  baudrate: 38400\
-        \nUSART6:\
-        \n  type: SBUS\
-        \n  fast: false\
-        \n  rx-inverted: true\
-        \n  half-duplex: false";
-        assert_eq!(expected.trim(), buf.to_string().trim());
         Ok(())
     }
 }

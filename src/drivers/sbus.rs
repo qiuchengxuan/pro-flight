@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
-use crate::hal::controller::{ControlSurfaceInput, Controller, ThrottleInput};
+use crate::hal::controller::{ControlInput, Controller};
 use crate::hal::receiver::Receiver;
 
 #[derive(Default, Debug)]
@@ -50,13 +50,9 @@ impl SbusReceiver {
 }
 
 impl Controller for SbusReceiver {
-    fn get_throttle(&self) -> ThrottleInput {
-        let throttle = self.data.channels[2] << 5;
-        ThrottleInput(throttle, throttle)
-    }
-
-    fn get_input(&self) -> ControlSurfaceInput {
-        ControlSurfaceInput {
+    fn get_input(&self) -> ControlInput {
+        ControlInput {
+            throttle: self.data.channels[2] << 5,
             roll: self.data.channels[0] as i16 - (1 << 10),
             pitch: self.data.channels[1] as i16 - (1 << 10),
             yaw: self.data.channels[3] as i16 - (1 << 10),

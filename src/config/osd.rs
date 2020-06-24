@@ -2,7 +2,7 @@ use core::fmt::{Display, Formatter, Result, Write};
 
 use btoi::btoi;
 
-use super::yaml::{ByteStream, Entry, FromYAML, ToYAML};
+use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct AspectRatio(pub u8, pub u8);
@@ -14,17 +14,18 @@ impl Default for AspectRatio {
 }
 
 impl FromYAML for AspectRatio {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
-        loop {
-            match byte_stream.next(indent) {
-                Some(Entry::KeyValue(key, value)) => match key {
-                    b"width" => self.0 = btoi(value).ok().unwrap_or(16),
-                    b"height" => self.1 = btoi(value).ok().unwrap_or(9),
-                    _ => continue,
-                },
-                _ => return,
+    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
+        let mut width: u8 = 16;
+        let mut height: u8 = 9;
+        while let Some((key, value)) = parser.next_key_value() {
+            let value = btoi(value.as_bytes()).ok();
+            match key {
+                "width" => width = value.unwrap_or(16),
+                "height" => height = value.unwrap_or(9),
+                _ => continue,
             }
         }
+        Self(width, height)
     }
 }
 
@@ -50,10 +51,10 @@ impl Default for Standard {
     }
 }
 
-impl From<&[u8]> for Standard {
-    fn from(bytes: &[u8]) -> Standard {
-        match bytes {
-            b"NTSC" => Standard::NTSC,
+impl From<&str> for Standard {
+    fn from(string: &str) -> Standard {
+        match string {
+            "NTSC" => Standard::NTSC,
             _ => Standard::PAL,
         }
     }
@@ -76,17 +77,18 @@ pub struct Offset {
 }
 
 impl FromYAML for Offset {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
-        for _ in 0..2 {
-            match byte_stream.next(indent) {
-                Some(Entry::KeyValue(key, value)) => match key {
-                    b"horizental" => self.horizental = btoi(value).ok().unwrap_or(0),
-                    b"vertical" => self.vertical = btoi(value).ok().unwrap_or(0),
-                    _ => return,
-                },
-                _ => return,
-            }
+    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
+        let mut horizental: i8 = 0;
+        let mut vertical: i8 = 0;
+        while let Some((key, value)) = parser.next_key_value() {
+            let value = btoi(value.as_bytes()).ok().unwrap_or(0);
+            match key {
+                "horizental" => horizental = value,
+                "vertical" => vertical = value,
+                _ => continue,
+            };
         }
+        Self { horizental, vertical }
     }
 }
 
@@ -120,22 +122,29 @@ impl Default for OSD {
 }
 
 impl FromYAML for OSD {
-    fn from_yaml<'a>(&mut self, indent: usize, byte_stream: &mut ByteStream<'a>) {
-        loop {
-            match byte_stream.next(indent) {
-                Some(Entry::Key(key)) => match key {
-                    b"offset" => self.offset.from_yaml(indent + 1, byte_stream),
-                    b"aspect-ratio" => self.aspect_ratio.from_yaml(indent + 1, byte_stream),
-                    _ => byte_stream.skip(indent),
-                },
-                Some(Entry::KeyValue(key, value)) => match key {
-                    b"standard" => self.standard = Standard::from(value),
-                    b"fov" => self.fov = btoi(value).unwrap_or(150),
-                    _ => byte_stream.skip(indent),
-                },
-                _ => return,
+    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> OSD {
+        let mut fov = 120u8;
+        let mut aspect_ratio = AspectRatio::default();
+        let mut standard = Standard::default();
+        let mut offset = Offset::default();
+        while let Some(key) = parser.next_entry() {
+            match key {
+                "offset" => offset = Offset::from_yaml(parser),
+                "aspect-ratio" => aspect_ratio = AspectRatio::from_yaml(parser),
+                "standard" => {
+                    if let Some(value) = parser.next_value() {
+                        standard = Standard::from(value);
+                    }
+                }
+                "fov" => {
+                    if let Some(value) = parser.next_value() {
+                        fov = btoi(value.as_bytes()).unwrap_or(150);
+                    }
+                }
+                _ => parser.skip(),
             }
         }
+        OSD { fov, aspect_ratio, standard, offset }
     }
 }
 
@@ -154,34 +163,5 @@ impl ToYAML for OSD {
 
         self.write_indent(indent, w)?;
         writeln!(w, "standard: {}", self.standard)
-    }
-}
-
-mod test {
-    #[cfg(test)]
-    extern crate std;
-
-    #[test]
-    fn test_write() -> core::fmt::Result {
-        use std::string::String;
-        use std::string::ToString;
-
-        use super::OSD;
-        use crate::config::yaml::ToYAML;
-
-        let mut buf = String::new();
-        let osd = OSD::default();
-        osd.write_to(0, &mut buf)?;
-        let expected = "\
-        \naspect-ratio:\
-        \n  width: 16\
-        \n  height: 9\
-        \nfov: 120\
-        \noffset:\
-        \n  horizental: 0\
-        \n  vertical: 0\
-        \nstandard: PAL";
-        assert_eq!(expected.trim(), buf.to_string().trim());
-        Ok(())
     }
 }
