@@ -2,7 +2,10 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
-use crate::hal::controller::{ControlInput, Controller};
+use crate::config::receiver::{Channels, MAX_CHANNEL};
+use crate::datastructures::input::InputType;
+use crate::datastructures::input::{Pitch, Roll, Throttle, Yaw};
+use crate::hal::input::BasicInput;
 use crate::hal::receiver::Receiver;
 
 #[derive(Default, Debug)]
@@ -12,9 +15,14 @@ pub struct SbusReceiver {
     counter: u8,
     loss: u8,
     loss_rate: u8,
+    channel_mapping: [u8; MAX_CHANNEL],
 }
 
 impl SbusReceiver {
+    pub fn set_mapping(&mut self, config: &Channels) {
+        self.channel_mapping = config.mapping();
+    }
+
     pub fn handle(&mut self, ring: &[u8], offset: usize, num_bytes: usize) {
         let mut index = SBUS_PACKET_SIZE;
         let mut packet = [0u8; 1 + SBUS_PACKET_SIZE];
@@ -47,16 +55,28 @@ impl SbusReceiver {
             self.loss = 0;
         }
     }
+
+    #[inline]
+    fn channel_index(&self, input_type: InputType) -> usize {
+        self.channel_mapping[input_type as usize] as usize
+    }
 }
 
-impl Controller for SbusReceiver {
-    fn get_input(&self) -> ControlInput {
-        ControlInput {
-            throttle: self.data.channels[2] << 5,
-            roll: self.data.channels[0] as i16 - (1 << 10),
-            pitch: self.data.channels[1] as i16 - (1 << 10),
-            yaw: self.data.channels[3] as i16 - (1 << 10),
-        }
+impl BasicInput for SbusReceiver {
+    fn get_throttle(&self) -> Throttle {
+        self.data.channels[self.channel_index(InputType::Throttle)] << 5
+    }
+
+    fn get_roll(&self) -> Roll {
+        self.data.channels[self.channel_index(InputType::Roll)] as i16 - (1 << 10)
+    }
+
+    fn get_pitch(&self) -> Pitch {
+        self.data.channels[self.channel_index(InputType::Pitch)] as i16 - (1 << 10)
+    }
+
+    fn get_yaw(&self) -> Yaw {
+        self.data.channels[self.channel_index(InputType::Yaw)] as i16 - (1 << 10)
     }
 }
 

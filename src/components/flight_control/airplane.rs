@@ -1,7 +1,7 @@
+use crate::datastructures::input::{Pitch, Roll, Throttle, Yaw};
 use crate::drivers::pwm::{dummy_pwm, PWM};
-use crate::hal::controller::ControlInput;
 
-use super::aircraft::Aircraft;
+use super::basic::BasicControl;
 
 pub struct Airplane<'a> {
     motors: [&'a mut dyn PWM; 2],
@@ -30,8 +30,8 @@ fn set_angle(servo: &mut dyn PWM, value: i16) {
 }
 
 impl<'a> Airplane<'a> {
-    pub fn set_motors(&mut self, pwms: [&'a mut dyn PWM; 2]) {
-        self.motors = pwms;
+    pub fn set_motor(&mut self, index: usize, pwm: &'a mut dyn PWM) {
+        self.motors[index] = pwm;
     }
 
     pub fn set_aileron_left(&mut self, pwm: &'a mut dyn PWM) {
@@ -51,17 +51,17 @@ impl<'a> Airplane<'a> {
     }
 }
 
-impl<'a> Aircraft for Airplane<'a> {
-    fn control(&mut self, control: ControlInput) {
+impl<'a> BasicControl for Airplane<'a> {
+    fn set(&mut self, throttle: Throttle, roll: Roll, pitch: Pitch, yaw: Yaw) {
         let max_duty = self.motors[0].get_max_duty() as u32;
-        self.motors[0].set_duty((max_duty * control.throttle as u32 / u16::MAX as u32) as u16);
+        self.motors[0].set_duty((max_duty * throttle as u32 / u16::MAX as u32) as u16);
         let max_duty = self.motors[1].get_max_duty() as u32;
-        self.motors[1].set_duty((max_duty * control.throttle as u32 / u16::MAX as u32) as u16);
+        self.motors[1].set_duty((max_duty * throttle as u32 / u16::MAX as u32) as u16);
 
-        set_angle(self.aileron_left, control.roll);
-        set_angle(self.aileron_right, -control.roll);
+        set_angle(self.aileron_left, roll);
+        set_angle(self.aileron_right, -roll);
 
-        set_angle(self.elevator, control.pitch);
-        set_angle(self.rudder, control.yaw);
+        set_angle(self.elevator, pitch);
+        set_angle(self.rudder, yaw);
     }
 }

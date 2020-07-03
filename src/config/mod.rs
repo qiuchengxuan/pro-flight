@@ -127,7 +127,7 @@ pub fn read_config<E>(reader: &mut dyn Read<Error = E>) -> Config {
     let mut buffer = [0u8; 4096];
     let size = reader.read(&mut buffer).ok().unwrap_or(0);
     if size > 0 {
-        Config::from_yaml(&mut YamlParser::from(&buffer[..]))
+        Config::from_yaml(&mut YamlParser::from(&buffer[..size]))
     } else {
         Config::default()
     }

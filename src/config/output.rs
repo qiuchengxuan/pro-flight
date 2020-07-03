@@ -125,7 +125,7 @@ impl ToYAML for Output {
     }
 }
 
-pub struct Outputs([(Identifier, Output); MAX_OUTPUT_CONFIG]);
+pub struct Outputs(pub [(Identifier, Output); MAX_OUTPUT_CONFIG]);
 
 impl Default for Outputs {
     fn default() -> Outputs {

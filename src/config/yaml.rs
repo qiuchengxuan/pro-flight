@@ -12,13 +12,13 @@ pub struct YamlParser<'a> {
 impl<'a> From<&'a [u8]> for YamlParser<'a> {
     fn from(bytes: &'a [u8]) -> Self {
         let string = unsafe { core::str::from_utf8_unchecked(bytes) };
-        Self { string, indent: 0u16, unindent: 0u16 }
+        Self { string, indent: 0, unindent: 0 }
     }
 }
 
 impl<'a> From<&'a str> for YamlParser<'a> {
     fn from(string: &'a str) -> Self {
-        Self { string, indent: 0u16, unindent: 0u16 }
+        Self { string, indent: 0, unindent: 0 }
     }
 }
 

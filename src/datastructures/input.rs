@@ -1,6 +1,6 @@
 #[derive(Copy, Clone, PartialEq)]
 pub enum InputType {
-    Throttle,
+    Throttle = 0,
     Roll,
     Pitch,
     Yaw,
@@ -29,10 +29,16 @@ impl Into<&str> for InputType {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum Input {
-    Throttle(u16),
-    Roll(i16),
-    Pitch(i16),
-    Yaw(i16),
+pub type Throttle = u16;
+pub type Roll = i16;
+pub type Pitch = i16;
+pub type Yaw = i16;
+pub enum Flaps {
+    Auto,
+    Half,
+    Full,
+}
+pub enum LandingGear {
+    Up,
+    Down,
 }

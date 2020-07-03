@@ -1,7 +1,7 @@
 use core::cmp::min;
 
 use rs_flight::config::Outputs;
-use rs_flight::drivers::pwm::{PwmByName, PWM6};
+use rs_flight::drivers::pwm::{PwmByIdentifier, PWM6};
 use stm32f4xx_hal::gpio::gpioa::{PA1, PA2, PA3, PA8};
 use stm32f4xx_hal::gpio::gpiob::{PB0, PB1};
 use stm32f4xx_hal::gpio::{Floating, Input};
@@ -13,7 +13,7 @@ type Def = Input<Floating>;
 type PWMs = (stm32::TIM1, stm32::TIM2, stm32::TIM3, stm32::TIM5);
 type PINs = (PB0<Def>, PB1<Def>, PA2<Def>, PA3<Def>, PA1<Def>, PA8<Def>);
 
-pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmByName {
+pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmByIdentifier {
     let rate1 = cfg.get("output1").map(|o| o.rate()).unwrap_or(400) as u32;
     let rate2 = cfg.get("output2").map(|o| o.rate()).unwrap_or(400) as u32;
 
@@ -34,5 +34,5 @@ pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmBy
     let rate = cfg.get("output6").map(|o| o.rate()).unwrap_or(50) as u32;
     let pwm6 = pwm::tim1(tim1, pa8.into_alternate_af1(), clocks, rate.hz());
 
-    PWM6(pwm1, pwm2, pwm3, pwm4, pwm5, pwm6)
+    PWM6::new((pwm1, pwm2, pwm3, pwm4, pwm5, pwm6))
 }

@@ -43,13 +43,15 @@ use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibra
 use log::Level;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
+use rs_flight::components::flight_control::{Aircraft, Airplane};
 use rs_flight::components::logger::{self};
 use rs_flight::components::panic::write_panic_file;
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::yaml::ToYAML;
-use rs_flight::config::{read_config, Config, SerialConfig};
+use rs_flight::config::{read_config, Config, Output, SerialConfig};
+use rs_flight::drivers::pwm::PwmByIdentifier;
 use rs_flight::drivers::uart::Device;
-use rs_flight::hal::receiver::{NoReceiver, Receiver};
+use rs_flight::hal::input::{BasicInput, NoInput};
 use rs_flight::sys::fs::File;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
@@ -110,6 +112,7 @@ fn main() -> ! {
         int,
     );
 
+    info!("Loading config");
     let mut config: Config = Default::default();
     match File::open("sdcard://config.yml") {
         Ok(mut file) => {
@@ -121,16 +124,29 @@ fn main() -> ! {
         }
     };
 
-    let mut receiver: &dyn Receiver = &NoReceiver {};
-
+    info!("Initialize PWMs");
     let pwms = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    pwm::init(pwms, pins, clocks, &config.outputs);
+    let outputs = pwm::init(pwms, pins, clocks, &config.outputs);
+    let mut airplane = Airplane::default();
+    for &(identifier, output_type) in config.outputs.0.iter() {
+        if let Some(output) = outputs.get(identifier) {
+            match output_type {
+                Output::AileronLeft => airplane.set_aileron_left(output),
+                Output::AileronRight => airplane.set_aileron_right(output),
+                Output::Elevator => airplane.set_elevator(output),
+                Output::Rudder => airplane.set_rudder(output),
+                Output::Motor(index, _) => airplane.set_motor(index as usize, output),
+                Output::None => (),
+            }
+        }
+    }
 
     let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
     spi1_exti4_gyro::init_temperature_ring();
     let imu = IMU::new(accel_gyro_ring, GYRO_SAMPLE_RATE as u16, &config.accelerometer, 256);
 
+    info!("Initialize MPU6000");
     let mut int = gpio_c.pc4.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
@@ -146,6 +162,7 @@ fn main() -> ! {
     )
     .ok();
 
+    info!("Initialize ADC VBAT");
     let battery = BatterySource::new(adc2_vbat::init(peripherals.ADC2, gpio_c.pc2));
 
     let baro_ring = spi3_tim7_osd_baro::init_ring();
@@ -154,6 +171,7 @@ fn main() -> ! {
     unsafe { TELEMETRY = MaybeUninit::new(telemetry) };
     let telemetry = unsafe { &*TELEMETRY.as_ptr() };
 
+    info!("Initialize OSD & Barometer");
     spi3_tim7_osd_baro::init(
         peripherals.SPI3,
         peripherals.TIM7,
@@ -173,6 +191,7 @@ fn main() -> ! {
     let pin = gpio_b.pb5.into_push_pull_output();
     let mut sysled = Sysled::new(pin, MillisCountDown::new(&systick));
 
+    info!("Initialize USB CDC");
     let usb = USB {
         usb_global: peripherals.OTG_FS_GLOBAL,
         usb_device: peripherals.OTG_FS_DEVICE,
@@ -183,6 +202,9 @@ fn main() -> ! {
 
     let (mut serial, mut device) = usb_serial::init(usb);
 
+    let mut basic_input: &dyn BasicInput = &NoInput {};
+
+    info!("Initialize USART1");
     if let Some(config) = config.serials.get("USART1") {
         if let SerialConfig::GNSS(baudrate) = config {
             let pins = (gpio_a.pa9, gpio_a.pa10);
@@ -191,8 +213,9 @@ fn main() -> ! {
         }
     }
 
-    if let Some(config) = config.serials.get("USART6") {
-        if let SerialConfig::SBUS(sbus_config) = config {
+    info!("Initialize USART6");
+    if let Some(serial_config) = config.serials.get("USART6") {
+        if let SerialConfig::SBUS(sbus_config) = serial_config {
             if sbus_config.rx_inverted {
                 gpio_c.pc8.into_push_pull_output().set_high().ok();
                 debug!("USART6 rx inverted");
@@ -200,15 +223,21 @@ fn main() -> ! {
         }
         let pins = (gpio_c.pc6, gpio_c.pc7);
         let count_down = MillisCountDown::new(&systick);
-        let device = usart6::init(peripherals.USART6, pins, &config, clocks, count_down);
+        let device = usart6::init(peripherals.USART6, pins, &serial_config, clocks, count_down);
         match device {
-            Device::SBUS(r) => receiver = r,
+            Device::SBUS(ref mut r) => {
+                r.set_mapping(&config.receiver.0);
+                basic_input = r;
+            }
             _ => (),
         }
     }
 
+    let mut aircraft = Aircraft::new(airplane, basic_input);
+
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
+        aircraft.run_once();
         sysled.check_toggle().unwrap();
         if !device.poll(&mut [&mut serial]) {
             continue;
@@ -228,8 +257,6 @@ fn main() -> ! {
                 for s in logger::reader() {
                     console::write(&mut serial, s).ok();
                 }
-            } else if line == *b"receiver" {
-                console!(&mut serial, "{}\n", receiver.get_input());
             } else if line == *b"telemetry" {
                 console!(&mut serial, "{}\n", unsafe { &*TELEMETRY.as_ptr() }.get_data());
             } else if line.starts_with(b"read") {

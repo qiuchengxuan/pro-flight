@@ -44,7 +44,7 @@ pub fn init<C: CountDown<Time = Duration>>(
     config: &SerialConfig,
     clocks: Clocks,
     mut count_down: C,
-) -> &'static Device {
+) -> &'static mut Device {
     let mut cfg = Config::default();
     match config {
         SerialConfig::SBUS(sbus) => {
@@ -56,7 +56,7 @@ pub fn init<C: CountDown<Time = Duration>>(
         _ => {
             return unsafe {
                 DEVICE = Device::None;
-                &DEVICE
+                &mut DEVICE
             }
         }
     };
@@ -67,7 +67,7 @@ pub fn init<C: CountDown<Time = Duration>>(
     while !usart.is_idle() {
         if count_down.wait().is_ok() {
             warn!("USART6 never idle");
-            return unsafe { &DEVICE };
+            return unsafe { &mut DEVICE };
         }
     }
 
@@ -96,14 +96,11 @@ pub fn init<C: CountDown<Time = Duration>>(
     // FIXME: use a timer to ensure remaining data be received
 
     let device = match config {
-        SerialConfig::SBUS(_) => {
-            let sbus_receiver = SbusReceiver::default();
-            Device::SBUS(sbus_receiver)
-        }
+        SerialConfig::SBUS(_) => Device::SBUS(SbusReceiver::default()),
         _ => Device::None,
     };
     unsafe {
         DEVICE = device;
-        &DEVICE
+        &mut DEVICE
     }
 }
