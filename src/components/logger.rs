@@ -1,13 +1,29 @@
-use core::fmt::{Result, Write};
+use core::fmt::{Display, Result, Write};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use log::{Level, Log, Metadata, Record};
+pub enum Level {
+    Debug = 0,
+    Info,
+    Warning,
+    Error,
+}
+
+impl Display for Level {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            Self::Debug => write!(f, "DEBUG"),
+            Self::Info => write!(f, "INFO "),
+            Self::Warning => write!(f, "WARN "),
+            Self::Error => write!(f, "ERROR"),
+        }
+    }
+}
 
 static mut LOG_BUFFER: &'static mut [u8] = &mut [0u8; 0];
 static mut WRITE_INDEX: AtomicUsize = AtomicUsize::new(0);
-static mut LEVEL: Level = Level::Trace;
+static mut LEVEL: Level = Level::Debug;
 
-pub struct Logger {}
+pub struct Logger;
 
 impl Logger {
     fn allocate(&self, len: usize) -> usize {
@@ -53,33 +69,67 @@ impl Write for Logger {
     }
 }
 
-impl Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= unsafe { LEVEL }
-    }
+#[doc(hidden)]
+pub fn __write_log(args: core::fmt::Arguments, level: Level, file: &'static str, line: u32) {
+    let mut logger = Logger {};
+    let filename = file.rsplitn(2, "/").next().unwrap_or("?.rs");
+    write!(logger, "{} {}:{}\t", level, filename, line).ok();
+    writeln!(logger, "{}", args).ok();
+}
 
-    fn log(&self, record: &Record) {
-        if !self.enabled(record.metadata()) {
-            return;
-        }
-        let level = match record.level() {
-            Level::Error => "ERROR",
-            Level::Warn => "WARN ",
-            Level::Info => "INFO ",
-            Level::Debug => "DEBUG",
-            Level::Trace => "TRACE",
-        };
-        match (record.file(), record.line()) {
-            (Some(file), Some(line)) => {
-                let file = file.rsplitn(2, "/").next().unwrap_or("?.rs");
-                writeln!(&mut Logger {}, "{} {}:{} {}", level, file, line, record.args())
-            }
-            (_, _) => writeln!(&mut Logger {}, "{}: {}", level, record.args()),
-        }
-        .ok();
-    }
+#[doc(hidden)]
+pub fn __write_log_literal(message: &'static str, level: Level, file: &'static str, line: u32) {
+    let mut logger = Logger {};
+    let filename = file.rsplitn(2, "/").next().unwrap_or("?.rs");
+    write!(logger, "{} {}:{}\t", level, filename, line).ok();
+    writeln!(logger, "{}", message).ok();
+}
 
-    fn flush(&self) {}
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __format_args {
+    ($($args:tt)*) => {
+        format_args!($($args)*)
+    };
+}
+
+#[macro_export]
+macro_rules! log {
+    ($level:expr, $message:expr) => ({
+        let _ = __format_args!($message);
+        $crate::components::logger::__write_log_literal($message, $level, file!(), line!());
+    });
+    ($level:expr, $($arg:tt)+) => {
+        $crate::components::logger::__write_log(__format_args!($($arg)+), $level, file!(), line!());
+    };
+}
+
+#[macro_export]
+macro_rules! debug {
+    ($($arg:tt)+) => {
+        log!($crate::components::logger::Level::Debug, $($arg)+);
+    };
+}
+
+#[macro_export]
+macro_rules! info {
+    ($($arg:tt)+) => {
+        log!($crate::components::logger::Level::Info, $($arg)+);
+    };
+}
+
+#[macro_export]
+macro_rules! warn {
+    ($($arg:tt)+) => {
+        log!($crate::components::logger::Level::Warning, $($arg)+);
+    };
+}
+
+#[macro_export]
+macro_rules! error {
+    ($($arg:tt)+) => {
+        log!($crate::components::logger::Level::Error, $($arg)+);
+    };
 }
 
 pub fn init(buffer: &'static mut [u8], level: Level) {
@@ -87,8 +137,6 @@ pub fn init(buffer: &'static mut [u8], level: Level) {
         LOG_BUFFER = buffer;
         LEVEL = level
     }
-    log::set_logger(&Logger {}).ok();
-    log::set_max_level(level.to_level_filter());
 }
 
 pub struct LogReader((usize, usize));

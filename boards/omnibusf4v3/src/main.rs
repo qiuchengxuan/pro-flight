@@ -11,8 +11,6 @@ extern crate cortex_m;
 extern crate cortex_m_rt;
 extern crate cortex_m_systick_countdown;
 extern crate embedded_sdmmc;
-#[macro_use]
-extern crate log;
 extern crate max7456;
 extern crate mpu6000;
 extern crate nb;
@@ -40,11 +38,10 @@ use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
-use log::Level;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::flight_control::{Aircraft, Airplane};
-use rs_flight::components::logger::{self};
+use rs_flight::components::logger::{self, Level};
 use rs_flight::components::panic::write_panic_file;
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::yaml::ToYAML;
@@ -79,7 +76,7 @@ fn main() -> ! {
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
     unsafe { LOG_BUFFER = core::mem::zeroed() };
-    logger::init(unsafe { &mut LOG_BUFFER }, Level::Trace);
+    logger::init(unsafe { &mut LOG_BUFFER }, Level::Debug);
 
     let (hclk, pclk1, pclk2) =
         (clocks.hclk().0 / MHZ, clocks.pclk1().0 / MHZ, clocks.pclk2().0 / MHZ);
