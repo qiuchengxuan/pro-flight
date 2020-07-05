@@ -1,6 +1,6 @@
 use nalgebra::Vector3;
 
-use crate::datastructures::measurement::Altitude;
+use crate::datastructures::measurement::{Altitude, Distance};
 
 #[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
 pub struct Axis {
@@ -78,7 +78,7 @@ pub struct Pressure(pub u32); // unit of Pa
 
 impl Pressure {
     pub fn to_sea_level_altitude(self) -> Altitude {
-        Altitude((1013 - (self.0 / 100) as i32) * 82)
+        Distance((1013 - (self.0 / 100) as isize) * 82)
     }
 }
 

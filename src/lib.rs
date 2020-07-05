@@ -29,6 +29,7 @@ pub mod config;
 pub mod datastructures;
 pub mod drivers;
 pub mod hal;
+pub mod math;
 pub mod sys;
 
 #[cfg(test)]

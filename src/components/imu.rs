@@ -1,6 +1,6 @@
 use ahrs::{Ahrs, Mahony};
 use integer_sqrt::IntegerSquareRoot;
-use nalgebra::Vector3;
+use nalgebra::{Quaternion, Vector3};
 
 use crate::config::Accelerometer;
 use crate::datastructures::measurement::{quaternion_to_euler, Euler, DEGREE_PER_DAG};
@@ -64,6 +64,10 @@ impl<'a> IMU<'a> {
 
     pub fn get_zyx_euler(&self) -> Euler {
         quaternion_to_euler(&self.ahrs.quat)
+    }
+
+    pub fn quaternion(&self) -> Quaternion<f32> {
+        self.ahrs.quat
     }
 
     pub fn g_force(&self) -> u8 {

@@ -42,6 +42,7 @@ use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::flight_control::{Aircraft, Airplane};
 use rs_flight::components::logger::{self, Level};
+use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::write_panic_file;
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::yaml::ToYAML;
@@ -54,6 +55,8 @@ use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::{prelude::*, stm32};
+
+use spi3_tim7_osd_baro::OSD_REFRESH_RATE;
 
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
@@ -163,8 +166,9 @@ fn main() -> ! {
     let battery = BatterySource::new(adc2_vbat::init(peripherals.ADC2, gpio_c.pc2));
 
     let baro_ring = spi3_tim7_osd_baro::init_ring();
-    let altimeter = Altimeter::new(baro_ring.clone());
-    let telemetry = TelemetryUnit::new(imu, altimeter, battery, &config.battery);
+    let altimeter = Altimeter::new(baro_ring.clone(), OSD_REFRESH_RATE as u16);
+    let navigation = Navigation::new(1.0 / GYRO_SAMPLE_RATE as f32);
+    let telemetry = TelemetryUnit::new(altimeter, battery, imu, navigation, &config.battery);
     unsafe { TELEMETRY = MaybeUninit::new(telemetry) };
     let telemetry = unsafe { &*TELEMETRY.as_ptr() };
 

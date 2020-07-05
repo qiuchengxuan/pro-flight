@@ -1,3 +1,4 @@
+pub mod coordinate;
 pub mod input;
 pub mod measurement;
 pub mod ring_buffer;

@@ -9,6 +9,7 @@ pub mod cmdlet;
 pub mod flight_control;
 pub mod imu;
 pub mod monitor;
+pub mod navigation;
 pub mod panic;
 pub mod sysled;
 pub mod telemetry;

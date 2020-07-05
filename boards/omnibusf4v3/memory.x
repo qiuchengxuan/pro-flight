@@ -5,8 +5,8 @@ MEMORY
   /* These values correspond to the LM3S6965, one of the few devices QEMU can emulate */
   FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 872K
   CFG (rwx): ORIGIN = 0x080E0000, LENGTH = 128K
-  RAM : ORIGIN = 0x20000000, LENGTH = 128K
-  CCMRAM : ORIGIN = 0x10000000, LENGTH = 64K
+  RAM : ORIGIN = 0x20000000, LENGTH = 128K /* 0x2001FFFF */
+  CCMRAM : ORIGIN = 0x10000000, LENGTH = 64K /* 0x1000FFFF */
 }
 
 /* This is where the call stack will be allocated. */

@@ -37,6 +37,8 @@ static mut CALIBRATION: MaybeUninit<Calibration> = MaybeUninit::uninit();
 static mut DMA_BUFFER: [u8; 8] = [0u8; 8];
 static mut RING_BUFFER: MaybeUninit<RingBuffer<Pressure>> = MaybeUninit::uninit();
 
+pub const OSD_REFRESH_RATE: u32 = 50;
+
 pub struct TickDelay(u32);
 
 impl DelayNs<u8> for TickDelay {
@@ -163,7 +165,7 @@ pub fn init<'a>(
 
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
     spi3.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
-    let mut timer = Timer::tim7(tim7, 50.hz(), clocks);
+    let mut timer = Timer::tim7(tim7, OSD_REFRESH_RATE.hz(), clocks);
     timer.listen(Event::TimeOut);
     unsafe {
         OSD = MaybeUninit::new(AsciiHud::new(

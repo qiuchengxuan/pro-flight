@@ -25,14 +25,31 @@ pub fn quaternion_to_euler(q: &Quaternion<f32>) -> Euler {
     Euler { phi, theta, psi }
 }
 
-pub struct Altitude(pub i32); // in units of centimeter
+#[derive(Default, Copy, Clone)]
+pub struct Distance(pub isize); // in units of centimeter
 
-impl Altitude {
-    pub fn as_feet(self) -> i32 {
+impl Distance {
+    pub fn as_feet(self) -> isize {
         self.0 / 33
     }
 
-    pub fn as_meter(self) -> i32 {
+    pub fn as_meter(self) -> isize {
         self.0 / 10
     }
 }
+
+impl core::ops::Sub for Distance {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
+    }
+}
+
+impl Into<f32> for Distance {
+    fn into(self) -> f32 {
+        self.0 as f32 / 100.0
+    }
+}
+
+pub type Altitude = Distance;

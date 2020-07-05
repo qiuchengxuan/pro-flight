@@ -5,6 +5,7 @@ use ascii_osd_hud::telemetry as hud;
 
 use crate::components::altimeter::Altimeter;
 use crate::components::imu::IMU;
+use crate::components::navigation::Navigation;
 use crate::components::BatterySource;
 use crate::config;
 use crate::datastructures::measurement::Euler;
@@ -53,9 +54,10 @@ impl core::fmt::Display for TelemetryData {
 }
 
 pub struct TelemetrySource<'a> {
-    imu: IMU<'a>,
     altimeter: Altimeter<'a>,
     battery: BatterySource<'a>,
+    imu: IMU<'a>,
+    navigation: Navigation,
 }
 
 pub struct TelemetryUnit<'a> {
@@ -110,13 +112,14 @@ impl<'a> hud::TelemetrySource for TelemetryUnit<'a> {
 
 impl<'a> TelemetryUnit<'a> {
     pub fn new(
-        imu: IMU<'a>,
         altimeter: Altimeter<'a>,
         battery: BatterySource<'a>,
+        imu: IMU<'a>,
+        navigation: Navigation,
         config: &config::Battery,
     ) -> Self {
         Self {
-            source: RefCell::new(TelemetrySource { imu, altimeter, battery }),
+            source: RefCell::new(TelemetrySource { altimeter, battery, imu, navigation }),
             initial_altitude: Default::default(),
             cells: Cell::new(config.cells),
         }
