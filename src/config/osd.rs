@@ -2,6 +2,8 @@ use core::fmt::{Display, Formatter, Result, Write};
 
 use btoi::btoi;
 
+use crate::alloc;
+
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -105,6 +107,7 @@ impl ToYAML for Offset {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OSD {
     pub fov: u8,
+    pub font: &'static str,
     pub aspect_ratio: AspectRatio,
     pub standard: Standard,
     pub offset: Offset,
@@ -114,6 +117,7 @@ impl Default for OSD {
     fn default() -> Self {
         Self {
             fov: 120,
+            font: "",
             aspect_ratio: AspectRatio(16, 9),
             standard: Standard::default(),
             offset: Offset::default(),
@@ -123,17 +127,21 @@ impl Default for OSD {
 
 impl FromYAML for OSD {
     fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> OSD {
-        let mut fov = 120u8;
         let mut aspect_ratio = AspectRatio::default();
+        let mut font = "";
+        let mut fov = 120u8;
         let mut standard = Standard::default();
         let mut offset = Offset::default();
         while let Some(key) = parser.next_entry() {
             match key {
-                "offset" => offset = Offset::from_yaml(parser),
                 "aspect-ratio" => aspect_ratio = AspectRatio::from_yaml(parser),
-                "standard" => {
+                "font" => {
                     if let Some(value) = parser.next_value() {
-                        standard = Standard::from(value);
+                        let length = value.as_bytes().len();
+                        if let Some(bytes) = alloc::allocate(length, alloc::AllocateType::Generic) {
+                            bytes.copy_from_slice(value.as_bytes());
+                            font = unsafe { core::str::from_utf8_unchecked(bytes) };
+                        }
                     }
                 }
                 "fov" => {
@@ -141,10 +149,16 @@ impl FromYAML for OSD {
                         fov = btoi(value.as_bytes()).unwrap_or(150);
                     }
                 }
+                "offset" => offset = Offset::from_yaml(parser),
+                "standard" => {
+                    if let Some(value) = parser.next_value() {
+                        standard = Standard::from(value);
+                    }
+                }
                 _ => parser.skip(),
             }
         }
-        OSD { fov, aspect_ratio, standard, offset }
+        OSD { aspect_ratio, font, fov, standard, offset }
     }
 }
 
@@ -153,6 +167,9 @@ impl ToYAML for OSD {
         self.write_indent(indent, w)?;
         writeln!(w, "aspect-ratio:")?;
         self.aspect_ratio.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "font: {}", self.font)?;
 
         self.write_indent(indent, w)?;
         writeln!(w, "fov: {}", self.fov)?;

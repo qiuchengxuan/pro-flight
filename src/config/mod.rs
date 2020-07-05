@@ -124,7 +124,7 @@ impl ToYAML for Config {
 }
 
 pub fn read_config<E>(reader: &mut dyn Read<Error = E>) -> Config {
-    let mut buffer = [0u8; 4096];
+    let mut buffer = [0u8; 2048];
     let size = reader.read(&mut buffer).ok().unwrap_or(0);
     if size > 0 {
         Config::from_yaml(&mut YamlParser::from(&buffer[..size]))
@@ -143,6 +143,9 @@ mod test {
         use std::fs::File;
         use std::io::Read;
         use std::string::{String, ToString};
+
+        static mut PRIMARY_BUFFER: [u8; 256] = [0u8; 256];
+        unsafe { crate::alloc::init(&mut PRIMARY_BUFFER, &mut []) };
 
         use super::yaml::{FromYAML, ToYAML, YamlParser};
         use super::Config;

@@ -34,8 +34,8 @@ type SpiError = bus::SpiError<Error, Error, Infallible>;
 
 static mut CS: MaybeUninit<gpioa::PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut INT: MaybeUninit<gpioc::PC4<Input<PullUp>>> = MaybeUninit::uninit();
-#[export_name = "GYRO_DMA_BUFFER"]
-static mut DMA_BUFFER: [u8; 16] = [0u8; 16];
+#[export_name = "MPU6000_DMA_BUFFER"]
+static mut DMA_BUFFER: [u8; 20] = [0u8; 20]; // a little bit larger to avoid out-of-range
 
 #[interrupt]
 unsafe fn EXTI4() {
@@ -81,7 +81,7 @@ unsafe fn DMA2_STREAM0() {
         dma2.lifcr.write(|w| w.bits(0x3D << 22 | 0x3D));
     });
 
-    on_dma_receive(&DMA_BUFFER);
+    on_dma_receive(core::mem::transmute(&DMA_BUFFER));
     { &mut *CS.as_mut_ptr() }.set_high().ok();
 }
 

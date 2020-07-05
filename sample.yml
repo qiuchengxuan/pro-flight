@@ -18,6 +18,7 @@ osd:
   aspect-ratio:
     width: 16
     height: 9
+  font: sdcard://font.mcm
   fov: 145
   offset:
     horizental: 8

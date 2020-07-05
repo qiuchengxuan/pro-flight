@@ -20,10 +20,11 @@ impl Dfu {
         rcc.cfgr.sysclk(48.mhz()).freeze();
         unsafe {
             peripherals.SYSCFG.memrm.write(|w| w.bits(1)); // from system memory
-            llvm_asm!("eor r0, r0
-                       ldr sp, [r0, #0]
-                       ldr r0, [r0, #4]
-                       bx r0" :::: "volatile");
+            #[cfg(all(cortex_m, feature = "inline-asm"))]
+            asm!("eor r0, r0
+                  ldr sp, [r0, #0]
+                  ldr r0, [r0, #4]
+                  bx r0" :::: "volatile");
         }
     }
 

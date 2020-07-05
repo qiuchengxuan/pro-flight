@@ -5,15 +5,20 @@ data flow
 graph LR
   subgraph Input
     Receiver
-    MotionSensor
+    Accelerometer
+    Gyroscope
+    Barometer
     GNSS
   end
 
   PostionRing{{Ring<Position>}}
   AccelGyroRing{{Ring<Accel, Gyro>}}
   GNSS --> |10*12B|PostionRing
-  MotionSensor --> |16*32B|AccelGyroRing
-  MotionSensor --> Stabilizer
+  Accelerometer --> |16*16|AccelGyroRing
+  Gyroscope --> |16*16|AccelGyroRing
+  Accelerometer --> Stabilizer
+  Gyroscope --> Stabilizer
+  Barometer --> Altimeter
 
   PostionRing --> Navigation
   PostionRing --> GNSS-Speed
@@ -39,6 +44,7 @@ graph LR
   EAC --> FlightControl
 
   IMU --> TelemetryUnit
+  Altimeter --> TelemetryUnit
   SpeedIntegrator --> TelemetryUnit
   Navigation --> TelemetryUnit
 

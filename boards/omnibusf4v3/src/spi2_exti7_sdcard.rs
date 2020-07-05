@@ -3,7 +3,7 @@ use core::mem::MaybeUninit;
 use embedded_hal::spi::MODE_3;
 use embedded_sdmmc::{Controller, SdMmcSpi, TimeSource, Timestamp};
 use rs_flight::drivers::sdcard::Sdcard;
-use rs_flight::sys::fs::{set_media, Error, FileDescriptor, Media, OpenOptions, Schema};
+use rs_flight::sys::fs::{set_media, NoMedia, Schema};
 use stm32f4xx_hal::gpio::gpiob::{PB12, PB13, PB14, PB15, PB7};
 use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::gpio::{Alternate, Floating, Input, Output, PullUp, PushPull, AF5};
@@ -23,61 +23,39 @@ impl TimeSource for StubRTC {
 
 pub type SPI = Spi<SPI2, (PB13<Alternate<AF5>>, PB14<Alternate<AF5>>, PB15<Alternate<AF5>>)>;
 pub type CS = PB12<Output<PushPull>>;
-static mut CONTROLLER: MaybeUninit<Controller<SdMmcSpi<SPI, CS>, StubRTC>> = MaybeUninit::uninit();
-static mut SDCARD: Option<Sdcard<SdMmcSpi<SPI, CS>, StubRTC>> = None;
-
-fn open(path: &str, options: OpenOptions) -> Result<FileDescriptor, Error> {
-    unsafe { SDCARD.as_mut().unwrap() }.open(path, options)
-}
-
-fn close(fd: FileDescriptor) {
-    unsafe { SDCARD.as_mut().unwrap() }.close(fd)
-}
-
-fn read(fd: &FileDescriptor, buf: &mut [u8]) -> Result<usize, Error> {
-    unsafe { SDCARD.as_mut().unwrap() }.read(fd, buf)
-}
-
-fn write(fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, Error> {
-    unsafe { SDCARD.as_mut().unwrap() }.write(fd, bytes)
-}
-
-fn probe_sdcard() {
-    let controller = unsafe { &mut *CONTROLLER.as_mut_ptr() };
-    match controller.device().init() {
-        Ok(_) => (),
-        Err(e) => {
-            debug!("{:?}", e);
-            return;
-        }
-    }
-    unsafe {
-        SDCARD = Sdcard::new(controller);
-        if SDCARD.is_some() {
-            set_media(Schema::Sdcard, Media { open, close, read, write });
-        }
-    }
-}
-
+static mut SDCARD_PRESENT: bool = false;
+static mut SDCARD: MaybeUninit<Sdcard<SdMmcSpi<SPI, CS>, StubRTC>> = MaybeUninit::uninit();
 static mut SDCARD_PRESENT_INT: MaybeUninit<PB7<Input<PullUp>>> = MaybeUninit::uninit();
+
+unsafe fn probe_sdcard() {
+    let sdcard = &mut *SDCARD.as_mut_ptr();
+    match sdcard.probe(|c| c.device().init().is_ok()) {
+        Ok(_) => {
+            info!("SDCARD Found");
+            SDCARD_PRESENT = true;
+            set_media(Schema::Sdcard, &*SDCARD.as_ptr())
+        }
+        Err(e) => warn!("{:?}", e),
+    }
+}
 
 #[interrupt]
 unsafe fn EXTI9_5() {
-    let pin = { &mut *SDCARD_PRESENT_INT.as_mut_ptr() };
+    let pin = &mut *SDCARD_PRESENT_INT.as_mut_ptr();
     cortex_m::interrupt::free(|_| {
         pin.clear_interrupt_pending_bit();
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI9_5);
     });
 
-    if pin.is_low().ok().unwrap() {
+    if pin.is_low().ok().unwrap() && !SDCARD_PRESENT {
         debug!("SD CARD INSERTED");
         probe_sdcard();
     } else {
         debug!("SD CARD EJECTED");
-        if let Some(mut sdcard) = SDCARD.take() {
-            sdcard.destroy();
-        }
-        set_media(Schema::Sdcard, Media::default());
+        let sdcard = &mut *SDCARD.as_mut_ptr();
+        sdcard.invalidate();
+        SDCARD_PRESENT = false;
+        set_media(Schema::Sdcard, &NoMedia {});
     }
 }
 
@@ -88,7 +66,7 @@ pub fn init(
     spi2_pins: Spi2Pins,
     pb12: PB12<Input<Floating>>,
     clocks: Clocks,
-    int: PB7<Input<PullUp>>,
+    mut int: PB7<Input<PullUp>>,
 ) {
     let cs = pb12.into_push_pull_output();
     let (pb13, pb14, pb15) = spi2_pins;
@@ -99,11 +77,13 @@ pub fn init(
     let spi2 = Spi::spi2(spi2, (sclk, miso, mosi), MODE_3, freq, clocks);
     let stub_rtc = StubRTC {};
     let controller = Controller::new(SdMmcSpi::new(spi2, cs), stub_rtc);
+    let sdcard = Sdcard::new(controller);
+    int.clear_interrupt_pending_bit();
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI9_5);
     unsafe {
-        CONTROLLER = MaybeUninit::new(controller);
+        SDCARD = MaybeUninit::new(sdcard);
         SDCARD_PRESENT_INT = MaybeUninit::new(int);
         cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::EXTI9_5);
+        probe_sdcard();
     }
-    probe_sdcard()
 }

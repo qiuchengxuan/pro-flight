@@ -44,7 +44,7 @@ use rs_flight::components::console::{self, Console};
 use rs_flight::components::flight_control::{Aircraft, Airplane};
 use rs_flight::components::logger::{self, Level};
 use rs_flight::components::navigation::Navigation;
-use rs_flight::components::panic::write_panic_file;
+use rs_flight::components::panic::{log_panic, PanicLogger};
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::yaml::ToYAML;
 use rs_flight::config::{read_config, Config, Output, SerialConfig};
@@ -63,10 +63,17 @@ use spi3_tim7_osd_baro::OSD_REFRESH_RATE;
 
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
+const LOG_BUFFER_SIZE: usize = 1024;
 
 #[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
 static mut CCM_MEMORY: [u8; 32768] = [0u8; 32768];
+
+macro_rules! panic_logger {
+    () => {
+        &mut *(&mut CCM_MEMORY[LOG_BUFFER_SIZE] as *mut _ as *mut PanicLogger)
+    };
+}
 
 #[link_section = ".uninit.STACKS"]
 static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
@@ -84,6 +91,12 @@ fn main() -> ! {
     unsafe { alloc::init(&mut [], &mut CCM_MEMORY) };
 
     logger::init(alloc::allocate(1024, alloc::AllocateType::Generic).unwrap(), Level::Debug);
+
+    let panic_logger = unsafe { panic_logger!() };
+    if panic_logger.is_valid() {
+        warn!("Last panic: {}", panic_logger);
+        panic_logger.invalidate();
+    }
 
     let (hclk, pclk1, pclk2) =
         (clocks.hclk().0 / MHZ, clocks.pclk1().0 / MHZ, clocks.pclk2().0 / MHZ);
@@ -259,7 +272,7 @@ fn main() -> ! {
                 cortex_m::peripheral::SCB::sys_reset();
             } else if line.starts_with(b"logread") {
                 for s in logger::reader() {
-                    console::write(&mut serial, s).ok();
+                    console!(&mut serial, "{}", s);
                 }
             } else if line == *b"telemetry" {
                 console!(&mut serial, "{}\n", telemetry.get_data());
@@ -282,20 +295,21 @@ fn main() -> ! {
 }
 
 #[panic_handler]
-unsafe fn panic(info: &PanicInfo) -> ! {
-    write_panic_file(info);
+unsafe fn panic(panic_info: &PanicInfo) -> ! {
+    log_panic(format_args!("{}", panic_info), panic_logger!());
     (&mut *DFU.as_mut_ptr()).reboot_into();
     loop {}
 }
 
 #[exception]
-unsafe fn HardFault(ef: &ExceptionFrame) -> ! {
-    write_panic_file(ef);
+unsafe fn HardFault(exception_frame: &ExceptionFrame) -> ! {
+    log_panic(format_args!("{:?}", exception_frame), panic_logger!());
     (&mut *DFU.as_mut_ptr()).reboot_into();
     loop {}
 }
 
 #[exception]
-unsafe fn DefaultHandler(_irqn: i16) {
+unsafe fn DefaultHandler(irqn: i16) {
+    log_panic(format_args!("{}", irqn), panic_logger!());
     (&mut *DFU.as_mut_ptr()).reboot_into();
 }

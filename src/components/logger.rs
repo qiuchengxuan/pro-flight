@@ -73,7 +73,7 @@ impl Write for Logger {
 pub fn __write_log(args: core::fmt::Arguments, level: Level, file: &'static str, line: u32) {
     let mut logger = Logger {};
     let filename = file.rsplitn(2, "/").next().unwrap_or("?.rs");
-    write!(logger, "{} {}:{}\t", level, filename, line).ok();
+    write!(logger, "{} {}:{} ", level, filename, line).ok();
     writeln!(logger, "{}", args).ok();
 }
 
@@ -81,7 +81,7 @@ pub fn __write_log(args: core::fmt::Arguments, level: Level, file: &'static str,
 pub fn __write_log_literal(message: &'static str, level: Level, file: &'static str, line: u32) {
     let mut logger = Logger {};
     let filename = file.rsplitn(2, "/").next().unwrap_or("?.rs");
-    write!(logger, "{} {}:{}\t", level, filename, line).ok();
+    write!(logger, "{} {}:{} ", level, filename, line).ok();
     writeln!(logger, "{}", message).ok();
 }
 
@@ -142,15 +142,15 @@ pub fn init(buffer: &'static mut [u8], level: Level) {
 pub struct LogReader((usize, usize));
 
 impl Iterator for LogReader {
-    type Item = &'static [u8];
+    type Item = &'static str;
 
-    fn next(&mut self) -> Option<&'static [u8]> {
+    fn next(&mut self) -> Option<&'static str> {
         let (index, count) = self.0;
         let log_buffer = unsafe { &LOG_BUFFER };
         if index <= log_buffer.len() {
             if count == 0 {
                 self.0 = (index, 1);
-                return Some(unsafe { &LOG_BUFFER[..index] });
+                return Some(unsafe { core::str::from_utf8_unchecked(&LOG_BUFFER[..index]) });
             } else {
                 return None;
             }
@@ -158,10 +158,11 @@ impl Iterator for LogReader {
         if count == 0 {
             self.0 = (index, 1);
             let bytes = unsafe { &LOG_BUFFER[index % log_buffer.len()..] };
-            return bytes.splitn(1, |&b| b == '\n' as u8).next();
+            return unsafe { core::str::from_utf8_unchecked(bytes) }.splitn(1, "\n").next();
         } else if count == 1 {
             self.0 = (index, 2);
-            return Some(unsafe { &LOG_BUFFER[..index % log_buffer.len()] });
+            let bytes = unsafe { &LOG_BUFFER[..index % log_buffer.len()] };
+            return Some(unsafe { core::str::from_utf8_unchecked(bytes) });
         }
         None
     }

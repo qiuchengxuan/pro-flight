@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::hal::io::{Read, Write};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct OpenOptions {
     pub read: bool,
     pub write: bool,
@@ -56,13 +56,32 @@ pub enum Error {
 
 pub struct FileDescriptor(pub usize);
 
-#[derive(Copy, Clone)]
-pub struct Media {
-    pub open: fn(path: &str, options: OpenOptions) -> Result<FileDescriptor, Error>,
-    pub close: fn(fd: FileDescriptor),
-    pub read: fn(fd: &FileDescriptor, buf: &mut [u8]) -> Result<usize, Error>,
-    pub write: fn(fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, Error>,
+pub trait Media {
+    fn open(&self, path: &str, options: OpenOptions) -> Result<FileDescriptor, Error>;
+    fn close(&self, fd: FileDescriptor);
+    fn read(&self, fd: &FileDescriptor, buf: &mut [u8]) -> Result<usize, Error>;
+    fn write(&self, fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, Error>;
 }
+
+pub struct NoMedia;
+
+impl Media for NoMedia {
+    fn open(&self, _: &str, _: OpenOptions) -> Result<FileDescriptor, Error> {
+        Err(Error::NoMedia)
+    }
+
+    fn close(&self, _: FileDescriptor) {}
+
+    fn read(&self, _: &FileDescriptor, _: &mut [u8]) -> Result<usize, Error> {
+        Err(Error::NoMedia)
+    }
+
+    fn write(&self, _: &FileDescriptor, _: &[u8]) -> Result<usize, Error> {
+        Err(Error::NoMedia)
+    }
+}
+
+static mut SCHEMAS: [&dyn Media; 2] = [&NoMedia {}, &NoMedia {}];
 
 #[derive(Copy, Clone, Debug)]
 pub enum Schema {
@@ -70,30 +89,9 @@ pub enum Schema {
     Sdcard = 1,
 }
 
-fn no_open(_: &str, _: OpenOptions) -> Result<FileDescriptor, Error> {
-    Err(Error::NotFound)
+fn get_media(schema: Schema) -> &'static dyn Media {
+    unsafe { SCHEMAS[schema as usize] }
 }
-fn no_close(_: FileDescriptor) {}
-fn no_read(_: &FileDescriptor, _: &mut [u8]) -> Result<usize, Error> {
-    Ok(0)
-}
-fn no_write(_: &FileDescriptor, _: &[u8]) -> Result<usize, Error> {
-    Ok(0)
-}
-
-macro_rules! no_media {
-    () => {
-        Media { open: no_open, close: no_close, read: no_read, write: no_write }
-    };
-}
-
-impl Default for Media {
-    fn default() -> Self {
-        no_media!()
-    }
-}
-
-static mut MEDIAS: [Media; 2] = [no_media!(), no_media!()];
 
 pub struct File {
     schema: Schema,
@@ -106,9 +104,8 @@ impl File {
     }
 
     pub fn close(&mut self) {
-        let medias = unsafe { &MEDIAS };
         if let Some(fd) = self.fd.take() {
-            (medias[self.schema as usize].close)(fd)
+            get_media(self.schema).close(fd)
         }
     }
 }
@@ -116,9 +113,8 @@ impl File {
 impl Read for File {
     type Error = Error;
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        let medias = unsafe { &MEDIAS };
-        if let Some(fd) = &self.fd {
-            (medias[self.schema as usize].read)(&fd, buf)
+        if let Some(fd) = self.fd.as_ref() {
+            get_media(self.schema).read(fd, buf)
         } else {
             Ok(0)
         }
@@ -128,9 +124,8 @@ impl Read for File {
 impl Write for File {
     type Error = Error;
     fn write(&mut self, bytes: &[u8]) -> Result<usize, Error> {
-        let medias = unsafe { &MEDIAS };
-        if let Some(fd) = &self.fd {
-            (medias[self.schema as usize].write)(&fd, bytes)
+        if let Some(fd) = self.fd.as_ref() {
+            get_media(self.schema).write(fd, bytes)
         } else {
             Ok(0)
         }
@@ -139,9 +134,8 @@ impl Write for File {
 
 impl fmt::Write for File {
     fn write_char(&mut self, c: char) -> fmt::Result {
-        let medias = unsafe { &MEDIAS };
-        if let Some(fd) = &self.fd {
-            match (medias[self.schema as usize].write)(&fd, &[c as u8]) {
+        if let Some(fd) = self.fd.as_ref() {
+            match get_media(self.schema).write(fd, &[c as u8]) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(fmt::Error),
             }
@@ -151,11 +145,9 @@ impl fmt::Write for File {
     }
 
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        if let Some(fd) = &self.fd {
-            let medias = unsafe { &MEDIAS };
-            let write = medias[self.schema as usize].write;
-            (write)(&fd, s.as_bytes()).map_err(|_| fmt::Error)?;
-            Ok(())
+        if let Some(fd) = self.fd.as_ref() {
+            let result = get_media(self.schema).write(fd, s.as_bytes());
+            result.map(|_| ()).map_err(|_| fmt::Error)
         } else {
             Err(fmt::Error)
         }
@@ -164,19 +156,18 @@ impl fmt::Write for File {
 
 impl OpenOptions {
     pub fn open(self, path: &str) -> Result<File, Error> {
-        let medias = unsafe { &MEDIAS };
-        if path.starts_with("flash://") {
-            let option = (medias[Schema::Flash as usize].open)(&path[8..], self);
-            option.map(|fd| File { schema: Schema::Flash, fd: Some(fd) })
+        let (schema, path) = if path.starts_with("flash://") {
+            (Schema::Flash, &path[8..])
         } else if path.starts_with("sdcard://") {
-            let option = (medias[Schema::Sdcard as usize].open)(&path[9..], self);
-            option.map(|fd| File { schema: Schema::Sdcard, fd: Some(fd) })
+            (Schema::Sdcard, &path[9..])
         } else {
-            Err(Error::BadSchema)
-        }
+            return Err(Error::BadSchema);
+        };
+        let result = get_media(schema).open(path, self);
+        result.map(|fd| File { schema, fd: Some(fd) })
     }
 }
 
-pub fn set_media(schema: Schema, media: Media) {
-    unsafe { MEDIAS[schema as usize] = media }
+pub fn set_media(schema: Schema, media: &'static dyn Media) {
+    unsafe { SCHEMAS[schema as usize] = media }
 }

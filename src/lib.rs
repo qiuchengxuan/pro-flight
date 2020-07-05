@@ -1,5 +1,4 @@
-#![no_std]
-#![feature(maybe_uninit_uninit_array)]
+#![cfg_attr(not(test), no_std)]
 #![feature(trait_alias)]
 
 extern crate ahrs;
@@ -15,6 +14,7 @@ extern crate integer_sqrt;
 extern crate micromath;
 #[macro_use]
 extern crate mpu6000;
+extern crate md5;
 extern crate nalgebra;
 extern crate nb;
 extern crate ryu;

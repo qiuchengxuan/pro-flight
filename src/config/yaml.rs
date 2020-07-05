@@ -39,7 +39,8 @@ impl<'a> YamlParser<'a> {
     fn next_non_blank_line(&mut self) -> Option<&'a str> {
         let mut split = self.string.split('\n');
         while let Some(line) = split.next() {
-            if line.trim_start().is_empty() {
+            let trim_start = line.trim_start();
+            if trim_start.is_empty() || trim_start.starts_with("#") {
                 self.string = &self.string[min(line.len() + 1, self.string.len())..];
                 continue;
             }
