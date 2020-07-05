@@ -27,11 +27,11 @@ pub struct Logger;
 
 impl Logger {
     fn allocate(&self, len: usize) -> usize {
-        let mut index = unsafe { WRITE_INDEX.load(Ordering::Relaxed) };
+        let mut index = unsafe { WRITE_INDEX.load(Ordering::Acquire) };
         loop {
             let new_index = index + len;
             let current =
-                unsafe { WRITE_INDEX.compare_and_swap(index, new_index, Ordering::Relaxed) };
+                unsafe { WRITE_INDEX.compare_and_swap(index, new_index, Ordering::SeqCst) };
             if current == index {
                 return index as usize;
             }
@@ -169,7 +169,7 @@ impl Iterator for LogReader {
 
 pub fn reader() -> LogReader {
     unsafe {
-        let index = WRITE_INDEX.load(Ordering::Relaxed);
+        let index = WRITE_INDEX.load(Ordering::Acquire);
         LogReader((index, 0))
     }
 }

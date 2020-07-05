@@ -2,13 +2,10 @@ use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use mpu6000::bus::{self, DelayNs, SpiBus};
-use mpu6000::measurement;
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
 
-use rs_flight::datastructures::ring_buffer::{RingBuffer, RingBufferReader};
-use rs_flight::drivers::mpu6000::{init as mpu6000_init, ACCELEROMETER_SENSITIVE, GYRO_SENSITIVE};
-use rs_flight::hal::sensors::{Acceleration, Gyro, Temperature};
+use rs_flight::drivers::mpu6000::{init as mpu6000_init, on_dma_receive};
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::gpioc;
@@ -34,14 +31,11 @@ impl DelayNs<u16> for TickDelay {
 }
 
 type SpiError = bus::SpiError<Error, Error, Infallible>;
-type AccelGyro = (Acceleration, Gyro);
 
 static mut CS: MaybeUninit<gpioa::PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut INT: MaybeUninit<gpioc::PC4<Input<PullUp>>> = MaybeUninit::uninit();
 #[export_name = "GYRO_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 16] = [0u8; 16];
-static mut ACCEL_GYRO_RING: MaybeUninit<RingBuffer<AccelGyro>> = MaybeUninit::uninit();
-static mut TEMPERATURE_RING: MaybeUninit<RingBuffer<Temperature>> = MaybeUninit::uninit();
 
 #[interrupt]
 unsafe fn EXTI4() {
@@ -87,33 +81,8 @@ unsafe fn DMA2_STREAM0() {
         dma2.lifcr.write(|w| w.bits(0x3D << 22 | 0x3D));
     });
 
-    let buf: &[i16; 8] = core::mem::transmute(&DMA_BUFFER);
-    let acceleration = measurement::Measurement::from_array(&buf[1..], ACCELEROMETER_SENSITIVE);
-    let temperature = measurement::Temperature(i16::from_be(buf[4]));
-    let gyro = measurement::Measurement::from_array(&buf[5..], GYRO_SENSITIVE);
-    let ring_buffer = &mut *ACCEL_GYRO_RING.as_mut_ptr();
-    ring_buffer.write((acceleration.into(), gyro.into()));
-    let ring_buffer = &mut *TEMPERATURE_RING.as_mut_ptr();
-    ring_buffer.write(temperature.0);
+    on_dma_receive(&DMA_BUFFER);
     { &mut *CS.as_mut_ptr() }.set_high().ok();
-}
-
-pub fn init_accel_gyro_ring() -> RingBufferReader<'static, AccelGyro> {
-    #[link_section = ".ccmram"]
-    static mut ACCEL_GYRO_BUFFER: MaybeUninit<[AccelGyro; 40]> = MaybeUninit::uninit();
-    unsafe {
-        ACCEL_GYRO_RING = MaybeUninit::new(RingBuffer::new(&mut *ACCEL_GYRO_BUFFER.as_mut_ptr()))
-    };
-    RingBufferReader::new(unsafe { &*ACCEL_GYRO_RING.as_ptr() })
-}
-
-pub fn init_temperature_ring() -> RingBufferReader<'static, Temperature> {
-    #[link_section = ".ccmram"]
-    static mut TEMPERATURE_BUFFER: MaybeUninit<[Temperature; 40]> = MaybeUninit::uninit();
-    unsafe {
-        TEMPERATURE_RING = MaybeUninit::new(RingBuffer::new(&mut *TEMPERATURE_BUFFER.as_mut_ptr()));
-    }
-    RingBufferReader::new(unsafe { &*TEMPERATURE_RING.as_ptr() })
 }
 
 type PA4 = gpioa::PA4<Input<Floating>>;

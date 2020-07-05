@@ -22,9 +22,9 @@ impl<'a, T: Copy + Clone> RingBuffer<'a, T> {
         if buffer.len() > 0 {
             let write = self.write.load(Ordering::Relaxed) as usize;
             let next_write = (Wrapping(write) + Wrapping(1)).0;
-            self.write.store(next_write, Ordering::Relaxed);
+            self.write.store(next_write, Ordering::Release);
             buffer[write % buffer.len()] = value;
-            self.written.store(next_write, Ordering::Relaxed);
+            self.written.store(next_write, Ordering::Release);
         }
     }
 }
@@ -36,12 +36,12 @@ pub struct RingBufferReader<'a, T> {
 
 impl<'a, T: Copy + Clone> RingBufferReader<'a, T> {
     pub fn new(ring: &'a RingBuffer<'a, T>) -> Self {
-        Self { ring, read: Wrapping(ring.write.load(Ordering::Relaxed)) }
+        Self { ring, read: Wrapping(ring.write.load(Ordering::Acquire)) }
     }
 
     pub fn read(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
-        let mut written = Wrapping(self.ring.written.load(Ordering::Relaxed));
+        let mut written = Wrapping(self.ring.written.load(Ordering::Acquire));
         let mut delta = (written - self.read).0;
         if delta == 0 {
             return None;
@@ -52,19 +52,19 @@ impl<'a, T: Copy + Clone> RingBufferReader<'a, T> {
                 self.read = written - Wrapping(buffer.len());
             }
             let value = buffer[self.read.0 % buffer.len()];
-            let write = self.ring.write.load(Ordering::Relaxed);
+            let write = self.ring.write.load(Ordering::Acquire);
             if (Wrapping(write) - self.read).0 <= buffer.len() {
                 self.read += Wrapping(1);
                 return Some(value);
             }
-            written = Wrapping(self.ring.written.load(Ordering::Relaxed));
+            written = Wrapping(self.ring.written.load(Ordering::Acquire));
             self.read += Wrapping(1);
         }
     }
 
     pub fn read_latest(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
-        let written = Wrapping(self.ring.written.load(Ordering::Relaxed));
+        let written = Wrapping(self.ring.written.load(Ordering::Acquire));
         if (written - self.read).0 == 0 {
             return None;
         }
@@ -75,7 +75,7 @@ impl<'a, T: Copy + Clone> RingBufferReader<'a, T> {
 
 impl<'a, T> Clone for RingBufferReader<'a, T> {
     fn clone(&self) -> Self {
-        Self { ring: self.ring, read: Wrapping(self.ring.write.load(Ordering::Relaxed)) }
+        Self { ring: self.ring, read: Wrapping(self.ring.write.load(Ordering::Acquire)) }
     }
 }
 

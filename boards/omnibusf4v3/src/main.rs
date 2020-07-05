@@ -38,6 +38,7 @@ use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
+use rs_flight::alloc;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::flight_control::{Aircraft, Airplane};
@@ -47,6 +48,8 @@ use rs_flight::components::panic::write_panic_file;
 use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
 use rs_flight::config::yaml::ToYAML;
 use rs_flight::config::{read_config, Config, Output, SerialConfig};
+use rs_flight::drivers::bmp280::init_ring as bmp280_init_ring;
+use rs_flight::drivers::mpu6000::{init_accel_gyro_ring, init_temperature_ring};
 use rs_flight::drivers::pwm::PwmByIdentifier;
 use rs_flight::drivers::uart::Device;
 use rs_flight::hal::input::{BasicInput, NoInput};
@@ -60,13 +63,13 @@ use spi3_tim7_osd_baro::OSD_REFRESH_RATE;
 
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
+
 #[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
-static mut LOG_BUFFER: [u8; 1024] = [0u8; 1024];
+static mut CCM_MEMORY: [u8; 32768] = [0u8; 32768];
+
 #[link_section = ".uninit.STACKS"]
 static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
-
-static mut TELEMETRY: MaybeUninit<TelemetryUnit> = MaybeUninit::uninit();
 
 #[entry]
 fn main() -> ! {
@@ -78,8 +81,9 @@ fn main() -> ! {
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
-    unsafe { LOG_BUFFER = core::mem::zeroed() };
-    logger::init(unsafe { &mut LOG_BUFFER }, Level::Debug);
+    unsafe { alloc::init(&mut [], &mut CCM_MEMORY) };
+
+    logger::init(alloc::allocate(1024, alloc::AllocateType::Generic).unwrap(), Level::Debug);
 
     let (hclk, pclk1, pclk2) =
         (clocks.hclk().0 / MHZ, clocks.pclk1().0 / MHZ, clocks.pclk2().0 / MHZ);
@@ -142,8 +146,8 @@ fn main() -> ! {
         }
     }
 
-    let accel_gyro_ring = spi1_exti4_gyro::init_accel_gyro_ring();
-    spi1_exti4_gyro::init_temperature_ring();
+    let accel_gyro_ring = init_accel_gyro_ring();
+    init_temperature_ring();
     let imu = IMU::new(accel_gyro_ring, GYRO_SAMPLE_RATE as u16, &config.accelerometer, 256);
 
     info!("Initialize MPU6000");
@@ -165,12 +169,11 @@ fn main() -> ! {
     info!("Initialize ADC VBAT");
     let battery = BatterySource::new(adc2_vbat::init(peripherals.ADC2, gpio_c.pc2));
 
-    let baro_ring = spi3_tim7_osd_baro::init_ring();
+    let baro_ring = bmp280_init_ring();
     let altimeter = Altimeter::new(baro_ring.clone(), OSD_REFRESH_RATE as u16);
     let navigation = Navigation::new(1.0 / GYRO_SAMPLE_RATE as f32);
     let telemetry = TelemetryUnit::new(altimeter, battery, imu, navigation, &config.battery);
-    unsafe { TELEMETRY = MaybeUninit::new(telemetry) };
-    let telemetry = unsafe { &*TELEMETRY.as_ptr() };
+    let telemetry = alloc::into_static(telemetry, alloc::AllocateType::Generic).unwrap();
 
     info!("Initialize OSD & Barometer");
     spi3_tim7_osd_baro::init(
@@ -259,7 +262,7 @@ fn main() -> ! {
                     console::write(&mut serial, s).ok();
                 }
             } else if line == *b"telemetry" {
-                console!(&mut serial, "{}\n", unsafe { &*TELEMETRY.as_ptr() }.get_data());
+                console!(&mut serial, "{}\n", telemetry.get_data());
             } else if line.starts_with(b"read") {
                 cmdlet::read(line, &mut serial);
             } else if line.starts_with(b"dump ") {

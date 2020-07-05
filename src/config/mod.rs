@@ -138,6 +138,7 @@ mod test {
     extern crate std;
 
     #[test]
+    #[serial]
     fn test_read_config() -> std::io::Result<()> {
         use std::fs::File;
         use std::io::Read;

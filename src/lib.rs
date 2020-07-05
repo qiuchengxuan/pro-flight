@@ -23,6 +23,7 @@ extern crate sbus_parser;
 extern crate sval;
 extern crate sval_json;
 
+pub mod alloc;
 #[macro_use]
 pub mod components;
 pub mod config;
@@ -38,3 +39,7 @@ extern crate std;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+
+#[cfg(test)]
+#[macro_use]
+extern crate serial_test;

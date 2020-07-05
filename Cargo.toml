@@ -34,3 +34,4 @@ name = "rs_flight"
 
 [dev-dependencies]
 pretty_assertions = "0.4"
+serial_test = "*"
