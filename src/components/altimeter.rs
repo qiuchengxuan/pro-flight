@@ -1,43 +1,49 @@
-use crate::datastructures::ring_buffer::RingBufferReader;
-use crate::hal::sensors::Pressure;
-
-pub struct Altimeter<'a> {
-    reader: RingBufferReader<'a, Pressure>,
-
-    altitude: i16, // dimensionless
-    prev_altitude: i16,
-    vertical_speed: i16, // per minute
-    rate: u16,           // hz
-}
-
-fn round_up_10(value: i16) -> i16 {
-    (value + 5) / 10 * 10
-}
+use crate::alloc;
+use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
+use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::measurement::{Altitude, DistanceUnit, Pressure, Velocity};
+use crate::datastructures::schedule::Schedulable;
 
 const SECONDS_PER_MINUTE: i16 = 60;
+const MAX_RECORDS: usize = 25;
 
-impl<'a> Altimeter<'a> {
-    pub fn new(reader: RingBufferReader<'a, Pressure>, rate: u16) -> Self {
-        Self { reader, altitude: 0, prev_altitude: 0, vertical_speed: 0, rate }
+pub struct Altimeter<D> {
+    data_source: D,
+    data: &'static SingularData<(Altitude, Velocity)>,
+
+    records: &'static mut [i16],
+    rate: u16, // hz
+    counter: u8,
+}
+
+impl<D: DataSource<Pressure>> Altimeter<D> {
+    pub fn new(data_source: D, rate: u16) -> Self {
+        let data = alloc::into_static(SingularData::default(), false).unwrap();
+        let mut size = MAX_RECORDS;
+        for i in 0..16 {
+            size = (rate >> i) as usize;
+            if (size & 1 > 0) || size <= MAX_RECORDS {
+                break;
+            }
+        }
+        let records = alloc::typed_allocate(0, size, false).unwrap();
+        Self { data_source, data, records, rate, counter: 0 }
     }
 
-    pub fn altitude(&self) -> i16 {
-        self.altitude
+    pub fn as_data_source(&self) -> impl DataSource<(Altitude, Velocity)> {
+        SingularDataSource::new(&self.data)
     }
+}
 
-    pub fn vertical_speed(&self) -> i16 {
-        self.vertical_speed
-    }
-
-    pub fn update(&mut self) {
-        if let Some(value) = self.reader.read_latest() {
-            self.prev_altitude = self.altitude;
-            let feet = value.to_sea_level_altitude().as_feet();
-            self.altitude = round_up_10(feet as i16);
-            let delta = self.altitude - self.prev_altitude;
-            let rate = self.rate as i16;
-            let speed = self.vertical_speed * (rate - 1) / rate + delta * SECONDS_PER_MINUTE;
-            self.vertical_speed = speed * 100 / 100;
+impl<D: DataSource<Pressure>> Schedulable for Altimeter<D> {
+    fn schedule(&mut self) {
+        if let Some(value) = self.data_source.read_last() {
+            let altitude: Altitude = value.into();
+            let meters = altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Meter, 1) as i16;
+            self.records[self.counter as usize] = meters;
+            self.counter = (self.counter + 1) % self.rate as u8;
+            let delta = meters - self.records[self.counter as usize];
+            self.data.write((altitude, delta * SECONDS_PER_MINUTE))
         }
     }
 }

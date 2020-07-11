@@ -39,17 +39,20 @@ use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use rs_flight::alloc;
+use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cmdlet;
 use rs_flight::components::console::{self, Console};
 use rs_flight::components::flight_control::{Aircraft, Airplane};
+use rs_flight::components::imu::IMU;
 use rs_flight::components::logger::{self, Level};
 use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::{log_panic, PanicLogger};
-use rs_flight::components::{Altimeter, BatterySource, Sysled, TelemetryUnit, IMU};
+use rs_flight::components::{Sysled, TelemetryUnit};
 use rs_flight::config::yaml::ToYAML;
 use rs_flight::config::{read_config, Config, Output, SerialConfig};
-use rs_flight::drivers::bmp280::init_ring as bmp280_init_ring;
-use rs_flight::drivers::mpu6000::{init_accel_gyro_ring, init_temperature_ring};
+use rs_flight::datastructures::schedule::Schedulable;
+use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
+use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
 use rs_flight::drivers::pwm::PwmByIdentifier;
 use rs_flight::drivers::uart::Device;
 use rs_flight::hal::input::{BasicInput, NoInput};
@@ -58,8 +61,6 @@ use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::{prelude::*, stm32};
-
-use spi3_tim7_osd_baro::OSD_REFRESH_RATE;
 
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
@@ -90,7 +91,7 @@ fn main() -> ! {
 
     unsafe { alloc::init(&mut [], &mut CCM_MEMORY) };
 
-    logger::init(alloc::allocate(1024, alloc::AllocateType::Generic).unwrap(), Level::Debug);
+    logger::init(alloc::allocate(1024, false).unwrap(), Level::Debug);
 
     let panic_logger = unsafe { panic_logger!() };
     if panic_logger.is_valid() {
@@ -159,9 +160,10 @@ fn main() -> ! {
         }
     }
 
-    let accel_gyro_ring = init_accel_gyro_ring();
-    init_temperature_ring();
-    let imu = IMU::new(accel_gyro_ring, GYRO_SAMPLE_RATE as u16, &config.accelerometer, 256);
+    let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
+    let rate = GYRO_SAMPLE_RATE as u16;
+    let imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
+    let imu = alloc::into_static_generic(imu).unwrap();
 
     info!("Initialize MPU6000");
     let mut int = gpio_c.pc4.into_pull_up_input();
@@ -180,13 +182,25 @@ fn main() -> ! {
     .ok();
 
     info!("Initialize ADC VBAT");
-    let battery = BatterySource::new(adc2_vbat::init(peripherals.ADC2, gpio_c.pc2));
+    let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2);
 
-    let baro_ring = bmp280_init_ring();
-    let altimeter = Altimeter::new(baro_ring.clone(), OSD_REFRESH_RATE as u16);
-    let navigation = Navigation::new(1.0 / GYRO_SAMPLE_RATE as f32);
-    let telemetry = TelemetryUnit::new(altimeter, battery, imu, navigation, &config.battery);
-    let telemetry = alloc::into_static(telemetry, alloc::AllocateType::Generic).unwrap();
+    let barometer = init_bmp280_data_source();
+    let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
+    let altimeter = alloc::into_static_generic(altimeter).unwrap();
+
+    let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
+    let navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
+    let navigation = alloc::into_static_generic(navigation).unwrap();
+
+    let telemetry = TelemetryUnit::new(
+        altimeter.as_data_source(),
+        battery,
+        imu.as_accelerometer(),
+        imu.as_imu(),
+        navigation.as_data_source(),
+        &config.battery,
+    );
+    let telemetry = alloc::into_static_generic(telemetry).unwrap();
 
     info!("Initialize OSD & Barometer");
     spi3_tim7_osd_baro::init(
@@ -252,9 +266,15 @@ fn main() -> ! {
 
     let mut aircraft = Aircraft::new(airplane, basic_input);
 
+    let (primary, no_dma) = alloc::available();
+    info!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
+
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
-        aircraft.run_once();
+        altimeter.schedule();
+        imu.schedule();
+        navigation.schedule();
+        aircraft.schedule();
         sysled.check_toggle().unwrap();
         if !device.poll(&mut [&mut serial]) {
             continue;

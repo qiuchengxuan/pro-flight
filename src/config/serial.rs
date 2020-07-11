@@ -1,7 +1,5 @@
 use core::fmt::{Result, Write};
 
-use btoi::btoi;
-
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(PartialEq, Copy, Clone)]
@@ -13,9 +11,9 @@ pub enum Identifier {
 impl From<&str> for Identifier {
     fn from(name: &str) -> Identifier {
         if name.starts_with("USART") {
-            return Identifier::USART(btoi(name[5..].as_bytes()).ok().unwrap_or(0));
+            return Identifier::USART(name[5..].parse().ok().unwrap_or(0));
         } else if name.starts_with("UART") {
-            return Identifier::UART(btoi(name[4..].as_bytes()).ok().unwrap_or(0));
+            return Identifier::UART(name[4..].parse().ok().unwrap_or(0));
         }
         Identifier::UART(0)
     }
@@ -73,7 +71,7 @@ impl FromYAML for Config {
         while let Some((key, value)) = parser.next_key_value() {
             match key {
                 "type" => type_string = value,
-                "baudrate" => baudrate = btoi(value.as_bytes()).ok().unwrap_or(0),
+                "baudrate" => baudrate = value.parse().ok().unwrap_or(0),
                 "fast" => fast = value == "true",
                 "rx-inverted" => rx_inverted = value == "true",
                 "half-duplex" => half_duplex = value == "true",

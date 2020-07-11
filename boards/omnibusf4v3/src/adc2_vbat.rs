@@ -8,14 +8,16 @@ use stm32f4xx_hal::gpio::Input;
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::stm32;
 
-use rs_flight::datastructures::U16DataSource;
+use rs_flight::datastructures::data_source::u16_source::{U16Data, U16DataSource};
+use rs_flight::datastructures::data_source::{DataSource, DataWriter};
+use rs_flight::datastructures::measurement::battery::Battery;
 
 const VOLTAGE_SCALE_X100: usize = 1100;
 const SAMPLE_SIZE: usize = 16;
 const VREF: usize = 3300;
 
 static mut DMA_BUFFER: [u16; SAMPLE_SIZE] = [0u16; SAMPLE_SIZE];
-static mut VBAT_EVENT: MaybeUninit<U16DataSource> = MaybeUninit::uninit();
+static mut VBAT_DATA: MaybeUninit<U16Data> = MaybeUninit::uninit();
 static mut ADC2: MaybeUninit<Adc<stm32::ADC2>> = MaybeUninit::uninit();
 
 #[interrupt]
@@ -29,10 +31,10 @@ unsafe fn DMA2_STREAM2() {
     let buf = &DMA_BUFFER;
     let sum: usize = buf.iter().map(|&v| v as usize).sum();
     let milli_voltages = (sum / SAMPLE_SIZE) * VREF / 0xFFF * VOLTAGE_SCALE_X100 / 100;
-    { &mut *VBAT_EVENT.as_mut_ptr() }.write(milli_voltages as u16);
+    { &mut *VBAT_DATA.as_mut_ptr() }.write(milli_voltages as u16);
 }
 
-pub fn init(adc2: stm32::ADC2, pc2: PC2<Input<Floating>>) -> &'static U16DataSource {
+pub fn init(adc2: stm32::ADC2, pc2: PC2<Input<Floating>>) -> impl DataSource<Battery> {
     let config = AdcConfig::default().dma(Dma::Continuous).continuous(Continuous::Continuous);
     let mut adc = Adc::adc2(adc2, true, config);
 
@@ -58,6 +60,6 @@ pub fn init(adc2: stm32::ADC2, pc2: PC2<Input<Floating>>) -> &'static U16DataSou
     adc.start_conversion();
     unsafe {
         ADC2 = MaybeUninit::new(adc);
-        &*VBAT_EVENT.as_ptr()
+        U16DataSource::new(&*VBAT_DATA.as_ptr())
     }
 }

@@ -1,4 +1,5 @@
 use super::basic::BasicControl;
+use crate::datastructures::schedule::Schedulable;
 use crate::hal::input::{BasicInput, NoInput};
 
 pub struct Aircraft<'a, B> {
@@ -43,8 +44,10 @@ impl<'a, B: BasicControl> Aircraft<'a, B> {
     pub fn set_flight_controller_limit(&mut self, limit: u8) {
         self.autopilot_limit = limit;
     }
+}
 
-    pub fn run_once(&mut self) {
+impl<'a, B: BasicControl> Schedulable for Aircraft<'a, B> {
+    fn schedule(&mut self) {
         let throttle = self.receiver.get_throttle();
 
         let stablizer_roll = limit_i16(self.stablizer.get_roll(), self.stablizer_limit);

@@ -1,15 +1,17 @@
 use core::cell::Cell;
-use core::cell::RefCell;
 
 use ascii_osd_hud::telemetry as hud;
+use nalgebra::UnitQuaternion;
 
-use crate::components::altimeter::Altimeter;
-use crate::components::imu::IMU;
-use crate::components::navigation::Navigation;
-use crate::components::BatterySource;
 use crate::config;
-use crate::datastructures::measurement::Euler;
-use crate::hal::sensors::Battery;
+use crate::datastructures::coordinate::{Displacement, Position, SphericalCoordinate};
+use crate::datastructures::data_source::DataSource;
+use crate::datastructures::measurement::battery::Battery;
+use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
+use crate::datastructures::measurement::{
+    Acceleration, Altitude, Distance, DistanceUnit, Velocity,
+};
+use crate::datastructures::waypoint::Steerpoint;
 
 #[derive(Default, Copy, Clone, Value)]
 pub struct Attitude {
@@ -36,14 +38,23 @@ impl Into<hud::Attitude> for Attitude {
     }
 }
 
+impl Into<hud::SphericalCoordinate> for SphericalCoordinate {
+    fn into(self) -> hud::SphericalCoordinate {
+        let rho = self.rho.convert(DistanceUnit::CentiMeter, DistanceUnit::NauticalMile, 10) as u16;
+        hud::SphericalCoordinate { rho, theta: self.theta, phi: self.phi }
+    }
+}
+
 #[derive(Default, Value)]
 pub struct TelemetryData {
     attitude: Attitude,
-    altitude: i16,
+    altitude: Altitude,
     heading: u16,
-    vertical_speed: i16,
+    velocity: i16,
     g_force: u8,
     battery: Battery,
+    position: Position,
+    steerpoint: Steerpoint,
 }
 
 impl core::fmt::Display for TelemetryData {
@@ -53,75 +64,107 @@ impl core::fmt::Display for TelemetryData {
     }
 }
 
-pub struct TelemetrySource<'a> {
-    altimeter: Altimeter<'a>,
-    battery: BatterySource<'a>,
-    imu: IMU<'a>,
-    navigation: Navigation,
+pub struct TelemetryUnit<A, B, C, IMU, NAV> {
+    altimeter: A,
+    battery: B,
+    accelerometer: C,
+    imu: IMU,
+    navigation: NAV,
+    initial_altitude: Cell<Altitude>,
+    battery_cells: Cell<u8>,
 }
 
-pub struct TelemetryUnit<'a> {
-    source: RefCell<TelemetrySource<'a>>,
-    initial_altitude: Cell<i16>,
-    cells: Cell<u8>,
-}
-
-impl<'a> TelemetryUnit<'a> {
+impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV>
+where
+    A: DataSource<(Altitude, Velocity)>,
+    B: DataSource<Battery>,
+    C: DataSource<Acceleration>,
+    IMU: DataSource<UnitQuaternion<f32>>,
+    NAV: DataSource<(Position, Steerpoint)>,
+{
     pub fn get_data(&self) -> TelemetryData {
-        if let Some(mut source) = self.source.try_borrow_mut().ok() {
-            source.imu.update();
-            source.altimeter.update();
+        let (altitude, velocity) = self.altimeter.read_last_unchecked();
+        if self.initial_altitude.get() == Distance(0) {
+            self.initial_altitude.set(altitude)
         }
-        let source = self.source.borrow();
-        let imu = &source.imu;
-        let altimeter = &source.altimeter;
-        if self.initial_altitude.get() == 0 {
-            self.initial_altitude.set(altimeter.altitude())
+        let battery = self.battery.read_last_unchecked();
+        if self.battery_cells.get() == 0 {
+            self.battery_cells.set(core::cmp::min(battery.0 / 4200 + 1, 8) as u8)
         }
-        let battery = source.battery.read();
-        if self.cells.get() == 0 {
-            self.cells.set(core::cmp::min(battery.0 / 4200 + 1, 8) as u8)
-        }
-        let euler = imu.get_zyx_euler();
+        let euler: Euler = self.imu.read_last_unchecked().into();
+        let (position, steerpoint) = self.navigation.read_last_unchecked();
         TelemetryData {
-            attitude: euler.into(),
-            altitude: altimeter.altitude(),
+            attitude: (euler * DEGREE_PER_DAG).into(),
+            altitude,
             heading: ((-euler.psi as isize + 360) % 360) as u16,
-            vertical_speed: altimeter.vertical_speed(),
-            g_force: imu.g_force(),
-            battery: battery / self.cells.get() as u16,
+            velocity,
+            g_force: self.accelerometer.read_last_unchecked().g_force(),
+            battery: battery / self.battery_cells.get() as u16,
+            position,
+            steerpoint,
         }
     }
 }
 
-impl<'a> hud::TelemetrySource for TelemetryUnit<'a> {
+fn round_up(value: i16) -> i16 {
+    (value + 5) / 10 * 10
+}
+
+impl<A, B, C, IMU, NAV> hud::TelemetrySource for TelemetryUnit<A, B, C, IMU, NAV>
+where
+    A: DataSource<(Altitude, Velocity)>,
+    B: DataSource<Battery>,
+    C: DataSource<Acceleration>,
+    IMU: DataSource<UnitQuaternion<f32>>,
+    NAV: DataSource<(Position, Steerpoint)>,
+{
     fn get_telemetry(&self) -> hud::Telemetry {
         let data = self.get_data();
+        let unit_quaternion = self.imu.read_last_unchecked();
+        let delta = data.steerpoint.waypoint.position - data.position;
+        let vector = unit_quaternion.inverse_transform_vector(&delta.into_f32_vector());
+        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
+        let coordinate: SphericalCoordinate = transformed.into();
+        let steerpoint = hud::Steerpoint {
+            number: data.steerpoint.index,
+            name: data.steerpoint.waypoint.name,
+            heading: delta.azimuth(),
+            coordinate: coordinate.into(),
+            unit: "NM",
+        };
+        let altitude = data.altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1);
+        let height = data.altitude - self.initial_altitude.get();
         hud::Telemetry {
-            altitude: data.altitude,
+            altitude: round_up(altitude as i16),
             attitude: data.attitude.into(),
             battery: data.battery.percentage(),
             heading: data.heading,
             g_force: data.g_force,
-            height: data.altitude - self.initial_altitude.get(),
-            vertical_speed: data.vertical_speed,
+            height: height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
+            velocity: data.velocity / 100 * 100,
+            steerpoint: steerpoint,
             ..Default::default()
         }
     }
 }
 
-impl<'a> TelemetryUnit<'a> {
+impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV> {
     pub fn new(
-        altimeter: Altimeter<'a>,
-        battery: BatterySource<'a>,
-        imu: IMU<'a>,
-        navigation: Navigation,
+        altimeter: A,
+        battery: B,
+        accelerometer: C,
+        imu: IMU,
+        navigation: NAV,
         config: &config::Battery,
     ) -> Self {
         Self {
-            source: RefCell::new(TelemetrySource { altimeter, battery, imu, navigation }),
+            altimeter,
+            battery,
+            accelerometer,
+            imu,
+            navigation,
             initial_altitude: Default::default(),
-            cells: Cell::new(config.cells),
+            battery_cells: Cell::new(config.cells),
         }
     }
 }

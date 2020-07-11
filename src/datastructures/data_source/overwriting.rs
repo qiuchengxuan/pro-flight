@@ -2,13 +2,15 @@ use core::cell::UnsafeCell;
 use core::num::Wrapping;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct RingBuffer<'a, T> {
+use super::{DataSource, DataWriter};
+
+pub struct OverwritingData<'a, T> {
     buffer: UnsafeCell<&'a mut [T]>,
     write: AtomicUsize,
     written: AtomicUsize,
 }
 
-impl<'a, T: Copy + Clone> RingBuffer<'a, T> {
+impl<'a, T: Copy + Clone> OverwritingData<'a, T> {
     pub fn new(buffer: &'a mut [T]) -> Self {
         Self {
             buffer: UnsafeCell::new(buffer),
@@ -16,8 +18,10 @@ impl<'a, T: Copy + Clone> RingBuffer<'a, T> {
             written: AtomicUsize::new(0),
         }
     }
+}
 
-    pub fn write(&self, value: T) {
+impl<'a, T> DataWriter<T> for OverwritingData<'a, T> {
+    fn write(&self, value: T) {
         let buffer = unsafe { &mut *self.buffer.get() };
         if buffer.len() > 0 {
             let write = self.write.load(Ordering::Relaxed) as usize;
@@ -29,17 +33,19 @@ impl<'a, T: Copy + Clone> RingBuffer<'a, T> {
     }
 }
 
-pub struct RingBufferReader<'a, T> {
-    ring: &'a RingBuffer<'a, T>,
+pub struct OverwritingDataSource<'a, T> {
+    ring: &'a OverwritingData<'a, T>,
     read: Wrapping<usize>,
 }
 
-impl<'a, T: Copy + Clone> RingBufferReader<'a, T> {
-    pub fn new(ring: &'a RingBuffer<'a, T>) -> Self {
+impl<'a, T> OverwritingDataSource<'a, T> {
+    pub fn new(ring: &'a OverwritingData<'a, T>) -> Self {
         Self { ring, read: Wrapping(ring.write.load(Ordering::Acquire)) }
     }
+}
 
-    pub fn read(&mut self) -> Option<T> {
+impl<'a, T: Copy + Clone> DataSource<T> for OverwritingDataSource<'a, T> {
+    fn read(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
         let mut written = Wrapping(self.ring.written.load(Ordering::Acquire));
         let mut delta = (written - self.read).0;
@@ -62,7 +68,7 @@ impl<'a, T: Copy + Clone> RingBufferReader<'a, T> {
         }
     }
 
-    pub fn read_latest(&mut self) -> Option<T> {
+    fn read_last(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
         let written = Wrapping(self.ring.written.load(Ordering::Acquire));
         if (written - self.read).0 == 0 {
@@ -71,9 +77,20 @@ impl<'a, T: Copy + Clone> RingBufferReader<'a, T> {
         self.read = written;
         Some(buffer[(self.read - Wrapping(1)).0 % buffer.len()])
     }
+
+    fn read_last_unchecked(&self) -> T {
+        let buffer = unsafe { &*self.ring.buffer.get() };
+        let written = Wrapping(self.ring.written.load(Ordering::Acquire));
+        buffer[(written - Wrapping(1)).0 % buffer.len()]
+    }
+
+    fn capacity(&self) -> usize {
+        let buffer = unsafe { &*self.ring.buffer.get() };
+        buffer.len()
+    }
 }
 
-impl<'a, T> Clone for RingBufferReader<'a, T> {
+impl<'a, T> Clone for OverwritingDataSource<'a, T> {
     fn clone(&self) -> Self {
         Self { ring: self.ring, read: Wrapping(self.ring.write.load(Ordering::Acquire)) }
     }
@@ -84,11 +101,11 @@ mod test {
     fn test_ring_buffer() {
         use core::sync::atomic::Ordering;
 
-        use super::{RingBuffer, RingBufferReader};
+        use super::{DataSource, DataWriter, OverwritingData, OverwritingDataSource};
 
         let mut buffer = [0usize; 32];
-        let ring = RingBuffer::new(&mut buffer);
-        let mut reader = RingBufferReader::new(&ring);
+        let ring = OverwritingData::new(&mut buffer);
+        let mut reader = OverwritingDataSource::new(&ring);
 
         assert_eq!(reader.read(), None);
 
@@ -108,6 +125,6 @@ mod test {
         ring.write.store(usize::MAX, Ordering::Relaxed);
         ring.write(10010);
         ring.write(10086);
-        assert_eq!(reader.read_latest(), Some(10086));
+        assert_eq!(reader.read_last(), Some(10086));
     }
 }

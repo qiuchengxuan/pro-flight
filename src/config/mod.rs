@@ -9,10 +9,8 @@ pub mod yaml;
 
 use core::fmt::{Result, Write};
 
-use btoi::btoi;
-
+use crate::datastructures::measurement::Axes;
 use crate::hal::io::Read;
-use crate::hal::sensors::Axis;
 
 pub use aircraft::Aircraft;
 pub use battery::Battery;
@@ -23,11 +21,11 @@ pub use sensor::Accelerometer;
 pub use serial::{Config as SerialConfig, Serials};
 use yaml::{FromYAML, ToYAML, YamlParser};
 
-impl FromYAML for Axis {
+impl FromYAML for Axes {
     fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
         let mut axis = Self::default();
         while let Some((key, value)) = parser.next_key_value() {
-            let value = btoi(value.as_bytes()).unwrap_or(0);
+            let value = value.parse().unwrap_or(0);
             match key {
                 "x" => axis.x = value,
                 "y" => axis.y = value,
@@ -39,7 +37,7 @@ impl FromYAML for Axis {
     }
 }
 
-impl ToYAML for Axis {
+impl ToYAML for Axes {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
         self.write_indent(indent, w)?;
         writeln!(w, "x: {}", self.x)?;

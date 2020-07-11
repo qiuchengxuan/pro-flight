@@ -1,23 +1,23 @@
 use core::fmt::{Result, Write};
 
-use crate::hal::sensors::Axis;
+use crate::datastructures::measurement::Axes;
 
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Default, Debug)]
 pub struct Accelerometer {
-    pub bias: Axis,
-    pub gain: Axis,
+    pub bias: Axes,
+    pub gain: Axes,
 }
 
 impl FromYAML for Accelerometer {
     fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut bias = Axis::default();
-        let mut gain = Axis::default();
+        let mut bias = Axes::default();
+        let mut gain = Axes::default();
         while let Some(key) = parser.next_entry() {
             match key {
-                "bias" => bias = Axis::from_yaml(parser),
-                "gain" => gain = Axis::from_yaml(parser),
+                "bias" => bias = Axes::from_yaml(parser),
+                "gain" => gain = Axes::from_yaml(parser),
                 _ => continue,
             }
         }

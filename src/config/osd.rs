@@ -1,7 +1,5 @@
 use core::fmt::{Display, Formatter, Result, Write};
 
-use btoi::btoi;
-
 use crate::alloc;
 
 use super::yaml::{FromYAML, ToYAML, YamlParser};
@@ -20,7 +18,7 @@ impl FromYAML for AspectRatio {
         let mut width: u8 = 16;
         let mut height: u8 = 9;
         while let Some((key, value)) = parser.next_key_value() {
-            let value = btoi(value.as_bytes()).ok();
+            let value = value.parse().ok();
             match key {
                 "width" => width = value.unwrap_or(16),
                 "height" => height = value.unwrap_or(9),
@@ -83,7 +81,7 @@ impl FromYAML for Offset {
         let mut horizental: i8 = 0;
         let mut vertical: i8 = 0;
         while let Some((key, value)) = parser.next_key_value() {
-            let value = btoi(value.as_bytes()).ok().unwrap_or(0);
+            let value = value.parse().ok().unwrap_or(0);
             match key {
                 "horizental" => horizental = value,
                 "vertical" => vertical = value,
@@ -138,7 +136,7 @@ impl FromYAML for OSD {
                 "font" => {
                     if let Some(value) = parser.next_value() {
                         let length = value.as_bytes().len();
-                        if let Some(bytes) = alloc::allocate(length, alloc::AllocateType::Generic) {
+                        if let Some(bytes) = alloc::allocate(length, false) {
                             bytes.copy_from_slice(value.as_bytes());
                             font = unsafe { core::str::from_utf8_unchecked(bytes) };
                         }
@@ -146,7 +144,7 @@ impl FromYAML for OSD {
                 }
                 "fov" => {
                     if let Some(value) = parser.next_value() {
-                        fov = btoi(value.as_bytes()).unwrap_or(150);
+                        fov = value.parse().unwrap_or(150);
                     }
                 }
                 "offset" => offset = Offset::from_yaml(parser),

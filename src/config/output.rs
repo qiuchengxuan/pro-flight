@@ -1,7 +1,5 @@
 use core::fmt::{Result, Write};
 
-use btoi::btoi;
-
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(PartialEq, Copy, Clone)]
@@ -12,7 +10,7 @@ pub enum Identifier {
 impl From<&str> for Identifier {
     fn from(name: &str) -> Identifier {
         if name.starts_with("PWM") {
-            return Identifier::PWM(btoi(name[3..].as_bytes()).ok().unwrap_or(0));
+            return Identifier::PWM(name[3..].parse().ok().unwrap_or(0));
         }
         Identifier::PWM(0)
     }
@@ -84,9 +82,9 @@ impl FromYAML for Output {
         while let Some((key, value)) = parser.next_key_value() {
             match key {
                 "type" => type_string = value,
-                "index" => index = btoi(value.as_bytes()).ok().unwrap_or(0),
+                "index" => index = value.parse().ok().unwrap_or(0),
                 "protocol" => protocol = value,
-                "rate" => rate = btoi(value.as_bytes()).ok().unwrap_or(400),
+                "rate" => rate = value.parse().ok().unwrap_or(400),
                 _ => continue,
             }
         }
