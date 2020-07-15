@@ -1,7 +1,5 @@
 use core::fmt::{Result, Write};
 
-use btoi::btoi;
-
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Copy, Clone, Debug)]
@@ -30,7 +28,7 @@ impl FromYAML for Battery {
         let mut max_cell_voltage: u16 = 4200;
         let mut warning_cell_voltage: u16 = 3500;
         while let Some((key, value)) = parser.next_key_value() {
-            let value = btoi::<u16>(value.as_bytes()).ok();
+            let value: Option<u16> = value.parse().ok();
             match key {
                 "cells" => cells = value.unwrap_or(0) as u8,
                 "min-cell-voltage" => min_cell_voltage = value.unwrap_or(3300),

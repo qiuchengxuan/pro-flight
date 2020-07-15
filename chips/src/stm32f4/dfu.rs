@@ -1,7 +1,6 @@
 use core::ptr::{read_volatile, write_volatile};
 
 use cortex_m;
-use stm32f4xx_hal::{prelude::*, stm32};
 
 const DFU_SAFE: usize = 0xCAFEFEED;
 const DFU_MAGIC: usize = 0xDEADBEEF;
@@ -13,18 +12,19 @@ impl Dfu {
         Self(DFU_SAFE)
     }
 
+    #[inline(never)]
     fn enter(&self) {
-        cortex_m::Peripherals::take().unwrap();
-        let peripherals = stm32::Peripherals::take().unwrap();
-        let rcc = peripherals.RCC.constrain();
-        rcc.cfgr.sysclk(48.mhz()).freeze();
         unsafe {
-            peripherals.SYSCFG.memrm.write(|w| w.bits(1)); // from system memory
-            #[cfg(all(cortex_m, feature = "inline-asm"))]
-            asm!("eor r0, r0
-                  ldr sp, [r0, #0]
-                  ldr r0, [r0, #4]
-                  bx r0" :::: "volatile");
+            llvm_asm!("ldr r0, =0x40023844
+                       ldr r1, =0x00004000
+                       str r1, [r0, #0]
+                       ldr r0, =0x40013800
+                       ldr r1, =0x00000001
+                       str r1, [r0, #0]
+                       ldr r0, =0x1fff0000
+                       ldr sp, [r0, #0]
+                       ldr r0, [r0, #4]
+                       bx r0" :::: "volatile");
         }
     }
 

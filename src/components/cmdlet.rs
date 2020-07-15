@@ -1,7 +1,6 @@
 use core::fmt::Write;
 use core::time::Duration;
 
-use btoi::{btoi, btoi_radix};
 use embedded_hal::serial;
 use embedded_hal::timer::CountDown;
 
@@ -19,11 +18,11 @@ pub fn init(validator: MemoryAddressValidator) {
     unsafe { MEMORY_ADDRESS_VALIDATOR = validator };
 }
 
-pub fn dump<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
-    let mut iter = line[5..].split(|b| *b == ' ' as u8);
+pub fn dump<WE, S: serial::Write<u8, Error = WE>>(line: &str, serial: &mut S) {
+    let mut iter = line[5..].split(' ');
     let mut address: u32 = 0;
     if let Some(word) = iter.next() {
-        if let Some(addr) = btoi_radix::<u32>(word, 16).ok() {
+        if let Some(addr) = u32::from_str_radix(word, 16).ok() {
             address = addr;
         }
     }
@@ -35,7 +34,7 @@ pub fn dump<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
     }
     let mut size: usize = 0;
     if let Some(word) = iter.next() {
-        if let Some(sz) = btoi(word).ok() {
+        if let Some(sz) = word.parse().ok() {
             size = sz
         }
     }
@@ -43,17 +42,17 @@ pub fn dump<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
     console!(serial, "Result: {:x?}\r\n", slice);
 }
 
-pub fn read<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
-    let mut split = line.split(|b| *b == ' ' as u8);
-    let read = split.next().unwrap_or(b"read");
-    if let Some(address) = split.next().map(|s| btoi_radix::<u32>(s, 16).ok()).flatten() {
+pub fn read<WE, S: serial::Write<u8, Error = WE>>(line: &str, serial: &mut S) {
+    let mut split = line.split(' ');
+    let read = split.next().unwrap_or("read");
+    if let Some(address) = split.next().map(|s| u32::from_str_radix(s, 16).ok()).flatten() {
         if unsafe { MEMORY_ADDRESS_VALIDATOR }(address) {
             match read {
-                b"readx" => {
+                "readx" => {
                     let value = unsafe { *(address as *const u32) };
                     console!(serial, "Result: {:x}\n", value);
                 }
-                b"readf" => {
+                "readf" => {
                     let value = unsafe { *(address as *const f32) };
                     let mut buffer = ryu::Buffer::new();
                     let printed = buffer.format(value);
@@ -68,12 +67,12 @@ pub fn read<WE, S: serial::Write<u8, Error = WE>>(line: &[u8], serial: &mut S) {
     }
 }
 
-pub fn write<WE, S, C>(line: &[u8], serial: &mut S, count_down: &mut C)
+pub fn write<WE, S, C>(line: &str, serial: &mut S, count_down: &mut C)
 where
     S: serial::Write<u8, Error = WE>,
     C: CountDown<Time = Duration>,
 {
-    let mut iter = line[6..].split(|b| *b == ' ' as u8).flat_map(|w| btoi_radix::<u32>(w, 16).ok());
+    let mut iter = line[6..].split(' ').flat_map(|w| u32::from_str_radix(w, 16).ok());
     if let Some(address) = iter.next() {
         if let Some(value) = iter.next() {
             if unsafe { MEMORY_ADDRESS_VALIDATOR }(address) {

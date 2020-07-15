@@ -1,7 +1,5 @@
 use core::fmt::{Result, Write};
 
-use btoi::btoi;
-
 use crate::datastructures::input::InputType;
 
 use super::yaml::{FromYAML, ToYAML, YamlParser};
@@ -42,7 +40,7 @@ impl FromYAML for Channels {
             let mut input_type: Option<InputType> = None;
             while let Some((key, value)) = parser.next_key_value() {
                 match key {
-                    "channel" => channel = btoi(value.as_bytes()).ok().unwrap_or(0),
+                    "channel" => channel = value.parse().ok().unwrap_or(0),
                     "type" => input_type = InputType::from_str(value),
                     _ => continue,
                 }

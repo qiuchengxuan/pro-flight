@@ -4,7 +4,7 @@ use crate::alloc;
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
-use crate::datastructures::measurement::Acceleration;
+use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
 use crate::datastructures::schedule::Schedulable;
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
 use crate::math::runge_kutta4;
@@ -12,12 +12,15 @@ use crate::math::runge_kutta4;
 const CURRENT: usize = 0;
 const HOME: usize = 0;
 const MAX_WAYPOINT: usize = 32;
+const GRAVITY: f32 = 9.80665;
 
 pub struct Navigation<'a, IMU, A> {
     imu: IMU,
     accelerometer: A,
     gnss: Option<&'a mut dyn DataSource<Position>>,
+    altimeter: Option<&'a mut dyn DataSource<(Altitude, Velocity)>>,
     waypoints: [Waypoint; MAX_WAYPOINT],
+    offset: (f32, f32, f32),
     displacements: [Displacement; MAX_WAYPOINT],
     output: &'static SingularData<(Position, Steerpoint)>,
     next_waypoint: u8,
@@ -37,7 +40,9 @@ where
             imu,
             accelerometer,
             gnss: None,
+            altimeter: None,
             waypoints: [Waypoint::default(); MAX_WAYPOINT],
+            offset: (0.0, 0.0, 0.0),
             displacements: [Displacement::default(); MAX_WAYPOINT],
             output: alloc::into_static(output, false).unwrap(),
             next_waypoint: HOME as u8,
@@ -53,6 +58,10 @@ where
 
     pub fn set_gnss(&mut self, gnss: &'a mut dyn DataSource<Position>) {
         self.gnss = Some(gnss)
+    }
+
+    pub fn set_altimeter(&mut self, altimeter: &'a mut dyn DataSource<(Altitude, Velocity)>) {
+        self.altimeter = Some(altimeter)
     }
 
     pub fn next_waypoint(&mut self) {
@@ -73,14 +82,16 @@ where
     fn update_from_imu(&mut self) {
         if let Some(unit_quaternion) = self.imu.read() {
             if let Some(acceleration) = self.accelerometer.read() {
-                let vector = unit_quaternion.transform_vector(&acceleration.0.into()) * 9.8;
-                let (ax, ay, az) = (vector[0], vector[1], vector[2]);
-                let mut current = self.displacements[CURRENT];
-                current.x = runge_kutta4(|_, dt| ax * dt, current.x, self.time, self.interval);
-                current.y = runge_kutta4(|_, dt| ay * dt, current.y, self.time, self.interval);
-                current.z = runge_kutta4(|_, dt| az * dt, current.z, self.time, self.interval);
+                let vector = unit_quaternion.transform_vector(&acceleration.0.into()) * GRAVITY;
+                let (ax, ay, az) = (vector[0], vector[1], vector[2] - GRAVITY); // z axis reverted
+                let (t, dt) = (self.time, self.interval);
+                let mut offset = self.offset;
+                offset.0 = runge_kutta4(|_, dt| ax * dt, offset.0, t, dt);
+                offset.1 = runge_kutta4(|_, dt| ay * dt, offset.1, t, dt);
+                offset.2 = runge_kutta4(|_, dt| az * dt, offset.2, t, dt);
+                self.offset = offset;
+                self.displacements[CURRENT] = offset.into();
                 self.time += self.interval;
-                self.displacements[CURRENT] = current;
                 let waypoint = self.waypoints[self.next_waypoint as usize];
                 let steerpoint = Steerpoint { index: self.next_waypoint, waypoint };
                 let position = self.waypoints[HOME].position + self.displacements[CURRENT];
@@ -89,10 +100,21 @@ where
         }
     }
 
-    pub fn update_from_gnss(&mut self) {
+    pub fn update_from_gnss_or_altimeter(&mut self) {
         if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read_last()).flatten() {
-            self.displacements[CURRENT] = self.waypoints[HOME].position - position;
+            if self.waypoints[HOME].position.latitude == 0 {
+                self.waypoints[HOME].position = position;
+            }
+            self.offset = (self.waypoints[HOME].position - position).into_f32();
             self.time = 0.0;
+        } else if let Some(altimeter) = self.altimeter.as_mut() {
+            if let Some((altitude, _)) = altimeter.read_last() {
+                if self.waypoints[HOME].position.altitude == 0 {
+                    self.waypoints[HOME].position.altitude = altitude;
+                }
+                let height = altitude - self.waypoints[HOME].position.altitude;
+                self.offset.2 = height.into();
+            }
         }
     }
 }
@@ -104,6 +126,6 @@ where
 {
     fn schedule(&mut self) {
         self.update_from_imu();
-        self.update_from_gnss();
+        self.update_from_gnss_or_altimeter();
     }
 }

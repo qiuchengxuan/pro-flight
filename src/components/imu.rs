@@ -86,7 +86,7 @@ impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G>
         while let Some(gyro) = self.gyroscope.read() {
             if let Some(acceleration) = self.accelerometer.read() {
                 if !self.calibrated {
-                    self.gyro_bias = self.gyro_bias.average(&gyro.axis);
+                    self.gyro_bias = self.gyro_bias.average(&gyro.axes);
                     self.calibrated = self.counter >= self.calibration_loop as usize;
                     self.counter += 1;
                 } else {

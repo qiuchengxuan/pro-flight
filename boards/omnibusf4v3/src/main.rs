@@ -191,6 +191,7 @@ fn main() -> ! {
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
     let navigation = alloc::into_static_generic(navigation).unwrap();
+    navigation.set_altimeter(alloc::into_static_generic(altimeter.as_data_source()).unwrap());
 
     let telemetry = TelemetryUnit::new(
         altimeter.as_data_source(),
@@ -280,30 +281,29 @@ fn main() -> ! {
             continue;
         }
 
-        let option = console::read_line(&mut serial, &mut vec);
-        if option.is_none() {
-            continue;
-        }
-        let line = option.unwrap();
+        let line = match console::read_line(&mut serial, &mut vec) {
+            Some(line) => unsafe { core::str::from_utf8_unchecked(line) },
+            None => continue,
+        };
         if line.len() > 0 {
-            if line == *b"dfu" {
+            if line == "dfu" {
                 unsafe { &mut *DFU.as_mut_ptr() }.reboot_into();
-            } else if line.starts_with(b"reboot") {
+            } else if line.starts_with("reboot") {
                 cortex_m::peripheral::SCB::sys_reset();
-            } else if line.starts_with(b"logread") {
+            } else if line.starts_with("logread") {
                 for s in logger::reader() {
                     console!(&mut serial, "{}", s);
                 }
-            } else if line == *b"telemetry" {
+            } else if line == "telemetry" {
                 console!(&mut serial, "{}\n", telemetry.get_data());
-            } else if line.starts_with(b"read") {
+            } else if line.starts_with("read") {
                 cmdlet::read(line, &mut serial);
-            } else if line.starts_with(b"dump ") {
+            } else if line.starts_with("dump ") {
                 cmdlet::dump(line, &mut serial);
-            } else if line.starts_with(b"write ") {
+            } else if line.starts_with("write ") {
                 let mut count_down = MillisCountDown::new(&systick);
                 cmdlet::write(line, &mut serial, &mut count_down);
-            } else if line.starts_with(b"show config") {
+            } else if line.starts_with("show config") {
                 config.write_to(0, &mut Console(&mut serial)).ok();
             } else {
                 console!(&mut serial, "unknown input\n");

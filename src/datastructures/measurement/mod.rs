@@ -19,8 +19,20 @@ pub enum DistanceUnit {
     NauticalMile = 1852 * 100,
 }
 
-#[derive(Default, Copy, Clone, PartialEq)]
+impl PartialOrd for DistanceUnit {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        (*self as usize).partial_cmp(&(*other as usize))
+    }
+}
+
+#[derive(Default, Copy, Clone, PartialEq, Debug)]
 pub struct Distance<T: Default + Copy + Clone + PartialEq>(pub T);
+
+impl<T: PartialEq + Copy + Default> PartialEq<T> for Distance<T> {
+    fn eq(&self, rhs: &T) -> bool {
+        self.0 == *rhs
+    }
+}
 
 impl<T: Add<Output = T> + Copy + Default + PartialEq> Add for Distance<T> {
     type Output = Distance<T::Output>;
@@ -48,14 +60,22 @@ impl<T: Into<isize> + Copy + Default + PartialEq> Distance<T> {
         let raw: isize = self.0.into();
         match (from, to) {
             (DistanceUnit::CentiMeter, _) => raw * scale / to as isize,
-            _ => raw * scale * from as isize / to as isize,
+            (_, DistanceUnit::CentiMeter) => raw * scale * from as isize,
+            _ => {
+                if from >= to {
+                    raw * scale * from as isize / to as isize
+                } else {
+                    raw * scale * to as isize / from as isize
+                }
+            }
         }
     }
 }
 
-impl<T: Into<f32> + Copy + Default + PartialEq> Into<f32> for Distance<T> {
+impl<T: Into<isize> + Copy + Default + PartialEq> Into<f32> for Distance<T> {
     fn into(self) -> f32 {
-        self.0.into() / 100.0
+        let value: isize = self.0.into();
+        value as f32 / (DistanceUnit::Meter as isize as f32)
     }
 }
 
@@ -92,51 +112,57 @@ impl PartialOrd for Axes {
 
 #[derive(Copy, Clone, PartialEq, Value)]
 pub struct Measurement {
-    pub axis: Axes,
+    pub axes: Axes,
     pub sensitive: i32,
 }
 
 impl Measurement {
-    pub fn calibrated(self, axis: &Axes) -> Self {
-        Self { axis: self.axis.calibrated(axis), sensitive: self.sensitive }
+    pub fn calibrated(self, axes: &Axes) -> Self {
+        Self { axes: self.axes.calibrated(axes), sensitive: self.sensitive }
     }
 }
 
 impl PartialOrd for Measurement {
     fn partial_cmp(self: &Self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.axis.partial_cmp(&other.axis)
+        self.axes.partial_cmp(&other.axes)
     }
 }
 
 impl Into<Vector3<f32>> for Measurement {
     fn into(self) -> Vector3<f32> {
         Vector3::new(
-            self.axis.x as f32 / self.sensitive as f32,
-            self.axis.y as f32 / self.sensitive as f32,
-            self.axis.z as f32 / self.sensitive as f32,
+            self.axes.x as f32 / self.sensitive as f32,
+            self.axes.y as f32 / self.sensitive as f32,
+            self.axes.z as f32 / self.sensitive as f32,
         )
     }
 }
 
 impl Default for Measurement {
     fn default() -> Self {
-        Self { axis: Default::default(), sensitive: 1 }
+        Self { axes: Default::default(), sensitive: 1 }
     }
 }
 
 #[derive(Default, Copy, Clone)]
 pub struct Acceleration(pub Measurement);
 
+impl sval::value::Value for Acceleration {
+    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
+        self.0.stream(stream)
+    }
+}
+
 impl Acceleration {
-    pub fn calibrated(self, axis: &Axes) -> Self {
-        return Self(self.0.calibrated(axis));
+    pub fn calibrated(self, axes: &Axes) -> Self {
+        return Self(self.0.calibrated(axes));
     }
 }
 
 impl Acceleration {
     pub fn g_force(&self) -> u8 {
-        let axis = self.0.axis;
-        let (x, y, z) = (axis.x, axis.y, axis.z);
+        let axes = self.0.axes;
+        let (x, y, z) = (axes.x, axes.y, axes.z);
         let square_sum = x * x + y * y + z * z;
         if square_sum > 0 {
             let g_force = square_sum.integer_sqrt();

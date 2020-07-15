@@ -49,8 +49,9 @@ impl Into<hud::SphericalCoordinate> for SphericalCoordinate {
 pub struct TelemetryData {
     attitude: Attitude,
     altitude: Altitude,
+    acceleration: Acceleration,
     heading: u16,
-    velocity: i16,
+    velocity: Velocity,
     g_force: u8,
     battery: Battery,
     position: Position,
@@ -93,12 +94,14 @@ where
         }
         let euler: Euler = self.imu.read_last_unchecked().into();
         let (position, steerpoint) = self.navigation.read_last_unchecked();
+        let acceleration = self.accelerometer.read_last_unchecked();
         TelemetryData {
             attitude: (euler * DEGREE_PER_DAG).into(),
             altitude,
+            acceleration,
             heading: ((-euler.psi as isize + 360) % 360) as u16,
             velocity,
-            g_force: self.accelerometer.read_last_unchecked().g_force(),
+            g_force: acceleration.g_force(),
             battery: battery / self.battery_cells.get() as u16,
             position,
             steerpoint,

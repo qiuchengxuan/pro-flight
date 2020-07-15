@@ -21,18 +21,18 @@ static mut TEMPERATURE_DATA: MaybeUninit<OverwritingData<Temperature>> = MaybeUn
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
     fn into(self) -> Measurement {
-        let axis = Axes { x: self.x as i32, y: self.y as i32, z: self.z as i32 };
+        let axes = Axes { x: self.x as i32, y: self.y as i32, z: self.z as i32 };
         let sensitive: f32 = ACCELEROMETER_SENSITIVE.into();
-        Measurement { axis, sensitive: sensitive as i32 }
+        Measurement { axes, sensitive: sensitive as i32 }
     }
 }
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<GyroSensitive> {
     fn into(self) -> Measurement {
-        let axis =
+        let axes =
             Axes { x: (self.x as i32) << 8, y: (self.y as i32) << 8, z: (self.z as i32) << 8 };
         let sensitive: f32 = GYRO_SENSITIVE.into();
-        Measurement { axis, sensitive: (sensitive * 256.0) as i32 }
+        Measurement { axes, sensitive: (sensitive * 256.0) as i32 }
     }
 }
 

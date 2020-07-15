@@ -2,14 +2,14 @@
 use micromath::F32Ext;
 use nalgebra::Vector3;
 
-use crate::datastructures::measurement::{Altitude, Distance};
+use crate::datastructures::measurement::{Altitude, Distance, DistanceUnit};
 
 use super::measurement::DEGREE_PER_DAG;
 
 const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub struct Longitude(i32);
 
 impl Longitude {
@@ -73,7 +73,7 @@ impl sval::Value for Longitude {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub struct Latitude(i32);
 
 impl Latitude {
@@ -102,6 +102,12 @@ impl Latitude {
             "S" => Some(Latitude(-value)),
             _ => None,
         }
+    }
+}
+
+impl PartialEq<isize> for Latitude {
+    fn eq(&self, rhs: &isize) -> bool {
+        self.0 as isize == *rhs
     }
 }
 
@@ -137,58 +143,57 @@ impl sval::Value for Latitude {
     }
 }
 
-#[derive(Copy, Clone, Default, Value)]
+#[derive(Copy, Clone, Default, Value, PartialEq, Debug)]
 pub struct SphericalCoordinate {
     pub rho: Distance<isize>, // radius
     pub theta: i16,           // azimuth angle, [-180, 180]
-    pub phi: i8,              // polar angle, [90, 90]
+    pub phi: i8,              // polar angle, [-90, 90]
 }
 
-#[derive(Default, Copy, Clone)]
+// assuming unit of centimeter
+#[derive(Default, Copy, Clone, PartialEq, Debug)]
 pub struct Displacement {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    pub x: Distance<isize>,
+    pub y: Distance<isize>,
+    pub z: Distance<isize>,
 }
 
 impl From<(f32, f32, f32)> for Displacement {
     fn from(tuple: (f32, f32, f32)) -> Self {
-        Self { x: tuple.0, y: tuple.1, z: tuple.2 }
-    }
-}
-
-impl core::ops::Neg for Displacement {
-    type Output = Self;
-    fn neg(self) -> Self {
-        Self { x: -self.x, y: -self.y, z: -self.z }
+        let unit = DistanceUnit::Meter as isize as f32;
+        let x = Distance((tuple.0 * unit) as isize);
+        let y = Distance((tuple.1 * unit) as isize);
+        let z = Distance((tuple.2 * unit) as isize);
+        Self { x, y, z }
     }
 }
 
 impl Displacement {
     pub fn azimuth(&self) -> u16 {
-        let theta = (self.x.atan2(self.y) * DEGREE_PER_DAG) as i16;
+        let theta = ((self.x.0 as f32).atan2(self.y.0 as f32) * DEGREE_PER_DAG) as i16;
         (if theta > 0 { theta } else { 360 + theta }) as u16
     }
 
     pub fn into_f32(self) -> (f32, f32, f32) {
-        (self.x, self.y, self.z)
+        (self.x.into(), self.y.into(), self.z.into())
     }
 
     pub fn into_f32_vector(self) -> Vector3<f32> {
-        Vector3::new(self.x, self.y, self.z)
+        Vector3::new(self.x.into(), self.y.into(), self.z.into())
     }
 }
 
 impl Into<SphericalCoordinate> for Displacement {
     fn into(self) -> SphericalCoordinate {
-        let mut square_sum = self.x * self.x + self.y * self.y + self.z * self.z;
+        let (x, y, z) = (self.x.0 as f32, self.y.0 as f32, self.z.0 as f32);
+        let mut square_sum = x * x + y * y + z * z;
         if square_sum <= 0.0 {
             square_sum = 0.0
         }
         let rho = square_sum.sqrt();
-        let theta = (self.x.atan2(self.y) * DEGREE_PER_DAG) as i16;
-        let phi = if rho.is_normal() { ((self.z / rho).acos() * DEGREE_PER_DAG) as i8 } else { 0 };
-        SphericalCoordinate { rho: Distance(rho as isize), theta: theta, phi: phi }
+        let theta = (x.atan2(y) * DEGREE_PER_DAG) as i16;
+        let phi = if rho.is_normal() { ((z / rho).acos() * DEGREE_PER_DAG) as i16 } else { 90 };
+        SphericalCoordinate { rho: Distance(rho as isize), theta: theta, phi: (90 - phi) as i8 }
     }
 }
 
@@ -200,11 +205,11 @@ impl core::ops::Sub for Displacement {
     }
 }
 
-#[derive(Default, Copy, Clone, Value)]
+#[derive(Default, Copy, Clone, Value, PartialEq)]
 pub struct Position {
-    latitude: Latitude,
-    longitude: Longitude,
-    altitude: Altitude,
+    pub latitude: Latitude,
+    pub longitude: Longitude,
+    pub altitude: Altitude,
 }
 
 impl core::ops::Sub for Position {
@@ -214,7 +219,11 @@ impl core::ops::Sub for Position {
         let x = self.longitude - other.longitude;
         let y = self.latitude - other.latitude;
         let height = self.altitude - other.altitude;
-        Displacement { x: x.0 as f32, y: y.0 as f32, z: (height.0 * 100) as f32 }
+        Displacement {
+            x: x,
+            y: y,
+            z: Distance(height.convert(DistanceUnit::Meter, DistanceUnit::CentiMeter, 1)),
+        }
     }
 }
 
@@ -222,9 +231,9 @@ impl core::ops::Add<Displacement> for Position {
     type Output = Self;
 
     fn add(self, displacement: Displacement) -> Self {
-        let longitude = self.longitude + Distance::<isize>(displacement.x as isize);
-        let latitude = self.latitude + Distance::<isize>(displacement.y as isize);
-        let altitude = self.altitude + Distance::<isize>(displacement.z as isize);
+        let longitude = self.longitude + displacement.x;
+        let latitude = self.latitude + displacement.y;
+        let altitude = self.altitude + displacement.z;
         Self { latitude, longitude, altitude }
     }
 }
@@ -240,5 +249,45 @@ mod test {
         assert_eq!("N40*19.480", s);
         let s = format!("{}", longitude);
         assert_eq!("E116*44.540", s);
+    }
+
+    #[test]
+    fn test_spherical_coordinate() {
+        use nalgebra::UnitQuaternion;
+
+        use super::{Displacement, SphericalCoordinate};
+        use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
+        use crate::datastructures::measurement::Distance;
+
+        let displacement = Displacement { y: Distance(1484), ..Default::default() };
+        let euler = Euler { phi: 0.0, theta: 0.0, psi: 30.0 } / DEGREE_PER_DAG;
+        let quaternion: UnitQuaternion<f32> = euler.into();
+        let vector = quaternion.inverse_transform_vector(&displacement.into_f32_vector());
+        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
+        let coordinate: SphericalCoordinate = transformed.into();
+        assert_eq!(coordinate, SphericalCoordinate { rho: Distance(1483), theta: 30, phi: 0 });
+
+        let euler = Euler { phi: 30.0, theta: 0.0, psi: 0.0 } / DEGREE_PER_DAG;
+        let quaternion: UnitQuaternion<f32> = euler.into();
+        let vector = quaternion.inverse_transform_vector(&displacement.into_f32_vector());
+        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
+        let coordinate: SphericalCoordinate = transformed.into();
+        assert_eq!(coordinate, SphericalCoordinate { rho: Distance(1483), theta: 0, phi: -30 });
+
+        let displacement = Displacement { x: Distance(1484), ..Default::default() };
+        let euler = Euler { phi: 0.0, theta: 90.0, psi: 0.0 } / DEGREE_PER_DAG;
+        let quaternion: UnitQuaternion<f32> = euler.into();
+        let vector = quaternion.inverse_transform_vector(&displacement.into_f32_vector());
+        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
+        let coordinate: SphericalCoordinate = transformed.into();
+        assert_eq!(coordinate, SphericalCoordinate { rho: Distance(1484), theta: 0, phi: 90 });
+
+        let displacement = Displacement { z: Distance(1000), ..Default::default() };
+        let coordinate: SphericalCoordinate = displacement.into();
+        assert_eq!(coordinate, SphericalCoordinate { rho: Distance(1000), theta: 0, phi: 90 });
+
+        let displacement = Displacement { z: Distance(-1000), ..Default::default() };
+        let coordinate: SphericalCoordinate = displacement.into();
+        assert_eq!(coordinate, SphericalCoordinate { rho: Distance(1000), theta: 0, phi: -90 });
     }
 }
