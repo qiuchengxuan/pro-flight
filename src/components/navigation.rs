@@ -78,17 +78,39 @@ where
             self.displacements[index] = waypoint.position - self.waypoints[HOME].position;
         }
     }
+}
 
-    fn update_from_imu(&mut self) {
-        if let Some(unit_quaternion) = self.imu.read() {
+impl<'a, IMU, A> Schedulable for Navigation<'a, IMU, A>
+where
+    IMU: DataSource<UnitQuaternion<f32>>,
+    A: DataSource<Acceleration>,
+{
+    fn schedule(&mut self) {
+        if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read_last()).flatten() {
+            if self.waypoints[HOME].position.latitude == 0 {
+                self.waypoints[HOME].position = position;
+            }
+            self.offset = (self.waypoints[HOME].position - position).into_f32();
+            self.time = 0.0;
+        } else if let Some(unit_quaternion) = self.imu.read() {
             if let Some(acceleration) = self.accelerometer.read() {
                 let vector = unit_quaternion.transform_vector(&acceleration.0.into()) * GRAVITY;
                 let (ax, ay, az) = (vector[0], vector[1], vector[2] - GRAVITY); // z axis reverted
                 let (t, dt) = (self.time, self.interval);
                 let mut offset = self.offset;
+                // TODO: add speed data source or runge-kutta won't properly work
                 offset.0 = runge_kutta4(|_, dt| ax * dt, offset.0, t, dt);
                 offset.1 = runge_kutta4(|_, dt| ay * dt, offset.1, t, dt);
-                offset.2 = runge_kutta4(|_, dt| az * dt, offset.2, t, dt);
+                let altimeter = self.altimeter.as_mut().map(|a| a.read_last()).flatten();
+                if let Some((altitude, _)) = altimeter {
+                    if self.waypoints[HOME].position.altitude == 0 {
+                        self.waypoints[HOME].position.altitude = altitude;
+                    }
+                    let height = altitude - self.waypoints[HOME].position.altitude;
+                    self.offset.2 = height.into();
+                } else {
+                    offset.2 = runge_kutta4(|_, dt| az * dt, offset.2, t, dt);
+                }
                 self.offset = offset;
                 self.displacements[CURRENT] = offset.into();
                 self.time += self.interval;
@@ -98,34 +120,5 @@ where
                 self.output.write((position, steerpoint));
             }
         }
-    }
-
-    pub fn update_from_gnss_or_altimeter(&mut self) {
-        if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read_last()).flatten() {
-            if self.waypoints[HOME].position.latitude == 0 {
-                self.waypoints[HOME].position = position;
-            }
-            self.offset = (self.waypoints[HOME].position - position).into_f32();
-            self.time = 0.0;
-        } else if let Some(altimeter) = self.altimeter.as_mut() {
-            if let Some((altitude, _)) = altimeter.read_last() {
-                if self.waypoints[HOME].position.altitude == 0 {
-                    self.waypoints[HOME].position.altitude = altitude;
-                }
-                let height = altitude - self.waypoints[HOME].position.altitude;
-                self.offset.2 = height.into();
-            }
-        }
-    }
-}
-
-impl<'a, IMU, A> Schedulable for Navigation<'a, IMU, A>
-where
-    IMU: DataSource<UnitQuaternion<f32>>,
-    A: DataSource<Acceleration>,
-{
-    fn schedule(&mut self) {
-        self.update_from_imu();
-        self.update_from_gnss_or_altimeter();
     }
 }

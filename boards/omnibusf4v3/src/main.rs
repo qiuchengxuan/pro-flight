@@ -270,12 +270,17 @@ fn main() -> ! {
     let (primary, no_dma) = alloc::available();
     info!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
 
+    let mut count_down = MillisCountDown::new(&systick);
+    count_down.start_ms(20);
     let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
-        altimeter.schedule();
-        imu.schedule();
-        navigation.schedule();
-        aircraft.schedule();
+        if count_down.wait().is_ok() {
+            altimeter.schedule();
+            imu.schedule();
+            navigation.schedule();
+            aircraft.schedule();
+            count_down.start_ms(20);
+        }
         sysled.check_toggle().unwrap();
         if !device.poll(&mut [&mut serial]) {
             continue;
