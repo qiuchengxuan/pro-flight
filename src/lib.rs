@@ -22,6 +22,9 @@ extern crate sbus_parser;
 extern crate sval;
 extern crate sval_json;
 
+#[macro_use]
+pub mod logger;
+
 pub mod alloc;
 #[macro_use]
 pub mod components;

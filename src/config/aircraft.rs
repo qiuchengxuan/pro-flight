@@ -24,6 +24,7 @@ impl Into<&str> for Configuration {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Aircraft {
     pub configuration: Configuration,
 }

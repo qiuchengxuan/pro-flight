@@ -97,38 +97,38 @@ macro_rules! __format_args {
 macro_rules! log {
     ($level:expr, $message:expr) => ({
         let _ = __format_args!($message);
-        $crate::components::logger::__write_log_literal($message, $level, file!(), line!());
+        $crate::logger::__write_log_literal($message, $level, file!(), line!());
     });
     ($level:expr, $($arg:tt)+) => {
-        $crate::components::logger::__write_log(__format_args!($($arg)+), $level, file!(), line!());
+        $crate::logger::__write_log(__format_args!($($arg)+), $level, file!(), line!());
     };
 }
 
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Debug, $($arg)+);
+        log!($crate::logger::Level::Debug, $($arg)+);
     };
 }
 
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Info, $($arg)+);
+        log!($crate::logger::Level::Info, $($arg)+);
     };
 }
 
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Warning, $($arg)+);
+        log!($crate::logger::Level::Warning, $($arg)+);
     };
 }
 
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Error, $($arg)+);
+        log!($crate::logger::Level::Error, $($arg)+);
     };
 }
 

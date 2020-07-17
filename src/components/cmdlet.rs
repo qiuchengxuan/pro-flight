@@ -1,10 +1,7 @@
-use core::fmt::Write;
 use core::time::Duration;
 
 use embedded_hal::serial;
 use embedded_hal::timer::CountDown;
-
-use crate::components::console::Console;
 
 pub type MemoryAddressValidator = fn(u32) -> bool;
 

@@ -48,7 +48,7 @@ impl ToYAML for Axes {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct Config {
     pub accelerometer: Accelerometer,
     pub battery: Battery,
@@ -121,14 +121,23 @@ impl ToYAML for Config {
     }
 }
 
-pub fn read_config<E>(reader: &mut dyn Read<Error = E>) -> Config {
+static mut CONFIG: Option<Config> = None;
+
+#[inline]
+pub fn get() -> &'static Config {
+    unsafe { CONFIG.as_ref().unwrap() }
+}
+
+pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     let mut buffer = [0u8; 2048];
     let size = reader.read(&mut buffer).ok().unwrap_or(0);
-    if size > 0 {
+    let config = if size > 0 {
         Config::from_yaml(&mut YamlParser::from(&buffer[..size]))
     } else {
         Config::default()
-    }
+    };
+    unsafe { CONFIG = Some(config) }
+    get()
 }
 
 mod test {
@@ -137,7 +146,7 @@ mod test {
 
     #[test]
     #[serial]
-    fn test_read_config() -> std::io::Result<()> {
+    fn test_init_config() -> std::io::Result<()> {
         use std::fs::File;
         use std::io::Read;
         use std::string::{String, ToString};

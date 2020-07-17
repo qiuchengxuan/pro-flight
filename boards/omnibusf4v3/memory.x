@@ -28,8 +28,8 @@ MEMORY
    you want to place there. */
 /* Note that the section will not be zero-initialized by the runtime! */
 SECTIONS {
-     .ccmram (NOLOAD) : ALIGN(4) {
-       *(.ccmram);
-       . = ALIGN(4);
-     } > CCMRAM
+    .ccmram (NOLOAD) : ALIGN(4) {
+      *(.ccmram);
+      . = ALIGN(4);
+    } > CCMRAM
 } INSERT AFTER .bss;

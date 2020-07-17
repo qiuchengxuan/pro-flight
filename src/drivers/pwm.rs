@@ -10,31 +10,47 @@ pub trait PwmByIdentifier {
     fn get<'a>(&self, identifier: Identifier) -> Option<&mut dyn PWM>;
 }
 
-pub struct PWM6<P1, P2, P3, P4, P5, P6>(UnsafeCell<(P1, P2, P3, P4, P5, P6)>);
+macro_rules! pwms_impls {
+    ($(
+        $PWM:ident {
+            $(($idx:tt) -> $P:ident)+
+        }
+    )+) => {
+        $(
+            pub struct $PWM<$($P,)+>(UnsafeCell<($($P,)+)>);
 
-impl<P1, P2, P3, P4, P5, P6> PWM6<P1, P2, P3, P4, P5, P6> {
-    pub fn new(pwms: (P1, P2, P3, P4, P5, P6)) -> Self {
-        Self(UnsafeCell::new(pwms))
+            impl<$($P,)+> $PWM<$($P,)+> {
+                pub fn new(pwms: ($($P,)+)) -> Self {
+                    Self(UnsafeCell::new(pwms))
+                }
+            }
+
+            impl<$($P: PWM,)+> PwmByIdentifier for $PWM<$($P,)+> {
+                fn get<'a>(&self, identifier: Identifier) -> Option<&mut dyn PWM> {
+                    match identifier {
+                        Identifier::PWM(index) => unsafe {
+                            match index {
+                                $(
+                                    $idx => Some(&mut (&mut *self.0.get()).$idx),
+                                )+
+                                _ => None,
+                            }
+                        }
+                    }
+                }
+            }
+        )+
     }
 }
 
-impl<P1: PWM, P2: PWM, P3: PWM, P4: PWM, P5: PWM, P6: PWM> PwmByIdentifier
-    for PWM6<P1, P2, P3, P4, P5, P6>
-{
-    fn get<'a>(&self, identifier: Identifier) -> Option<&mut dyn PWM> {
-        match identifier {
-            Identifier::PWM(index) => unsafe {
-                match index {
-                    1 => Some(&mut (&mut *self.0.get()).0),
-                    2 => Some(&mut (&mut *self.0.get()).1),
-                    3 => Some(&mut (&mut *self.0.get()).2),
-                    4 => Some(&mut (&mut *self.0.get()).3),
-                    5 => Some(&mut (&mut *self.0.get()).4),
-                    6 => Some(&mut (&mut *self.0.get()).5),
-                    _ => None,
-                }
-            },
-        }
+pwms_impls! {
+    PWM6 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
     }
 }
 

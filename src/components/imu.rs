@@ -41,7 +41,7 @@ where
             calibration_loop: 200,
             acceleration: alloc::into_static(OverwritingData::new(accel), false).unwrap(),
             quaternion: alloc::into_static(OverwritingData::new(quat), false).unwrap(),
-            gyro: alloc::into_static(SingularData::<Gyro>::default(), false).unwrap(),
+            gyro: alloc::into_static(SingularData::default(), false).unwrap(),
 
             ahrs: Mahony::new(1.0 / sample_rate as f32, 0.5, 0.0),
             gyro_bias: Default::default(),

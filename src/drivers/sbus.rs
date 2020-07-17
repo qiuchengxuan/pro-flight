@@ -20,7 +20,11 @@ pub struct SbusReceiver {
 
 impl SbusReceiver {
     pub fn set_mapping(&mut self, config: &Channels) {
-        self.channel_mapping = config.mapping();
+        for (index, &option) in config.0.iter().enumerate() {
+            if let Some(input_type) = option {
+                self.channel_mapping[input_type as usize] = index as u8;
+            }
+        }
     }
 
     pub fn handle(&mut self, ring: &[u8], offset: usize, num_bytes: usize) {

@@ -4,7 +4,7 @@ use crate::datastructures::measurement::Axes;
 
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct Accelerometer {
     pub bias: Axes,
     pub gain: Axes,

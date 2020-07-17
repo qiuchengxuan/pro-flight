@@ -27,6 +27,9 @@ pub fn init(primary: &'static mut [u8], no_dma: &'static mut [u8]) {
 }
 
 pub fn allocate(size: usize, dma: bool) -> Option<&'static mut [u8]> {
+    if size == 0 {
+        return Some(&mut []);
+    }
     let word_size = core::mem::size_of::<isize>();
     let aligned_size = ((size - 1) / word_size + 1) * word_size;
     let allocate_info = unsafe { &mut ALLOCATE_INFO };
@@ -70,15 +73,6 @@ pub fn typed_allocate<T>(_: T, size: usize, dma: bool) -> Option<&'static mut [T
 
 pub fn into_static<T>(t: T, dma: bool) -> Option<&'static mut T> {
     if let Some(bytes) = allocate(size_of::<T>(), dma) {
-        let static_t: &'static mut T = unsafe { &mut *(&mut bytes[0] as *mut _ as *mut T) };
-        *static_t = t;
-        return Some(static_t);
-    }
-    None
-}
-
-pub fn into_static_generic<T>(t: T) -> Option<&'static mut T> {
-    if let Some(bytes) = allocate(size_of::<T>(), false) {
         let static_t: &'static mut T = unsafe { &mut *(&mut bytes[0] as *mut _ as *mut T) };
         *static_t = t;
         return Some(static_t);

@@ -9,7 +9,7 @@ use bmp280::registers::Register;
 use embedded_hal::digital::v2::OutputPin;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
-use rs_flight::config::OSD;
+use rs_flight::config;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
 use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
@@ -122,7 +122,6 @@ pub fn init<'a>(
     pa15: PA15<Input<Floating>>,
     pb3: PB3<Input<Floating>>,
     clocks: Clocks,
-    config: &OSD,
     telemetry_source: &'static dyn TelemetrySource,
     delay: &mut Delay,
 ) -> Result<bool, Error> {
@@ -142,8 +141,9 @@ pub fn init<'a>(
     if !bmp280_init(bus, delay).is_ok() {
         return Ok(false);
     }
-    max7456_init(VirtualSpi::new(&spi, 1), delay, config)?;
+    max7456_init(VirtualSpi::new(&spi, 1), delay)?;
 
+    let config = &config::get().osd;
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
     spi3.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
     let mut timer = Timer::tim7(tim7, OSD_REFRESH_RATE.hz(), clocks);

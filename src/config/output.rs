@@ -123,6 +123,7 @@ impl ToYAML for Output {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Outputs(pub [(Identifier, Output); MAX_OUTPUT_CONFIG]);
 
 impl Default for Outputs {

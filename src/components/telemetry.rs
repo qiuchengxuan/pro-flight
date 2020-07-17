@@ -152,14 +152,8 @@ where
 }
 
 impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV> {
-    pub fn new(
-        altimeter: A,
-        battery: B,
-        accelerometer: C,
-        imu: IMU,
-        navigation: NAV,
-        config: &config::Battery,
-    ) -> Self {
+    pub fn new(altimeter: A, battery: B, accelerometer: C, imu: IMU, navigation: NAV) -> Self {
+        let config = config::get();
         Self {
             altimeter,
             battery,
@@ -167,7 +161,7 @@ impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV> {
             imu,
             navigation,
             initial_altitude: Default::default(),
-            battery_cells: Cell::new(config.cells),
+            battery_cells: Cell::new(config.battery.cells),
         }
     }
 }

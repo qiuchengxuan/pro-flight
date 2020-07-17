@@ -1,4 +1,5 @@
 use core::fmt;
+use core::fmt::Write as _;
 
 use embedded_hal::serial::{Read, Write};
 
@@ -15,7 +16,6 @@ macro_rules! writes {
     };
 }
 
-// impl<RE, WE, S: Read<u8, Error = RE> + Write<u8, Error = WE>> Console<S> {
 pub fn read_line<'a, A, RE, WE, S>(serial: &mut S, vec: &'a mut ArrayVec<A>) -> Option<&'a [u8]>
 where
     A: Array<Item = u8>,
@@ -91,7 +91,23 @@ impl<'a, WE, S: Write<u8, Error = WE>> fmt::Write for Console<'a, S> {
     }
 }
 
+#[doc(hidden)]
+pub fn __write_console<E, S: Write<u8, Error = E>>(serial: &mut S, args: core::fmt::Arguments) {
+    write!(&mut Console(serial), "{}", args).ok();
+}
+
+#[doc(hidden)]
+pub fn __write_console_literal<E, S: Write<u8, Error = E>>(serial: &mut S, message: &'static str) {
+    write!(&mut Console(serial), "{}", message).ok();
+}
+
 #[macro_export]
 macro_rules! console {
-    ($serial:expr, $($arg:tt)*) => (write!(&mut Console($serial), $($arg)*).ok())
+    ($serial:expr, $message:expr) => ({
+        let _ = __format_args!($message); // XXX: defined in logger.rs
+        $crate::components::console::__write_console_literal($serial, $message);
+    });
+    ($serial:expr, $($arg:tt)+) => {
+        $crate::components::console::__write_console($serial, __format_args!($($arg)+));
+    };
 }

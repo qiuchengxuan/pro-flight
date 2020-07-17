@@ -1,10 +1,9 @@
 #[macro_use]
-pub mod logger;
-
-#[macro_use]
 pub mod console;
+
 pub mod altimeter;
 pub mod ascii_hud;
+pub mod cli;
 pub mod cmdlet;
 pub mod flight_control;
 pub mod gnss;

@@ -35,7 +35,6 @@ where
     A: DataSource<Acceleration>,
 {
     pub fn new(imu: IMU, accelerometer: A, interval: f32) -> Self {
-        let output = SingularData::<(Position, Steerpoint)>::default();
         Self {
             imu,
             accelerometer,
@@ -44,7 +43,7 @@ where
             waypoints: [Waypoint::default(); MAX_WAYPOINT],
             offset: (0.0, 0.0, 0.0),
             displacements: [Displacement::default(); MAX_WAYPOINT],
-            output: alloc::into_static(output, false).unwrap(),
+            output: alloc::into_static(SingularData::default(), false).unwrap(),
             next_waypoint: HOME as u8,
             max_waypoint: 1,
             interval,

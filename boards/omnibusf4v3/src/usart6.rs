@@ -1,7 +1,5 @@
 use core::mem::MaybeUninit;
-use core::time::Duration;
 
-use embedded_hal::timer::CountDown;
 use rs_flight::config::SerialConfig;
 use rs_flight::drivers::sbus::SbusReceiver;
 use rs_flight::drivers::uart::{handle as handle_uart, Device};
@@ -38,12 +36,11 @@ unsafe fn DMA2_STREAM1() {
     handle_uart(&mut DEVICE, &DMA_BUFFER, offset, DMA_BUFFER.len() / 2);
 }
 
-pub fn init<C: CountDown<Time = Duration>>(
+pub fn init(
     usart6: stm32::USART6,
     pins: (PC6, PC7),
     config: &SerialConfig,
     clocks: Clocks,
-    mut count_down: C,
 ) -> &'static mut Device {
     let mut cfg = Config::default();
     match config {
@@ -63,13 +60,6 @@ pub fn init<C: CountDown<Time = Duration>>(
     let (pc6, pc7) = pins;
     let pins = (pc6.into_alternate_af8(), pc7.into_alternate_af8());
     let usart = Serial::usart6(usart6, pins, cfg, clocks).unwrap();
-    count_down.start(Duration::from_millis(20));
-    while !usart.is_idle() {
-        if count_down.wait().is_ok() {
-            warn!("USART6 never idle");
-            return unsafe { &mut DEVICE };
-        }
-    }
 
     // dma2 stream1 channel 5 rx
     unsafe {

@@ -6,7 +6,8 @@ use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 pub const MAX_CHANNEL: usize = 4;
 
-pub struct Channels([Option<InputType>; MAX_CHANNEL]);
+#[derive(Copy, Clone)]
+pub struct Channels(pub [Option<InputType>; MAX_CHANNEL]);
 
 impl Default for Channels {
     fn default() -> Self {
@@ -16,19 +17,6 @@ impl Default for Channels {
             Some(InputType::Throttle),
             Some(InputType::Yaw),
         ])
-    }
-}
-
-impl Channels {
-    pub fn mapping(&self) -> [u8; MAX_CHANNEL] {
-        let mut mapping = [0u8; MAX_CHANNEL];
-        for i in 0..self.0.len() {
-            let option = self.0[i];
-            if let Some(channel_type) = option {
-                mapping[channel_type as usize] = i as u8;
-            }
-        }
-        mapping
     }
 }
 
@@ -69,8 +57,10 @@ impl ToYAML for Channels {
     }
 }
 
-#[derive(Default)]
-pub struct Receiver(pub Channels);
+#[derive(Default, Copy, Clone)]
+pub struct Receiver {
+    pub channels: Channels,
+}
 
 impl FromYAML for Receiver {
     fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
@@ -80,18 +70,18 @@ impl FromYAML for Receiver {
                 channels = Channels::from_yaml(parser)
             }
         }
-        Self(channels)
+        Self { channels }
     }
 }
 
 impl ToYAML for Receiver {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
         self.write_indent(indent, w)?;
-        if (self.0).0.iter().all(|&c| c.is_none()) {
+        if self.channels.0.iter().all(|&c| c.is_none()) {
             writeln!(w, "channels: []")
         } else {
             writeln!(w, "channels:")?;
-            self.0.write_to(indent + 1, w)
+            self.channels.write_to(indent + 1, w)
         }
     }
 }

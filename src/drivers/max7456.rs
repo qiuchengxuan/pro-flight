@@ -7,7 +7,7 @@ use max7456::registers::Standard;
 use max7456::MAX7456;
 use md5::Context;
 
-use crate::config::{self, OSD};
+use crate::config;
 use crate::hal::io::Read;
 use crate::sys::fs::File;
 
@@ -79,10 +79,11 @@ where
     Ok(true)
 }
 
-pub fn init<BUS, E>(bus: BUS, delay: &mut dyn DelayMs<u8>, config: &OSD) -> Result<(), E>
+pub fn init<BUS, E>(bus: BUS, delay: &mut dyn DelayMs<u8>) -> Result<(), E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
+    let config = &config::get().osd;
     let mut max7456 = MAX7456::new(bus);
     max7456.reset(delay)?;
     max7456.set_standard(config.standard.into())?;

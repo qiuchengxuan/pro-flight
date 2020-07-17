@@ -111,6 +111,7 @@ impl ToYAML for Config {
 
 const MAX_SERIAL_CONFIGS: usize = 5;
 
+#[derive(Copy, Clone)]
 pub struct Serials([(Identifier, Config); MAX_SERIAL_CONFIGS]);
 
 impl Default for Serials {

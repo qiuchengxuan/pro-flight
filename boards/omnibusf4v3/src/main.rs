@@ -29,33 +29,30 @@ mod usart1;
 mod usart6;
 mod usb_serial;
 
-use core::fmt::Write;
 use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 
-use arrayvec::ArrayVec;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use rs_flight::alloc;
 use rs_flight::components::altimeter::Altimeter;
+use rs_flight::components::cli::CLI;
 use rs_flight::components::cmdlet;
-use rs_flight::components::console::{self, Console};
 use rs_flight::components::flight_control::{Aircraft, Airplane};
 use rs_flight::components::imu::IMU;
-use rs_flight::components::logger::{self, Level};
 use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::{log_panic, PanicLogger};
 use rs_flight::components::{Sysled, TelemetryUnit};
-use rs_flight::config::yaml::ToYAML;
-use rs_flight::config::{read_config, Config, Output, SerialConfig};
+use rs_flight::config::{self, Config, Output, SerialConfig};
 use rs_flight::datastructures::schedule::Schedulable;
 use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
 use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
 use rs_flight::drivers::pwm::PwmByIdentifier;
 use rs_flight::drivers::uart::Device;
 use rs_flight::hal::input::{BasicInput, NoInput};
+use rs_flight::logger::{self, Level};
 use rs_flight::sys::fs::File;
 use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
@@ -134,7 +131,7 @@ fn main() -> ! {
     let mut config: Config = Default::default();
     match File::open("sdcard://config.yml") {
         Ok(mut file) => {
-            config = read_config(&mut file);
+            config = *config::load(&mut file);
             file.close();
         }
         Err(e) => {
@@ -163,7 +160,7 @@ fn main() -> ! {
     let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
     let rate = GYRO_SAMPLE_RATE as u16;
     let imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
-    let imu = alloc::into_static_generic(imu).unwrap();
+    let imu = alloc::into_static(imu, false).unwrap();
 
     info!("Initialize MPU6000");
     let mut int = gpio_c.pc4.into_pull_up_input();
@@ -186,12 +183,12 @@ fn main() -> ! {
 
     let barometer = init_bmp280_data_source();
     let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
-    let altimeter = alloc::into_static_generic(altimeter).unwrap();
+    let altimeter = alloc::into_static(altimeter, false).unwrap();
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
-    let navigation = alloc::into_static_generic(navigation).unwrap();
-    navigation.set_altimeter(alloc::into_static_generic(altimeter.as_data_source()).unwrap());
+    let navigation = alloc::into_static(navigation, false).unwrap();
+    navigation.set_altimeter(alloc::into_static(altimeter.as_data_source(), false).unwrap());
 
     let telemetry = TelemetryUnit::new(
         altimeter.as_data_source(),
@@ -199,9 +196,8 @@ fn main() -> ! {
         imu.as_accelerometer(),
         imu.as_imu(),
         navigation.as_data_source(),
-        &config.battery,
     );
-    let telemetry = alloc::into_static_generic(telemetry).unwrap();
+    let telemetry = alloc::into_static(telemetry, false).unwrap();
 
     info!("Initialize OSD & Barometer");
     spi3_tim7_osd_baro::init(
@@ -211,7 +207,6 @@ fn main() -> ! {
         gpio_a.pa15,
         gpio_b.pb3,
         clocks,
-        &config.osd,
         telemetry,
         &mut delay,
     )
@@ -236,8 +231,8 @@ fn main() -> ! {
 
     let mut basic_input: &dyn BasicInput = &NoInput {};
 
-    info!("Initialize USART1");
     if let Some(config) = config.serials.get("USART1") {
+        info!("Initialize USART1");
         if let SerialConfig::GNSS(baudrate) = config {
             let pins = (gpio_a.pa9, gpio_a.pa10);
             let count_down = MillisCountDown::new(&systick);
@@ -245,8 +240,8 @@ fn main() -> ! {
         }
     }
 
-    info!("Initialize USART6");
     if let Some(serial_config) = config.serials.get("USART6") {
+        info!("Initialize USART6");
         if let SerialConfig::SBUS(sbus_config) = serial_config {
             if sbus_config.rx_inverted {
                 gpio_c.pc8.into_push_pull_output().set_high().ok();
@@ -254,11 +249,10 @@ fn main() -> ! {
             }
         }
         let pins = (gpio_c.pc6, gpio_c.pc7);
-        let count_down = MillisCountDown::new(&systick);
-        let device = usart6::init(peripherals.USART6, pins, &serial_config, clocks, count_down);
+        let device = usart6::init(peripherals.USART6, pins, &serial_config, clocks);
         match device {
             Device::SBUS(ref mut r) => {
-                r.set_mapping(&config.receiver.0);
+                r.set_mapping(&config.receiver.channels);
                 basic_input = r;
             }
             _ => (),
@@ -270,9 +264,9 @@ fn main() -> ! {
     let (primary, no_dma) = alloc::available();
     info!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
 
+    let mut cli = CLI::new(MillisCountDown::new(&systick));
     let mut count_down = MillisCountDown::new(&systick);
     count_down.start_ms(20);
-    let mut vec = ArrayVec::<[u8; 80]>::new();
     loop {
         if count_down.wait().is_ok() {
             altimeter.schedule();
@@ -285,37 +279,15 @@ fn main() -> ! {
         if !device.poll(&mut [&mut serial]) {
             continue;
         }
-
-        let line = match console::read_line(&mut serial, &mut vec) {
-            Some(line) => unsafe { core::str::from_utf8_unchecked(line) },
-            None => continue,
-        };
-        if line.len() > 0 {
-            if line == "dfu" {
-                unsafe { &mut *DFU.as_mut_ptr() }.reboot_into();
-            } else if line.starts_with("reboot") {
-                cortex_m::peripheral::SCB::sys_reset();
-            } else if line.starts_with("logread") {
-                for s in logger::reader() {
-                    console!(&mut serial, "{}", s);
-                }
-            } else if line == "telemetry" {
-                console!(&mut serial, "{}\n", telemetry.get_data());
-            } else if line.starts_with("read") {
-                cmdlet::read(line, &mut serial);
-            } else if line.starts_with("dump ") {
-                cmdlet::dump(line, &mut serial);
-            } else if line.starts_with("write ") {
-                let mut count_down = MillisCountDown::new(&systick);
-                cmdlet::write(line, &mut serial, &mut count_down);
-            } else if line.starts_with("show config") {
-                config.write_to(0, &mut Console(&mut serial)).ok();
-            } else {
-                console!(&mut serial, "unknown input\n");
+        cli.interact(&mut serial, |line, serial| -> bool {
+            match line {
+                "dfu" => unsafe { &mut *DFU.as_mut_ptr() }.reboot_into(),
+                "reboot" => cortex_m::peripheral::SCB::sys_reset(),
+                "telemetry" => console!(serial, "{}\n", telemetry.get_data()),
+                _ => return false,
             }
-        }
-        console!(&mut serial, "# ");
-        vec.clear();
+            true
+        });
     }
 }
 
