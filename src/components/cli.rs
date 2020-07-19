@@ -9,6 +9,7 @@ use crate::components::console::{self, Console};
 use crate::config;
 use crate::config::yaml::ToYAML;
 use crate::logger;
+use crate::sys::fs::OpenOptions;
 
 pub struct CLI<C> {
     vec: ArrayVec<[u8; 80]>,
@@ -32,24 +33,37 @@ where
             Some(line) => unsafe { core::str::from_utf8_unchecked(line) },
             None => return,
         };
-        if line.len() > 0 {
-            if extra(line, serial) {
-                return;
-            }
-            if line.starts_with("logread") {
-                for s in logger::reader() {
-                    console!(serial, "{}", s);
+        if let Some(first_word) = line.split(' ').next() {
+            match first_word {
+                "logread" => {
+                    for s in logger::reader() {
+                        console!(serial, "{}", s);
+                    }
                 }
-            } else if line.starts_with("read") {
-                cmdlet::read(line, serial);
-            } else if line.starts_with("dump ") {
-                cmdlet::dump(line, serial);
-            } else if line.starts_with("write ") {
-                cmdlet::write(line, serial, &mut self.count_down);
-            } else if line.starts_with("show config") {
-                config::get().write_to(0, &mut Console(serial)).ok();
-            } else {
-                console!(serial, "unknown input\n");
+                "read" | "readx" | "readf" => cmdlet::read(line, serial),
+                "dump" => cmdlet::dump(line, serial),
+                "write" => cmdlet::write(line, serial, &mut self.count_down),
+                "show" => {
+                    config::get().write_to(0, &mut Console(serial)).ok();
+                }
+                "save" => {
+                    let option = OpenOptions {
+                        create: true,
+                        write: true,
+                        truncate: true,
+                        ..Default::default()
+                    };
+                    if let Some(mut file) = option.open("sdcard://config.yml").ok() {
+                        config::get().write_to(0, &mut file).ok();
+                        file.close();
+                    }
+                }
+                "" => (),
+                _ => {
+                    if !extra(line, serial) {
+                        console!(serial, "unknown input\n");
+                    }
+                }
             }
         }
         console!(serial, "# ");

@@ -67,13 +67,13 @@ pub fn allocate(size: usize, dma: bool) -> Option<&'static mut [u8]> {
 pub fn typed_allocate<T>(_: T, size: usize, dma: bool) -> Option<&'static mut [T]> {
     let option = allocate(core::mem::size_of::<T>() * size, dma);
     option.map(|bytes| unsafe {
-        core::slice::from_raw_parts_mut(&mut bytes[0] as *mut _ as *mut T, size)
+        core::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut _ as *mut T, size)
     })
 }
 
 pub fn into_static<T>(t: T, dma: bool) -> Option<&'static mut T> {
     if let Some(bytes) = allocate(size_of::<T>(), dma) {
-        let static_t: &'static mut T = unsafe { &mut *(&mut bytes[0] as *mut _ as *mut T) };
+        let static_t: &'static mut T = unsafe { &mut *(bytes.as_mut_ptr() as *mut _ as *mut T) };
         *static_t = t;
         return Some(static_t);
     }

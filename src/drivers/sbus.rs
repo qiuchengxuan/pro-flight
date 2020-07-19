@@ -1,30 +1,80 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::num::Wrapping;
 
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
-use crate::config::receiver::{Channels, MAX_CHANNEL};
+use crate::alloc;
+use crate::config;
+use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
+use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::input::ControlInput;
 use crate::datastructures::input::InputType;
-use crate::datastructures::input::{Pitch, Roll, Throttle, Yaw};
-use crate::hal::input::BasicInput;
-use crate::hal::receiver::Receiver;
+use crate::datastructures::input::Receiver;
 
-#[derive(Default, Debug)]
 pub struct SbusReceiver {
-    sequence: AtomicUsize,
-    data: SbusData,
+    sequence: Wrapping<u8>,
     counter: u8,
     loss: u8,
     loss_rate: u8,
-    channel_mapping: [u8; MAX_CHANNEL],
+    receiver: &'static SingularData<Receiver>,
+    control_input: &'static SingularData<ControlInput>,
+}
+
+#[inline]
+fn to_axis(value: u16) -> i16 {
+    // [0, 2047] -> [-1024, 1023] -> [-32768, 32736]
+    (Wrapping(value as i16) - Wrapping(0x400)).0 << 5
 }
 
 impl SbusReceiver {
-    pub fn set_mapping(&mut self, config: &Channels) {
-        for (index, &option) in config.0.iter().enumerate() {
+    pub fn new() -> Self {
+        Self {
+            sequence: Wrapping(0),
+            counter: 0,
+            loss: 0,
+            loss_rate: 0,
+            receiver: alloc::into_static(SingularData::default(), false).unwrap(),
+            control_input: alloc::into_static(SingularData::default(), false).unwrap(),
+        }
+    }
+
+    pub fn as_receiver(&self) -> impl DataSource<Receiver> {
+        SingularDataSource::new(self.receiver)
+    }
+
+    pub fn as_control_input(&self) -> impl DataSource<ControlInput> {
+        SingularDataSource::new(self.control_input)
+    }
+
+    fn handle_sbus_data(&mut self, data: &SbusData) {
+        self.sequence += Wrapping(1);
+        if data.frame_lost {
+            self.loss += 1;
+        }
+        self.counter += 1;
+        if self.counter == 100 {
+            self.loss_rate = self.loss;
+            self.counter = 0;
+            self.loss = 0;
+        }
+        self.receiver.write(Receiver { rssi: self.loss_rate, sequence: self.sequence.0 });
+
+        let mut control_input = ControlInput::default();
+        let channels = &config::get().receiver.channels;
+        for (index, option) in channels.0.iter().enumerate() {
+            if index >= data.channels.len() {
+                continue; // TODO: two bit channel
+            }
+            let value = data.channels[index];
             if let Some(input_type) = option {
-                self.channel_mapping[input_type as usize] = index as u8;
+                match input_type {
+                    InputType::Throttle => control_input.throttle = value << 5,
+                    InputType::Roll => control_input.roll = to_axis(value),
+                    InputType::Pitch => control_input.pitch = to_axis(value),
+                    InputType::Yaw => control_input.yaw = to_axis(value),
+                }
             }
         }
+        self.control_input.write(control_input);
     }
 
     pub fn handle(&mut self, ring: &[u8], offset: usize, num_bytes: usize) {
@@ -47,49 +97,7 @@ impl SbusReceiver {
             packet[1 + i] = ring[(index + i) % ring.len()];
         }
         let packet = SbusPacket::from_bytes(&packet).unwrap();
-        self.data = packet.parse();
-        self.sequence.fetch_add(1, Ordering::Relaxed);
-        if self.data.frame_lost {
-            self.loss += 1;
-        }
-        self.counter += 1;
-        if self.counter == 100 {
-            self.loss_rate = self.loss;
-            self.counter = 0;
-            self.loss = 0;
-        }
-    }
-
-    #[inline]
-    fn channel_index(&self, input_type: InputType) -> usize {
-        self.channel_mapping[input_type as usize] as usize
-    }
-}
-
-impl BasicInput for SbusReceiver {
-    fn get_throttle(&self) -> Throttle {
-        self.data.channels[self.channel_index(InputType::Throttle)] << 5
-    }
-
-    fn get_roll(&self) -> Roll {
-        self.data.channels[self.channel_index(InputType::Roll)] as i16 - (1 << 10)
-    }
-
-    fn get_pitch(&self) -> Pitch {
-        self.data.channels[self.channel_index(InputType::Pitch)] as i16 - (1 << 10)
-    }
-
-    fn get_yaw(&self) -> Yaw {
-        self.data.channels[self.channel_index(InputType::Yaw)] as i16 - (1 << 10)
-    }
-}
-
-impl Receiver for SbusReceiver {
-    fn rssi(&self) -> u8 {
-        self.loss_rate
-    }
-
-    fn get_sequence(&self) -> usize {
-        self.sequence.load(Ordering::Relaxed)
+        let sbus_data = packet.parse();
+        self.handle_sbus_data(&sbus_data);
     }
 }

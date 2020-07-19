@@ -32,10 +32,12 @@ impl DelayNs<u16> for TickDelay {
 
 type SpiError = bus::SpiError<Error, Error, Infallible>;
 
+const DMA_SIZE: usize = 16;
+
 static mut CS: MaybeUninit<gpioa::PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut INT: MaybeUninit<gpioc::PC4<Input<PullUp>>> = MaybeUninit::uninit();
 #[export_name = "MPU6000_DMA_BUFFER"]
-static mut DMA_BUFFER: [u8; 20] = [0u8; 20]; // a little bit larger to avoid out-of-range
+static mut DMA_BUFFER: [u8; DMA_SIZE + 4] = [0u8; DMA_SIZE + 4]; // a little bit larger to avoid out-of-range
 
 #[interrupt]
 unsafe fn EXTI4() {
@@ -52,7 +54,7 @@ unsafe fn EXTI4() {
 
     // dma2 channel 3 stream 0 rx
     let stream = &dma2.st[0];
-    stream.ndtr.write(|w| w.ndt().bits(DMA_BUFFER.len() as u16));
+    stream.ndtr.write(|w| w.ndt().bits(DMA_SIZE as u16));
     stream.par.write(|w| w.pa().bits(data_register));
     let m0ar = &stream.m0ar;
     m0ar.write(|w| w.m0a().bits(DMA_BUFFER.as_ptr() as u32 + 1));
@@ -66,7 +68,7 @@ unsafe fn EXTI4() {
 
     // dma2 channel 3 stream 3 tx
     let stream = &dma2.st[3];
-    stream.ndtr.write(|w| w.ndt().bits(DMA_BUFFER.len() as u16));
+    stream.ndtr.write(|w| w.ndt().bits(DMA_SIZE as u16));
     stream.par.write(|w| w.pa().bits(data_register));
     stream.m0ar.write(|w| w.m0a().bits(READ_REG.as_ptr() as u32));
     let cr = &stream.cr;

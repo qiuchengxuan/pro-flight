@@ -40,18 +40,20 @@ use rs_flight::alloc;
 use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cli::CLI;
 use rs_flight::components::cmdlet;
-use rs_flight::components::flight_control::{Aircraft, Airplane};
+use rs_flight::components::configuration::Airplane;
 use rs_flight::components::imu::IMU;
+use rs_flight::components::mixer::ControlMixer;
 use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::{log_panic, PanicLogger};
 use rs_flight::components::{Sysled, TelemetryUnit};
-use rs_flight::config::{self, Config, Output, SerialConfig};
+use rs_flight::config::aircraft::Configuration;
+use rs_flight::config::{self, Config, SerialConfig};
+use rs_flight::datastructures::data_source::{DataSource, NoDataSource};
+use rs_flight::datastructures::input::ControlInput;
 use rs_flight::datastructures::schedule::Schedulable;
 use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
 use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
-use rs_flight::drivers::pwm::PwmByIdentifier;
 use rs_flight::drivers::uart::Device;
-use rs_flight::hal::input::{BasicInput, NoInput};
 use rs_flight::logger::{self, Level};
 use rs_flight::sys::fs::File;
 use stm32f4xx_hal::delay::Delay;
@@ -139,24 +141,6 @@ fn main() -> ! {
         }
     };
 
-    info!("Initialize PWMs");
-    let pwms = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
-    let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    let outputs = pwm::init(pwms, pins, clocks, &config.outputs);
-    let mut airplane = Airplane::default();
-    for &(identifier, output_type) in config.outputs.0.iter() {
-        if let Some(output) = outputs.get(identifier) {
-            match output_type {
-                Output::AileronLeft => airplane.set_aileron_left(output),
-                Output::AileronRight => airplane.set_aileron_right(output),
-                Output::Elevator => airplane.set_elevator(output),
-                Output::Rudder => airplane.set_rudder(output),
-                Output::Motor(index, _) => airplane.set_motor(index as usize, output),
-                Output::None => (),
-            }
-        }
-    }
-
     let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
     let rate = GYRO_SAMPLE_RATE as u16;
     let imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
@@ -190,13 +174,39 @@ fn main() -> ! {
     let navigation = alloc::into_static(navigation, false).unwrap();
     navigation.set_altimeter(alloc::into_static(altimeter.as_data_source(), false).unwrap());
 
-    let telemetry = TelemetryUnit::new(
+    let mut telemetry = TelemetryUnit::new(
         altimeter.as_data_source(),
         battery,
         imu.as_accelerometer(),
         imu.as_imu(),
         navigation.as_data_source(),
     );
+
+    let mut control_input: &'static mut dyn DataSource<ControlInput> =
+        alloc::into_static(NoDataSource::new(), false).unwrap();
+
+    if let Some(serial_config) = config.serials.get("USART6") {
+        info!("Initialize USART6");
+        if let SerialConfig::SBUS(sbus_config) = serial_config {
+            if sbus_config.rx_inverted {
+                gpio_c.pc8.into_push_pull_output().set_high().ok();
+                debug!("USART6 rx inverted");
+            }
+        }
+
+        let pins = (gpio_c.pc6, gpio_c.pc7);
+        let device = usart6::init(peripherals.USART6, pins, &serial_config, clocks);
+        match device {
+            Device::SBUS(ref mut sbus) => {
+                telemetry.set_receiver(alloc::into_static(sbus.as_receiver(), false).unwrap());
+                let input = alloc::into_static(sbus.as_control_input(), false).unwrap();
+                telemetry.set_control_input(input);
+                control_input = alloc::into_static(sbus.as_control_input(), false).unwrap();
+            }
+            _ => (),
+        }
+    }
+
     let telemetry = alloc::into_static(telemetry, false).unwrap();
 
     info!("Initialize OSD & Barometer");
@@ -229,8 +239,6 @@ fn main() -> ! {
 
     let (mut serial, mut device) = usb_serial::init(usb);
 
-    let mut basic_input: &dyn BasicInput = &NoInput {};
-
     if let Some(config) = config.serials.get("USART1") {
         info!("Initialize USART1");
         if let SerialConfig::GNSS(baudrate) = config {
@@ -240,50 +248,38 @@ fn main() -> ! {
         }
     }
 
-    if let Some(serial_config) = config.serials.get("USART6") {
-        info!("Initialize USART6");
-        if let SerialConfig::SBUS(sbus_config) = serial_config {
-            if sbus_config.rx_inverted {
-                gpio_c.pc8.into_push_pull_output().set_high().ok();
-                debug!("USART6 rx inverted");
-            }
-        }
-        let pins = (gpio_c.pc6, gpio_c.pc7);
-        let device = usart6::init(peripherals.USART6, pins, &serial_config, clocks);
-        match device {
-            Device::SBUS(ref mut r) => {
-                r.set_mapping(&config.receiver.channels);
-                basic_input = r;
-            }
-            _ => (),
-        }
-    }
-
-    let mut aircraft = Aircraft::new(airplane, basic_input);
+    info!("Initialize PWMs");
+    let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
+    let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
+    let pwms = pwm::init(tims, pins, clocks, &config.outputs);
+    let mixer = ControlMixer::new(control_input, NoDataSource::new());
+    let mut control_surface = match config.aircraft.configuration {
+        Configuration::Airplane => Airplane::new(mixer, pwms),
+    };
 
     let (primary, no_dma) = alloc::available();
     info!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
 
     let mut cli = CLI::new(MillisCountDown::new(&systick));
-    let mut count_down = MillisCountDown::new(&systick);
-    count_down.start_ms(20);
+    let mut schedule = MillisCountDown::new(&systick);
+    schedule.start_ms(20);
     loop {
-        if count_down.wait().is_ok() {
+        if schedule.wait().is_ok() {
             altimeter.schedule();
             imu.schedule();
             navigation.schedule();
-            aircraft.schedule();
-            count_down.start_ms(20);
+            control_surface.schedule();
+            schedule.start_ms(20);
         }
         sysled.check_toggle().unwrap();
         if !device.poll(&mut [&mut serial]) {
             continue;
         }
         cli.interact(&mut serial, |line, serial| -> bool {
-            match line {
-                "dfu" => unsafe { &mut *DFU.as_mut_ptr() }.reboot_into(),
-                "reboot" => cortex_m::peripheral::SCB::sys_reset(),
-                "telemetry" => console!(serial, "{}\n", telemetry.get_data()),
+            match line.split(' ').next() {
+                Some("dfu") => unsafe { &mut *DFU.as_mut_ptr() }.reboot_into(),
+                Some("reboot") => cortex_m::peripheral::SCB::sys_reset(),
+                Some("telemetry") => console!(serial, "{}\n", telemetry.get_data()),
                 _ => return false,
             }
             true

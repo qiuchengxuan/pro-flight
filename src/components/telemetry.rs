@@ -6,6 +6,7 @@ use nalgebra::UnitQuaternion;
 use crate::config;
 use crate::datastructures::coordinate::{Displacement, Position, SphericalCoordinate};
 use crate::datastructures::data_source::DataSource;
+use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::{
@@ -50,11 +51,13 @@ pub struct TelemetryData {
     attitude: Attitude,
     altitude: Altitude,
     acceleration: Acceleration,
+    control_input: ControlInput,
     heading: u16,
     velocity: Velocity,
     g_force: u8,
     battery: Battery,
     position: Position,
+    receiver: Receiver,
     steerpoint: Steerpoint,
 }
 
@@ -65,17 +68,19 @@ impl core::fmt::Display for TelemetryData {
     }
 }
 
-pub struct TelemetryUnit<A, B, C, IMU, NAV> {
+pub struct TelemetryUnit<'a, A, B, C, IMU, NAV> {
     altimeter: A,
     battery: B,
     accelerometer: C,
     imu: IMU,
     navigation: NAV,
+    receiver: Option<&'a mut dyn DataSource<Receiver>>,
+    control_input: Option<&'a mut dyn DataSource<ControlInput>>,
     initial_altitude: Cell<Altitude>,
     battery_cells: Cell<u8>,
 }
 
-impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV>
+impl<'a, A, B, C, IMU, NAV> TelemetryUnit<'a, A, B, C, IMU, NAV>
 where
     A: DataSource<(Altitude, Velocity)>,
     B: DataSource<Battery>,
@@ -95,6 +100,8 @@ where
         let euler: Euler = self.imu.read_last_unchecked().into();
         let (position, steerpoint) = self.navigation.read_last_unchecked();
         let acceleration = self.accelerometer.read_last_unchecked();
+        let input =
+            self.control_input.as_ref().map(|i| i.read_last_unchecked()).unwrap_or_default();
         TelemetryData {
             attitude: (euler * DEGREE_PER_DAG).into(),
             altitude,
@@ -105,6 +112,8 @@ where
             battery: battery / self.battery_cells.get() as u16,
             position,
             steerpoint,
+            receiver: self.receiver.as_ref().map(|r| r.read_last_unchecked()).unwrap_or_default(),
+            control_input: input,
         }
     }
 }
@@ -113,7 +122,7 @@ fn round_up(value: i16) -> i16 {
     (value + 5) / 10 * 10
 }
 
-impl<A, B, C, IMU, NAV> hud::TelemetrySource for TelemetryUnit<A, B, C, IMU, NAV>
+impl<'a, A, B, C, IMU, NAV> hud::TelemetrySource for TelemetryUnit<'a, A, B, C, IMU, NAV>
 where
     A: DataSource<(Altitude, Velocity)>,
     B: DataSource<Battery>,
@@ -151,7 +160,7 @@ where
     }
 }
 
-impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV> {
+impl<'a, A, B, C, IMU, NAV> TelemetryUnit<'a, A, B, C, IMU, NAV> {
     pub fn new(altimeter: A, battery: B, accelerometer: C, imu: IMU, navigation: NAV) -> Self {
         let config = config::get();
         Self {
@@ -162,6 +171,16 @@ impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV> {
             navigation,
             initial_altitude: Default::default(),
             battery_cells: Cell::new(config.battery.cells),
+            receiver: None,
+            control_input: None,
         }
+    }
+
+    pub fn set_receiver(&mut self, receiver: &'a mut dyn DataSource<Receiver>) {
+        self.receiver = Some(receiver)
+    }
+
+    pub fn set_control_input(&mut self, input: &'a mut dyn DataSource<ControlInput>) {
+        self.control_input = Some(input)
     }
 }

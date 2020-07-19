@@ -1,3 +1,11 @@
+pub type Percentage = u8;
+
+#[derive(Copy, Clone, Default, Value)]
+pub struct Receiver {
+    pub rssi: u8,
+    pub sequence: u8,
+}
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum InputType {
     Throttle = 0,
@@ -41,4 +49,17 @@ pub enum Flaps {
 pub enum LandingGear {
     Up,
     Down,
+}
+
+#[derive(Copy, Clone, Debug, Value, Default)]
+pub struct ControlInput {
+    pub throttle: Throttle,
+    pub roll: Roll,
+    pub pitch: Pitch,
+    pub yaw: Yaw,
+}
+
+pub struct FixedWingInput {
+    pub flaps: Flaps,
+    pub landing_gear: LandingGear,
 }

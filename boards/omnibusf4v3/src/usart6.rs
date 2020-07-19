@@ -86,7 +86,7 @@ pub fn init(
     // FIXME: use a timer to ensure remaining data be received
 
     let device = match config {
-        SerialConfig::SBUS(_) => Device::SBUS(SbusReceiver::default()),
+        SerialConfig::SBUS(_) => Device::SBUS(SbusReceiver::new()),
         _ => Device::None,
     };
     unsafe {

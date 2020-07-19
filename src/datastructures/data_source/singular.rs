@@ -1,5 +1,4 @@
 use core::cell::UnsafeCell;
-use core::num::Wrapping;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{DataSource, DataWriter};
@@ -20,7 +19,7 @@ impl<T: Copy> DataWriter<T> for SingularData<T> {
         let counter = self.counter.load(Ordering::Relaxed);
         let buffer = unsafe { &mut *self.buffer.get() };
         buffer[counter & 1] = data;
-        self.counter.store((Wrapping(counter) + Wrapping(1)).0, Ordering::Relaxed)
+        self.counter.fetch_add(1, Ordering::Relaxed);
     }
 }
 
