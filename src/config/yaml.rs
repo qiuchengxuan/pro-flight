@@ -191,10 +191,7 @@ pub trait ToYAML {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result;
 
     fn write_indent<W: Write>(&self, indent: usize, w: &mut W) -> Result {
-        for _ in 0..indent * INDENT_WIDTH as usize / 2 {
-            write!(w, "  ")?
-        }
-        Ok(())
+        write!(w, "{:indent$}", "", indent = indent * INDENT_WIDTH as usize)
     }
 }
 

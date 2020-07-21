@@ -20,9 +20,9 @@ pub struct SbusReceiver {
 }
 
 #[inline]
-fn to_axis(value: u16) -> i16 {
+fn to_axis(value: u16) -> i32 {
     // [0, 2047] -> [-1024, 1023] -> [-32768, 32736]
-    (Wrapping(value as i16) - Wrapping(0x400)).0 << 5
+    (Wrapping(value as i32) - Wrapping(0x400)).0 << 5
 }
 
 impl SbusReceiver {
@@ -64,13 +64,13 @@ impl SbusReceiver {
             if index >= data.channels.len() {
                 continue; // TODO: two bit channel
             }
-            let value = data.channels[index];
-            if let Some(input_type) = option {
-                match input_type {
-                    InputType::Throttle => control_input.throttle = value << 5,
-                    InputType::Roll => control_input.roll = to_axis(value),
-                    InputType::Pitch => control_input.pitch = to_axis(value),
-                    InputType::Yaw => control_input.yaw = to_axis(value),
+            if let Some(channel) = option {
+                let scaled = (to_axis(data.channels[index]) * channel.scale as i32 / 100) as i16;
+                match channel.input_type {
+                    InputType::Throttle => control_input.throttle = scaled,
+                    InputType::Roll => control_input.roll = scaled,
+                    InputType::Pitch => control_input.pitch = scaled,
+                    InputType::Yaw => control_input.yaw = scaled,
                 }
             }
         }

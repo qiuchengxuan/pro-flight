@@ -7,16 +7,17 @@ use super::yaml::{FromYAML, ToYAML, YamlParser};
 pub const MAX_CHANNEL: usize = 4;
 
 #[derive(Copy, Clone)]
-pub struct Channels(pub [Option<InputType>; MAX_CHANNEL]);
+pub struct Channel {
+    pub input_type: InputType,
+    pub scale: u8,
+}
+
+#[derive(Copy, Clone)]
+pub struct Channels(pub [Option<Channel>; MAX_CHANNEL]);
 
 impl Default for Channels {
     fn default() -> Self {
-        Self([
-            Some(InputType::Roll),
-            Some(InputType::Pitch),
-            Some(InputType::Throttle),
-            Some(InputType::Yaw),
-        ])
+        Self([None; MAX_CHANNEL])
     }
 }
 
@@ -26,15 +27,19 @@ impl FromYAML for Channels {
         while parser.next_list_begin() {
             let mut channel: usize = 0;
             let mut input_type: Option<InputType> = None;
+            let mut scale: u8 = 100;
             while let Some((key, value)) = parser.next_key_value() {
                 match key {
                     "channel" => channel = value.parse().ok().unwrap_or(0),
                     "type" => input_type = InputType::from_str(value),
+                    "scale" => scale = value.parse().ok().unwrap_or(100),
                     _ => continue,
                 }
             }
             if 0 < channel && channel <= MAX_CHANNEL {
-                channels.0[channel - 1] = input_type;
+                if let Some(input_type) = input_type {
+                    channels.0[channel - 1] = Some(Channel { input_type, scale });
+                }
             }
         }
         channels
@@ -44,13 +49,14 @@ impl FromYAML for Channels {
 impl ToYAML for Channels {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
         for i in 0..self.0.len() {
-            let channel = self.0[i];
-            if let Some(input_type) = channel {
+            if let Some(channel) = self.0[i] {
                 self.write_indent(indent, w)?;
                 writeln!(w, "- channel: {}", i + 1)?;
                 self.write_indent(indent, w)?;
-                let type_string: &str = input_type.into();
+                let type_string: &str = channel.input_type.into();
                 writeln!(w, "  type: {}", type_string)?;
+                self.write_indent(indent, w)?;
+                writeln!(w, "  scale: {}", channel.scale)?;
             }
         }
         Ok(())

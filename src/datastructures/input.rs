@@ -37,7 +37,7 @@ impl Into<&str> for InputType {
     }
 }
 
-pub type Throttle = u16;
+pub type Throttle = i16;
 pub type Roll = i16;
 pub type Pitch = i16;
 pub type Yaw = i16;
