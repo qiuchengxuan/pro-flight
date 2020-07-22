@@ -65,6 +65,7 @@ pub struct Config {
 impl Setter for Config {
     fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
         match path.next() {
+            Some("receiver") => self.receiver.set(path, value),
             Some("outputs") => self.outputs.set(path, value),
             _ => Err(SetError::MalformedPath),
         }

@@ -137,6 +137,7 @@ fn main() -> ! {
             file.close();
         }
         Err(e) => {
+            config::replace(&config);
             warn!("{:?}", e);
         }
     };

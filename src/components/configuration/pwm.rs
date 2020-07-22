@@ -1,8 +1,7 @@
-pub fn to_motor_pwm_duty(max_duty: u16, value: i16) -> u16 {
-    let base = max_duty / 20; // 1.0ms
-    let range = (max_duty / 20) as u32; // 1.0ms
+pub fn to_motor_pwm_duty(max_duty: u16, rate: u16, value: i16) -> u16 {
+    let duty_per_ms = max_duty as u32 * rate as u32 / 1000;
     let throttle = (value as i32 + i16::MAX as i32 + 1) as u32;
-    base + (range * throttle / u16::MAX as u32) as u16
+    (duty_per_ms + duty_per_ms * throttle / u16::MAX as u32) as u16
 }
 
 pub fn to_servo_pwm_duty(max_duty: u16, value: i16, angle: i8, reversed: bool) -> u16 {
@@ -20,6 +19,16 @@ pub fn to_servo_pwm_duty(max_duty: u16, value: i16, angle: i8, reversed: bool) -
 }
 
 mod test {
+    #[test]
+    fn test_to_motor_pwm_duty() {
+        use super::to_motor_pwm_duty;
+
+        let max_duty = 20000;
+        assert_eq!(to_motor_pwm_duty(max_duty, 400, -32768), 8000);
+        assert_eq!(to_motor_pwm_duty(max_duty, 400, 0), 12000);
+        assert_eq!(to_motor_pwm_duty(max_duty, 400, 32767), 16000);
+    }
+
     #[test]
     fn test_to_servo_pwm_duty() {
         use super::to_servo_pwm_duty;

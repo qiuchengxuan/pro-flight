@@ -279,11 +279,7 @@ impl ToYAML for Outputs {
 }
 
 impl Setter for Outputs {
-    fn set(
-        &mut self,
-        path: &mut core::str::Split<char>,
-        value: Option<&str>,
-    ) -> Result<(), SetError> {
+    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
         let id_string = match path.next() {
             Some(token) => token,
             None => return Err(SetError::MalformedPath),

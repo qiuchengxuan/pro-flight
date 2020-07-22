@@ -27,7 +27,7 @@ impl<PWMS: PwmByIdentifier, S: DataSource<ControlInput>> Schedulable for Airplan
             self.pwms.with(identifier, |pwm| {
                 let max_duty = pwm.get_max_duty();
                 let duty = match output {
-                    Output::Motor(_) => to_motor_pwm_duty(max_duty, input.throttle),
+                    Output::Motor(_) => to_motor_pwm_duty(max_duty, output.rate(), input.throttle),
                     Output::Servo(servo) => {
                         let axis = match servo.servo_type {
                             ServoType::AileronLeft => input.roll,

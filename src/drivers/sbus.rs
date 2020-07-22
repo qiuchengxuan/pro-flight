@@ -65,7 +65,14 @@ impl SbusReceiver {
                 continue; // TODO: two bit channel
             }
             if let Some(channel) = option {
-                let scaled = (to_axis(data.channels[index]) * channel.scale as i32 / 100) as i16;
+                let scaled = to_axis(data.channels[index]) * channel.scale as i32 / 100;
+                let scaled = if scaled > i16::MAX as i32 {
+                    i16::MAX
+                } else if scaled < i16::MIN as i32 {
+                    i16::MIN
+                } else {
+                    scaled as i16
+                };
                 match channel.input_type {
                     InputType::Throttle => control_input.throttle = scaled,
                     InputType::Roll => control_input.roll = scaled,

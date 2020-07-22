@@ -17,7 +17,7 @@ pub fn set<WE, S: serial::Write<u8, Error = WE>>(serial: &mut S, line: &str) {
         let mut config = config::get().clone();
         match config.set(&mut path.split('.'), split.next()) {
             Ok(()) => (),
-            Err(e) => console!(serial, "{}", e),
+            Err(e) => console!(serial, "{}\n", e),
         }
         config::replace(&config);
     }

@@ -1,7 +1,9 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::Split;
 
 use crate::datastructures::input::InputType;
 
+use super::setter::{SetError, Setter};
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 pub const MAX_CHANNEL: usize = 4;
@@ -47,7 +49,7 @@ impl FromYAML for Channels {
 }
 
 impl ToYAML for Channels {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         for i in 0..self.0.len() {
             if let Some(channel) = self.0[i] {
                 self.write_indent(indent, w)?;
@@ -60,6 +62,38 @@ impl ToYAML for Channels {
                     writeln!(w, "  scale: {}", channel.scale)?;
                 }
             }
+        }
+        Ok(())
+    }
+}
+
+impl Setter for Channels {
+    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
+        let index_string = match path.next() {
+            Some(s) => s,
+            None => return Err(SetError::MalformedPath),
+        };
+        let index = match index_string.parse::<usize>() {
+            Ok(index) => index,
+            Err(_) => return Err(SetError::MalformedPath),
+        };
+
+        if index >= self.0.len() {
+            return Err(SetError::MalformedPath);
+        }
+
+        let channel = match self.0[index] {
+            Some(ref mut channel) => channel,
+            None => return Err(SetError::MalformedPath),
+        };
+        match path.next() {
+            Some("scale") => {
+                channel.scale = match value.map(|v| v.parse::<u8>().ok()).flatten() {
+                    Some(scale) => scale,
+                    None => return Err(SetError::UnexpectedValue),
+                };
+            }
+            _ => return Err(SetError::MalformedPath),
         }
         Ok(())
     }
@@ -83,7 +117,7 @@ impl FromYAML for Receiver {
 }
 
 impl ToYAML for Receiver {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         if self.channels.0.iter().all(|&c| c.is_none()) {
             writeln!(w, "channels: []")
@@ -91,5 +125,14 @@ impl ToYAML for Receiver {
             writeln!(w, "channels:")?;
             self.channels.write_to(indent + 1, w)
         }
+    }
+}
+
+impl Setter for Receiver {
+    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
+        if path.next() == Some("channels") {
+            return self.channels.set(path, value);
+        }
+        Err(SetError::MalformedPath)
     }
 }
