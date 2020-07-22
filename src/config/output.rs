@@ -36,44 +36,76 @@ impl core::fmt::Display for Identifier {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Protocol {
-    PWM(u16),
+    PWM,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Servo {
+pub struct Motor {
+    pub protocol: Protocol,
+    pub index: u8,
+    pub rate: u16,
+}
+
+impl Motor {
+    pub fn new(protocol: Protocol, index: u8, rate: u16) -> Self {
+        Self { protocol, index, rate }
+    }
+}
+
+impl Default for Motor {
+    fn default() -> Self {
+        Self { protocol: Protocol::PWM, index: 0, rate: 400 }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ServoType {
     AileronLeft,
     AileronRight,
     Elevator,
     Rudder,
 }
 
+impl Into<&str> for ServoType {
+    fn into(self) -> &'static str {
+        match self {
+            Self::AileronLeft => "aileron-left",
+            Self::AileronRight => "aileron-right",
+            Self::Elevator => "elevator",
+            Self::Rudder => "rudder",
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Servo {
+    pub servo_type: ServoType,
+    pub center_angle: i8,
+    pub reversed: bool,
+}
+
+impl Servo {
+    pub fn new(servo_type: ServoType, center_angle: i8, reversed: bool) -> Self {
+        Self { servo_type, center_angle, reversed }
+    }
+
+    pub fn of(servo_type: ServoType) -> Self {
+        Self { servo_type, center_angle: 0, reversed: false }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Output {
-    Motor(u8, Protocol),
-    Servo(Servo, i8),
+    Motor(Motor),
+    Servo(Servo),
     None,
 }
 
 impl Output {
     pub fn rate(self) -> u16 {
         match self {
-            Self::Motor(_, protocol) => match protocol {
-                Protocol::PWM(rate) => rate,
-            },
+            Self::Motor(motor) => motor.rate,
             _ => 50,
-        }
-    }
-}
-
-impl Into<&str> for Output {
-    fn into(self) -> &'static str {
-        match self {
-            Self::Motor(_, _) => "motor",
-            Self::Servo(Servo::AileronLeft, _) => "aileron-left",
-            Self::Servo(Servo::AileronRight, _) => "aileron-right",
-            Self::Servo(Servo::Elevator, _) => "elevator",
-            Self::Servo(Servo::Rudder, _) => "rudder",
-            Self::None => "none",
         }
     }
 }
@@ -86,29 +118,31 @@ impl FromYAML for Output {
         let mut index = 0;
         let mut protocol: &str = &"";
         let mut rate = 400;
-        let mut center_angle = 0;
+        let mut angle = 0;
+        let mut reversed = false;
         while let Some((key, value)) = parser.next_key_value() {
             match key {
                 "type" => type_string = value,
                 "index" => index = value.parse().ok().unwrap_or(0),
                 "protocol" => protocol = value,
                 "rate" => rate = value.parse().ok().unwrap_or(400),
-                "center-angle" => center_angle = value.parse().ok().unwrap_or(0),
+                "center-angle" => angle = value.parse().ok().unwrap_or(0),
+                "reversed" => reversed = value == "true",
                 _ => continue,
             }
         }
-        if center_angle < -90 || center_angle > 90 {
-            center_angle = 0;
+        if angle < -90 || angle > 90 {
+            angle = 0;
         }
         match type_string {
             "motor" => match protocol {
-                "PWM" => Self::Motor(index, Protocol::PWM(rate)),
-                _ => Self::Motor(0, Protocol::PWM(400)),
+                "PWM" => Self::Motor(Motor::new(Protocol::PWM, index, rate)),
+                _ => Self::Motor(Motor::default()),
             },
-            "aileron-left" => Self::Servo(Servo::AileronLeft, center_angle),
-            "aileron-right" => Self::Servo(Servo::AileronRight, center_angle),
-            "elevator" => Self::Servo(Servo::Elevator, center_angle),
-            "rudder" => Self::Servo(Servo::Rudder, center_angle),
+            "aileron-left" => Self::Servo(Servo::new(ServoType::AileronLeft, angle, reversed)),
+            "aileron-right" => Self::Servo(Servo::new(ServoType::AileronRight, angle, reversed)),
+            "elevator" => Self::Servo(Servo::new(ServoType::Elevator, angle, reversed)),
+            "rudder" => Self::Servo(Servo::new(ServoType::Rudder, angle, reversed)),
             _ => Self::None,
         }
     }
@@ -116,26 +150,32 @@ impl FromYAML for Output {
 
 impl ToYAML for Output {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        let type_string: &str = (*self).into();
-        writeln!(w, "type: {}", type_string)?;
         match self {
-            Self::Motor(index, protocol) => {
+            Self::Motor(motor) => {
                 self.write_indent(indent, w)?;
-                writeln!(w, "index: {}", index)?;
-                match protocol {
-                    Protocol::PWM(rate) => {
+                writeln!(w, "type: motor")?;
+                self.write_indent(indent, w)?;
+                writeln!(w, "index: {}", motor.index)?;
+                match motor.protocol {
+                    Protocol::PWM => {
                         self.write_indent(indent, w)?;
                         writeln!(w, "protocol: PWM")?;
-                        self.write_indent(indent, w)?;
-                        writeln!(w, "rate: {}", rate)?;
                     }
                 }
+                self.write_indent(indent, w)?;
+                writeln!(w, "rate: {}", motor.rate)?;
             }
-            Self::Servo(_, center_angle) => {
-                if *center_angle != 0 {
+            Self::Servo(servo) => {
+                self.write_indent(indent, w)?;
+                let servo_type: &str = servo.servo_type.into();
+                writeln!(w, "type: {}", servo_type)?;
+                if servo.center_angle != 0 {
                     self.write_indent(indent, w)?;
-                    writeln!(w, "center-angle: {}", center_angle)?;
+                    writeln!(w, "center-angle: {}", servo.center_angle)?;
+                }
+                if servo.reversed {
+                    self.write_indent(indent, w)?;
+                    writeln!(w, "reversed: true")?;
                 }
             }
             _ => (),
@@ -152,11 +192,11 @@ impl Setter for Output {
         };
         match path.next() {
             Some("type") => match value {
-                "motor" => *self = Self::Motor(0, Protocol::PWM(400)),
-                "aileron-left" => *self = Self::Servo(Servo::AileronLeft, 0),
-                "aileron-right" => *self = Self::Servo(Servo::AileronRight, 0),
-                "elevator" => *self = Self::Servo(Servo::Elevator, 0),
-                "rudder" => *self = Self::Servo(Servo::Rudder, 0),
+                "motor" => *self = Self::Motor(Motor::default()),
+                "aileron-left" => *self = Self::Servo(Servo::of(ServoType::AileronLeft)),
+                "aileron-right" => *self = Self::Servo(Servo::of(ServoType::AileronRight)),
+                "elevator" => *self = Self::Servo(Servo::of(ServoType::Elevator)),
+                "rudder" => *self = Self::Servo(Servo::of(ServoType::Rudder)),
                 _ => return Err(SetError::UnexpectedValue),
             },
             Some("center-angle") => {
@@ -168,12 +208,16 @@ impl Setter for Output {
                     return Err(SetError::UnexpectedValue);
                 }
                 match self {
-                    Self::Servo(servo, _) => *self = Self::Servo(*servo, angle),
+                    Self::Servo(servo) => servo.center_angle = angle,
                     _ => return Err(SetError::MalformedPath),
                 }
             }
+            Some("reversed") => match self {
+                Self::Servo(servo) => servo.reversed = value == "true",
+                _ => return Err(SetError::MalformedPath),
+            },
             _ => return Err(SetError::MalformedPath),
-        }
+        };
         Ok(())
     }
 }

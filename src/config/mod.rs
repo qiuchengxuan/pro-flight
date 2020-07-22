@@ -190,7 +190,7 @@ mod test {
         use std::io::Read;
         use std::string::String;
 
-        use super::output::{Output, Servo};
+        use super::output::{Output, Servo, ServoType};
         use super::setter::Setter;
         use super::yaml::{FromYAML, YamlParser};
         use super::Config;
@@ -201,7 +201,8 @@ mod test {
         let mut config = Config::from_yaml(&mut YamlParser::from(yaml_string.as_ref() as &str));
 
         config.set(&mut "outputs.PWM5.center-angle".split('.'), Some("-10")).unwrap();
-        assert_eq!(config.outputs.get("PWM5").unwrap(), Output::Servo(Servo::AileronLeft, -10));
+        let expected = Output::Servo(Servo::new(ServoType::AileronLeft, -10, false));
+        assert_eq!(config.outputs.get("PWM5").unwrap(), expected);
         Ok(())
     }
 }

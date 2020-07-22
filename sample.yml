@@ -57,6 +57,7 @@ outputs:
     rate: 400
   PWM3:
     type: elevator
+    reversed: true
   PWM4:
     type: aileron-right
   PWM5:
