@@ -4,7 +4,6 @@ pub mod console;
 pub mod altimeter;
 pub mod ascii_hud;
 pub mod cli;
-pub mod cmdlet;
 pub mod configuration;
 pub mod gnss;
 pub mod imu;

@@ -5,9 +5,11 @@ pub mod output;
 pub mod receiver;
 pub mod sensor;
 pub mod serial;
+pub mod setter;
 pub mod yaml;
 
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::Split;
 
 use crate::datastructures::measurement::Axes;
 use crate::hal::io::Read;
@@ -19,6 +21,7 @@ pub use output::{Output, Outputs, Protocol};
 pub use receiver::Receiver;
 pub use sensor::Accelerometer;
 pub use serial::{Config as SerialConfig, Serials};
+use setter::{SetError, Setter};
 use yaml::{FromYAML, ToYAML, YamlParser};
 
 impl FromYAML for Axes {
@@ -38,7 +41,7 @@ impl FromYAML for Axes {
 }
 
 impl ToYAML for Axes {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "x: {}", self.x)?;
         self.write_indent(indent, w)?;
@@ -57,6 +60,15 @@ pub struct Config {
     pub receiver: Receiver,
     pub serials: Serials,
     pub outputs: Outputs,
+}
+
+impl Setter for Config {
+    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
+        match path.next() {
+            Some("outputs") => self.outputs.set(path, value),
+            _ => Err(SetError::MalformedPath),
+        }
+    }
 }
 
 impl FromYAML for Config {
@@ -79,7 +91,7 @@ impl FromYAML for Config {
 }
 
 impl ToYAML for Config {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "accelerometer:")?;
         self.accelerometer.write_to(indent + 1, w)?;
@@ -140,6 +152,10 @@ pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     get()
 }
 
+pub fn replace(config: &Config) {
+    unsafe { CONFIG = Some(*config) }
+}
+
 mod test {
     #[cfg(test)]
     extern crate std;
@@ -151,11 +167,11 @@ mod test {
         use std::io::Read;
         use std::string::{String, ToString};
 
-        static mut PRIMARY_BUFFER: [u8; 256] = [0u8; 256];
-        unsafe { crate::alloc::init(&mut PRIMARY_BUFFER, &mut []) };
-
         use super::yaml::{FromYAML, ToYAML, YamlParser};
         use super::Config;
+
+        static mut PRIMARY_BUFFER: [u8; 256] = [0u8; 256];
+        unsafe { crate::alloc::init(&mut PRIMARY_BUFFER, &mut []) };
 
         let mut file = File::open("sample.yml")?;
         let mut yaml_string = String::new();
@@ -165,6 +181,27 @@ mod test {
         let mut buf = String::new();
         config.write_to(0, &mut buf).ok();
         assert_eq!(yaml_string.trim(), buf.to_string().trim());
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_config() -> std::io::Result<()> {
+        use std::fs::File;
+        use std::io::Read;
+        use std::string::String;
+
+        use super::output::{Output, Servo};
+        use super::setter::Setter;
+        use super::yaml::{FromYAML, YamlParser};
+        use super::Config;
+
+        let mut file = File::open("sample.yml")?;
+        let mut yaml_string = String::new();
+        file.read_to_string(&mut yaml_string)?;
+        let mut config = Config::from_yaml(&mut YamlParser::from(yaml_string.as_ref() as &str));
+
+        config.set(&mut "outputs.PWM5.center-angle".split('.'), Some("-10")).unwrap();
+        assert_eq!(config.outputs.get("PWM5").unwrap(), Output::Servo(Servo::AileronLeft, -10));
         Ok(())
     }
 }

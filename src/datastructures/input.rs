@@ -51,12 +51,18 @@ pub enum LandingGear {
     Down,
 }
 
-#[derive(Copy, Clone, Debug, Value, Default)]
+#[derive(Copy, Clone, Debug, Value)]
 pub struct ControlInput {
     pub throttle: Throttle,
     pub roll: Roll,
     pub pitch: Pitch,
     pub yaw: Yaw,
+}
+
+impl Default for ControlInput {
+    fn default() -> Self {
+        Self { throttle: i16::MIN, roll: 0, pitch: 0, yaw: 0 }
+    }
 }
 
 pub struct FixedWingInput {

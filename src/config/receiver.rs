@@ -55,8 +55,10 @@ impl ToYAML for Channels {
                 self.write_indent(indent, w)?;
                 let type_string: &str = channel.input_type.into();
                 writeln!(w, "  type: {}", type_string)?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "  scale: {}", channel.scale)?;
+                if channel.scale != 100 {
+                    self.write_indent(indent, w)?;
+                    writeln!(w, "  scale: {}", channel.scale)?;
+                }
             }
         }
         Ok(())

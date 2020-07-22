@@ -1,15 +1,14 @@
+mod config;
+pub mod memory;
+
 use core::time::Duration;
 
 use arrayvec::ArrayVec;
 use embedded_hal::serial::{Read, Write};
 use embedded_hal::timer::CountDown;
 
-use crate::components::cmdlet;
-use crate::components::console::{self, Console};
-use crate::config;
-use crate::config::yaml::ToYAML;
+use crate::components::console;
 use crate::logger;
-use crate::sys::fs::OpenOptions;
 
 pub struct CLI<C> {
     vec: ArrayVec<[u8; 80]>,
@@ -40,24 +39,12 @@ where
                         console!(serial, "{}", s);
                     }
                 }
-                "read" | "readx" | "readf" => cmdlet::read(line, serial),
-                "dump" => cmdlet::dump(line, serial),
-                "write" => cmdlet::write(line, serial, &mut self.count_down),
-                "show" => {
-                    config::get().write_to(0, &mut Console(serial)).ok();
-                }
-                "save" => {
-                    let option = OpenOptions {
-                        create: true,
-                        write: true,
-                        truncate: true,
-                        ..Default::default()
-                    };
-                    if let Some(mut file) = option.open("sdcard://config.yml").ok() {
-                        config::get().write_to(0, &mut file).ok();
-                        file.close();
-                    }
-                }
+                "read" | "readx" | "readf" => memory::read(line, serial),
+                "dump" => memory::dump(line, serial),
+                "write" => memory::write(line, serial, &mut self.count_down),
+                "set" => config::set(serial, line),
+                "show" => config::show(serial),
+                "save" => config::save(),
                 "" => (),
                 _ => {
                     if !extra(line, serial) {

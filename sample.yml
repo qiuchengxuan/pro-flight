@@ -28,16 +28,13 @@ receiver:
   channels:
     - channel: 1
       type: roll
-      scale: 100
     - channel: 2
       type: pitch
-      scale: 100
     - channel: 3
       type: throttle
-      scale: 100
+      scale: 110
     - channel: 4
       type: yaw
-      scale: 100
 serials:
   USART1:
     type: GNSS
@@ -66,3 +63,4 @@ outputs:
     type: aileron-left
   PWM6:
     type: rudder
+    center-angle: -10

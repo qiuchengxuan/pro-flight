@@ -1,4 +1,4 @@
 pub mod airplane;
-pub mod servo;
+pub mod pwm;
 
 pub use airplane::Airplane;

@@ -1,5 +1,7 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::Split;
 
+use super::setter::{SetError, Setter};
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(PartialEq, Copy, Clone)]
@@ -32,18 +34,23 @@ impl core::fmt::Display for Identifier {
     }
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Protocol {
     PWM(u16),
 }
 
-#[derive(Copy, Clone)]
-pub enum Output {
-    Motor(u8, Protocol),
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Servo {
     AileronLeft,
     AileronRight,
     Elevator,
     Rudder,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Output {
+    Motor(u8, Protocol),
+    Servo(Servo, i8),
     None,
 }
 
@@ -62,10 +69,10 @@ impl Into<&str> for Output {
     fn into(self) -> &'static str {
         match self {
             Self::Motor(_, _) => "motor",
-            Self::AileronLeft => "aileron-left",
-            Self::AileronRight => "aileron-right",
-            Self::Elevator => "elevator",
-            Self::Rudder => "rudder",
+            Self::Servo(Servo::AileronLeft, _) => "aileron-left",
+            Self::Servo(Servo::AileronRight, _) => "aileron-right",
+            Self::Servo(Servo::Elevator, _) => "elevator",
+            Self::Servo(Servo::Rudder, _) => "rudder",
             Self::None => "none",
         }
     }
@@ -79,45 +86,93 @@ impl FromYAML for Output {
         let mut index = 0;
         let mut protocol: &str = &"";
         let mut rate = 400;
+        let mut center_angle = 0;
         while let Some((key, value)) = parser.next_key_value() {
             match key {
                 "type" => type_string = value,
                 "index" => index = value.parse().ok().unwrap_or(0),
                 "protocol" => protocol = value,
                 "rate" => rate = value.parse().ok().unwrap_or(400),
+                "center-angle" => center_angle = value.parse().ok().unwrap_or(0),
                 _ => continue,
             }
         }
+        if center_angle < -90 || center_angle > 90 {
+            center_angle = 0;
+        }
         match type_string {
             "motor" => match protocol {
-                "PWM" => Output::Motor(index, Protocol::PWM(rate)),
-                _ => Output::Motor(0, Protocol::PWM(400)),
+                "PWM" => Self::Motor(index, Protocol::PWM(rate)),
+                _ => Self::Motor(0, Protocol::PWM(400)),
             },
-            "aileron-left" => Output::AileronLeft,
-            "aileron-right" => Output::AileronRight,
-            "elevator" => Output::Elevator,
-            "rudder" => Output::Rudder,
-            _ => Output::None,
+            "aileron-left" => Self::Servo(Servo::AileronLeft, center_angle),
+            "aileron-right" => Self::Servo(Servo::AileronRight, center_angle),
+            "elevator" => Self::Servo(Servo::Elevator, center_angle),
+            "rudder" => Self::Servo(Servo::Rudder, center_angle),
+            _ => Self::None,
         }
     }
 }
 
 impl ToYAML for Output {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         let type_string: &str = (*self).into();
         writeln!(w, "type: {}", type_string)?;
-        if let Output::Motor(index, protocol) = self {
-            self.write_indent(indent, w)?;
-            writeln!(w, "index: {}", index)?;
-            match protocol {
-                Protocol::PWM(rate) => {
-                    self.write_indent(indent, w)?;
-                    writeln!(w, "protocol: PWM")?;
-                    self.write_indent(indent, w)?;
-                    writeln!(w, "rate: {}", rate)?;
+        match self {
+            Self::Motor(index, protocol) => {
+                self.write_indent(indent, w)?;
+                writeln!(w, "index: {}", index)?;
+                match protocol {
+                    Protocol::PWM(rate) => {
+                        self.write_indent(indent, w)?;
+                        writeln!(w, "protocol: PWM")?;
+                        self.write_indent(indent, w)?;
+                        writeln!(w, "rate: {}", rate)?;
+                    }
                 }
             }
+            Self::Servo(_, center_angle) => {
+                if *center_angle != 0 {
+                    self.write_indent(indent, w)?;
+                    writeln!(w, "center-angle: {}", center_angle)?;
+                }
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+}
+
+impl Setter for Output {
+    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
+        let value = match value {
+            Some(v) => v,
+            None => return Err(SetError::ExpectValue),
+        };
+        match path.next() {
+            Some("type") => match value {
+                "motor" => *self = Self::Motor(0, Protocol::PWM(400)),
+                "aileron-left" => *self = Self::Servo(Servo::AileronLeft, 0),
+                "aileron-right" => *self = Self::Servo(Servo::AileronRight, 0),
+                "elevator" => *self = Self::Servo(Servo::Elevator, 0),
+                "rudder" => *self = Self::Servo(Servo::Rudder, 0),
+                _ => return Err(SetError::UnexpectedValue),
+            },
+            Some("center-angle") => {
+                let angle = match value.parse::<i8>() {
+                    Ok(angle) => angle,
+                    Err(_) => return Err(SetError::UnexpectedValue),
+                };
+                if angle < -90 || angle > 90 {
+                    return Err(SetError::UnexpectedValue);
+                }
+                match self {
+                    Self::Servo(servo, _) => *self = Self::Servo(*servo, angle),
+                    _ => return Err(SetError::MalformedPath),
+                }
+            }
+            _ => return Err(SetError::MalformedPath),
         }
         Ok(())
     }
@@ -167,7 +222,7 @@ impl FromYAML for Outputs {
 }
 
 impl ToYAML for Outputs {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         for &(id, config) in self.0.iter() {
             if id.into() {
                 self.write_indent(indent, w)?;
@@ -176,5 +231,30 @@ impl ToYAML for Outputs {
             }
         }
         Ok(())
+    }
+}
+
+impl Setter for Outputs {
+    fn set(
+        &mut self,
+        path: &mut core::str::Split<char>,
+        value: Option<&str>,
+    ) -> Result<(), SetError> {
+        let id_string = match path.next() {
+            Some(token) => token,
+            None => return Err(SetError::MalformedPath),
+        };
+        let index = if id_string.starts_with("PWM") {
+            match id_string[3..].parse::<usize>() {
+                Ok(index) => index - 1,
+                Err(_) => return Err(SetError::MalformedPath),
+            }
+        } else {
+            return Err(SetError::MalformedPath);
+        };
+        if index >= MAX_OUTPUT_CONFIG {
+            return Err(SetError::MalformedPath);
+        }
+        self.0[index].1.set(path, value)
     }
 }

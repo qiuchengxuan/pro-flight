@@ -38,8 +38,8 @@ use cortex_m_rt::ExceptionFrame;
 use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use rs_flight::alloc;
 use rs_flight::components::altimeter::Altimeter;
+use rs_flight::components::cli::memory;
 use rs_flight::components::cli::CLI;
-use rs_flight::components::cmdlet;
 use rs_flight::components::configuration::Airplane;
 use rs_flight::components::imu::IMU;
 use rs_flight::components::mixer::ControlMixer;
@@ -115,7 +115,7 @@ fn main() -> ! {
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
 
-    cmdlet::init(valid_memory_address);
+    memory::init(valid_memory_address);
 
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);

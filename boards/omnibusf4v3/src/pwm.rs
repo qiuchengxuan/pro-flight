@@ -27,7 +27,7 @@ pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmBy
     let rate4 = cfg.get("PWM4").map(|o| o.rate()).unwrap_or(50) as u32;
     let pa2_3 = (pa2.into_alternate_af1(), pa3.into_alternate_af1());
     let rate = if rate3 > 0 && rate4 > 0 { min(rate3, rate4) } else { rate3 + rate4 };
-    let (mut pwm3, mut pwm4) = pwm::tim2(tim2, pa2_3, clocks, rate.hz());
+    let (mut pwm4, mut pwm3) = pwm::tim2(tim2, pa2_3, clocks, rate.hz());
 
     let rate = cfg.get("PWM5").map(|o| o.rate()).unwrap_or(50) as u32;
     let mut pwm5 = pwm::tim5(tim5, pa1.into_alternate_af2(), clocks, rate.hz());
