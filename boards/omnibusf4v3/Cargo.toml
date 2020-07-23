@@ -9,7 +9,7 @@ version = "0.1.0"
 # alloc-cortex-m = "0.4.0"
 arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"] }
 ascii-osd-hud = { path = "../../../ascii-osd-hud" }
-bmp280 = { path = "../../../bmp280" }
+bmp280-core = "0.1"
 cast = { version = "0.2.2", default-features = false }
 chips = { path = "../../chips" }
 cortex-m = "0.6"

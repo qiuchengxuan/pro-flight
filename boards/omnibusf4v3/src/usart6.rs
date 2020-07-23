@@ -13,11 +13,10 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 type PC6 = gpioc::PC6<Input<Floating>>;
 type PC7 = gpioc::PC7<Input<Floating>>;
-
 type PINS = (gpioc::PC6<Alternate<AF8>>, gpioc::PC7<Alternate<AF8>>);
 
-const HTIF_OFFSET: usize = 2;
-const STREAM1_OFFSET: usize = 8;
+const HTIF_OFFSET: usize = 4;
+const STREAM1_OFFSET: usize = 6;
 
 #[export_name = "USART6_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
@@ -43,6 +42,8 @@ pub fn init(
     config: &SerialConfig,
     clocks: Clocks,
 ) -> &'static mut Device {
+    unsafe { DEVICE = Device::None };
+
     let mut cfg = Config::default();
     match config {
         SerialConfig::SBUS(sbus) => {
@@ -51,13 +52,9 @@ pub fn init(
             // word-length-9 must be selected when parity is even
             cfg = cfg.stopbits(StopBits::STOP2).parity_even().wordlength_9();
         }
-        _ => {
-            return unsafe {
-                DEVICE = Device::None;
-                &mut DEVICE
-            }
-        }
+        _ => return unsafe { &mut DEVICE },
     };
+
     let (pc6, pc7) = pins;
     let pins = (pc6.into_alternate_af8(), pc7.into_alternate_af8());
     let usart = Serial::usart6(usart6, pins, cfg, clocks).unwrap();

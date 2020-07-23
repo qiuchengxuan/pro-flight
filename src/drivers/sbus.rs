@@ -1,5 +1,3 @@
-use core::num::Wrapping;
-
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
 use crate::alloc;
@@ -11,7 +9,7 @@ use crate::datastructures::input::InputType;
 use crate::datastructures::input::Receiver;
 
 pub struct SbusReceiver {
-    sequence: Wrapping<u8>,
+    sequence: u8,
     counter: u8,
     loss: u8,
     loss_rate: u8,
@@ -22,13 +20,13 @@ pub struct SbusReceiver {
 #[inline]
 fn to_axis(value: u16) -> i32 {
     // [0, 2047] -> [-1024, 1023] -> [-32768, 32736]
-    (Wrapping(value as i32) - Wrapping(0x400)).0 << 5
+    (value as i32).wrapping_sub(0x400) << 5
 }
 
 impl SbusReceiver {
     pub fn new() -> Self {
         Self {
-            sequence: Wrapping(0),
+            sequence: 0,
             counter: 0,
             loss: 0,
             loss_rate: 0,
@@ -46,7 +44,7 @@ impl SbusReceiver {
     }
 
     fn handle_sbus_data(&mut self, data: &SbusData) {
-        self.sequence += Wrapping(1);
+        self.sequence = self.sequence.wrapping_add(1);
         if data.frame_lost {
             self.loss += 1;
         }
@@ -56,7 +54,7 @@ impl SbusReceiver {
             self.counter = 0;
             self.loss = 0;
         }
-        self.receiver.write(Receiver { rssi: self.loss_rate, sequence: self.sequence.0 });
+        self.receiver.write(Receiver { rssi: self.loss_rate, sequence: self.sequence });
 
         let mut control_input = ControlInput::default();
         let channels = &config::get().receiver.channels;

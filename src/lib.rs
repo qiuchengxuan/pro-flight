@@ -5,7 +5,7 @@ extern crate ahrs;
 extern crate arrayvec;
 extern crate ascii;
 extern crate ascii_osd_hud;
-extern crate bmp280;
+extern crate bmp280_core as bmp280;
 #[macro_use]
 extern crate enum_map;
 extern crate embedded_sdmmc;

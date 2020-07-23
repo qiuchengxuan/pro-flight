@@ -3,7 +3,7 @@
 
 #[macro_use]
 extern crate ascii_osd_hud;
-extern crate bmp280;
+extern crate bmp280_core as bmp280;
 extern crate cast;
 extern crate chips;
 extern crate cortex_m;
@@ -242,11 +242,8 @@ fn main() -> ! {
 
     if let Some(config) = config.serials.get("USART1") {
         info!("Initialize USART1");
-        if let SerialConfig::GNSS(baudrate) = config {
-            let pins = (gpio_a.pa9, gpio_a.pa10);
-            let count_down = MillisCountDown::new(&systick);
-            usart1::init(peripherals.USART1, pins, baudrate, clocks, count_down);
-        }
+        let pins = (gpio_a.pa9, gpio_a.pa10);
+        usart1::init(peripherals.USART1, pins, &config, clocks);
     }
 
     info!("Initialize PWMs");

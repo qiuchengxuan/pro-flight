@@ -10,7 +10,7 @@ ahrs = { version = "0.2", default-features = false}
 arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"]}
 ascii = { version = "1.0", default-features = false }
 ascii-osd-hud = { path = "../ascii-osd-hud" }
-bmp280 = { path = "../bmp280" }
+bmp280-core = "0.1"
 cortex-m = "0.6"
 embedded-hal = "0.2"
 embedded-sdmmc = "0.3"
