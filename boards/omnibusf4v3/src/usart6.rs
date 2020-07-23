@@ -2,7 +2,7 @@ use core::mem::MaybeUninit;
 
 use rs_flight::config::SerialConfig;
 use rs_flight::drivers::sbus::SbusReceiver;
-use rs_flight::drivers::uart::{handle as handle_uart, Device};
+use rs_flight::drivers::uart::Device;
 use stm32f4xx_hal::gpio::gpioc;
 use stm32f4xx_hal::gpio::{Alternate, Floating, Input, AF8};
 use stm32f4xx_hal::interrupt;
@@ -16,12 +16,13 @@ type PC7 = gpioc::PC7<Input<Floating>>;
 
 type PINS = (gpioc::PC6<Alternate<AF8>>, gpioc::PC7<Alternate<AF8>>);
 
+const HTIF_OFFSET: usize = 2;
+const STREAM1_OFFSET: usize = 8;
+
 #[export_name = "USART6_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
 static mut DEVICE: Device = Device::None;
 static mut USART6: MaybeUninit<Serial<stm32::USART6, PINS>> = MaybeUninit::uninit();
-const HTIF_OFFSET: usize = 2;
-const STREAM1_OFFSET: usize = 8;
 
 #[interrupt]
 unsafe fn DMA2_STREAM1() {
@@ -33,7 +34,7 @@ unsafe fn DMA2_STREAM1() {
         dma2.lifcr.write(|w| w.bits(0x3D << STREAM1_OFFSET));
     });
     let offset = if half { 0 } else { DMA_BUFFER.len() / 2 };
-    handle_uart(&mut DEVICE, &DMA_BUFFER, offset, DMA_BUFFER.len() / 2);
+    DEVICE.handle(&DMA_BUFFER, offset, DMA_BUFFER.len() / 2);
 }
 
 pub fn init(

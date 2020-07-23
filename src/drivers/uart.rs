@@ -31,9 +31,11 @@ pub enum Device {
     GNSS,
 }
 
-pub fn handle(device: &mut Device, ring: &[u8], offset: usize, size: usize) {
-    match device {
-        Device::SBUS(sbus_device) => sbus_device.handle(ring, offset, size),
-        _ => (),
+impl Device {
+    pub fn handle(&mut self, ring: &[u8], offset: usize, size: usize) {
+        match self {
+            Device::SBUS(sbus_device) => sbus_device.handle(ring, offset, size),
+            _ => (),
+        }
     }
 }

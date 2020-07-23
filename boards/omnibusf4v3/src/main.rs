@@ -164,7 +164,7 @@ fn main() -> ! {
     .ok();
 
     info!("Initialize ADC VBAT");
-    let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2);
+    let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2).data_source();
 
     let barometer = init_bmp280_data_source();
     let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);

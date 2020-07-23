@@ -98,12 +98,12 @@ where
             self.battery_cells.set(core::cmp::min(battery.0 / 4200 + 1, 8) as u8)
         }
         let euler: Euler = self.imu.read_last_unchecked().into();
+        let euler = euler * DEGREE_PER_DAG;
         let (position, steerpoint) = self.navigation.read_last_unchecked();
         let acceleration = self.accelerometer.read_last_unchecked();
-        let input =
-            self.control_input.as_ref().map(|i| i.read_last_unchecked()).unwrap_or_default();
+        let input_option = self.control_input.as_ref().map(|i| i.read_last_unchecked());
         TelemetryData {
-            attitude: (euler * DEGREE_PER_DAG).into(),
+            attitude: euler.into(),
             altitude,
             acceleration,
             heading: ((-euler.psi as isize + 360) % 360) as u16,
@@ -113,7 +113,7 @@ where
             position,
             steerpoint,
             receiver: self.receiver.as_ref().map(|r| r.read_last_unchecked()).unwrap_or_default(),
-            control_input: input,
+            control_input: input_option.unwrap_or_default(),
         }
     }
 }
