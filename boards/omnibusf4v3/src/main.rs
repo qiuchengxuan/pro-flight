@@ -1,7 +1,6 @@
 #![no_main]
 #![no_std]
 
-#[macro_use]
 extern crate ascii_osd_hud;
 extern crate bmp280_core as bmp280;
 extern crate cast;

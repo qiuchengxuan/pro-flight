@@ -26,9 +26,9 @@ impl<'a, T> DataWriter<T> for OverwritingData<'a, T> {
         if buffer.len() > 0 {
             let write = self.write.load(Ordering::Relaxed) as usize;
             let next_write = (Wrapping(write) + Wrapping(1)).0;
-            self.write.store(next_write, Ordering::Release);
+            self.write.store(next_write, Ordering::Relaxed);
             buffer[write % buffer.len()] = value;
-            self.written.store(next_write, Ordering::Release);
+            self.written.store(next_write, Ordering::Relaxed);
         }
     }
 }
@@ -40,14 +40,14 @@ pub struct OverwritingDataSource<'a, T> {
 
 impl<'a, T> OverwritingDataSource<'a, T> {
     pub fn new(ring: &'a OverwritingData<'a, T>) -> Self {
-        Self { ring, read: Wrapping(ring.write.load(Ordering::Acquire)) }
+        Self { ring, read: Wrapping(ring.write.load(Ordering::Relaxed)) }
     }
 }
 
 impl<'a, T: Copy + Clone> DataSource<T> for OverwritingDataSource<'a, T> {
     fn read(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
-        let mut written = Wrapping(self.ring.written.load(Ordering::Acquire));
+        let mut written = Wrapping(self.ring.written.load(Ordering::Relaxed));
         let mut delta = (written - self.read).0;
         if delta == 0 {
             return None;
@@ -58,19 +58,19 @@ impl<'a, T: Copy + Clone> DataSource<T> for OverwritingDataSource<'a, T> {
                 self.read = written - Wrapping(buffer.len());
             }
             let value = buffer[self.read.0 % buffer.len()];
-            let write = self.ring.write.load(Ordering::Acquire);
+            let write = self.ring.write.load(Ordering::Relaxed);
             if (Wrapping(write) - self.read).0 <= buffer.len() {
                 self.read += Wrapping(1);
                 return Some(value);
             }
-            written = Wrapping(self.ring.written.load(Ordering::Acquire));
+            written = Wrapping(self.ring.written.load(Ordering::Relaxed));
             self.read += Wrapping(1);
         }
     }
 
     fn read_last(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
-        let written = Wrapping(self.ring.written.load(Ordering::Acquire));
+        let written = Wrapping(self.ring.written.load(Ordering::Relaxed));
         if (written - self.read).0 == 0 {
             return None;
         }
@@ -80,7 +80,7 @@ impl<'a, T: Copy + Clone> DataSource<T> for OverwritingDataSource<'a, T> {
 
     fn read_last_unchecked(&self) -> T {
         let buffer = unsafe { &*self.ring.buffer.get() };
-        let written = Wrapping(self.ring.written.load(Ordering::Acquire));
+        let written = Wrapping(self.ring.written.load(Ordering::Relaxed));
         buffer[(written - Wrapping(1)).0 % buffer.len()]
     }
 
@@ -92,7 +92,7 @@ impl<'a, T: Copy + Clone> DataSource<T> for OverwritingDataSource<'a, T> {
 
 impl<'a, T> Clone for OverwritingDataSource<'a, T> {
     fn clone(&self) -> Self {
-        Self { ring: self.ring, read: Wrapping(self.ring.write.load(Ordering::Acquire)) }
+        Self { ring: self.ring, read: Wrapping(self.ring.write.load(Ordering::Relaxed)) }
     }
 }
 

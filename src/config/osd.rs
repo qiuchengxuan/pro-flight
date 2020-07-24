@@ -1,43 +1,9 @@
 use core::fmt::{Display, Formatter, Result, Write};
 
 use crate::alloc;
+use crate::datastructures::Ratio;
 
 use super::yaml::{FromYAML, ToYAML, YamlParser};
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct AspectRatio(pub u8, pub u8);
-
-impl Default for AspectRatio {
-    fn default() -> Self {
-        Self(16, 9)
-    }
-}
-
-impl FromYAML for AspectRatio {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut width: u8 = 16;
-        let mut height: u8 = 9;
-        while let Some((key, value)) = parser.next_key_value() {
-            let value = value.parse().ok();
-            match key {
-                "width" => width = value.unwrap_or(16),
-                "height" => height = value.unwrap_or(9),
-                _ => continue,
-            }
-        }
-        Self(width, height)
-    }
-}
-
-impl ToYAML for AspectRatio {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "width: {}", self.0)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "height: {}", self.1)?;
-        Ok(())
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Standard {
@@ -67,6 +33,15 @@ impl Display for Standard {
             Self::NTSC => "NTSC",
         };
         f.write_str(string)
+    }
+}
+
+impl Into<Ratio> for Standard {
+    fn into(self) -> Ratio {
+        match self {
+            Self::PAL => Ratio(5, 4),
+            Self::NTSC => Ratio(16, 9),
+        }
     }
 }
 
@@ -106,7 +81,7 @@ impl ToYAML for Offset {
 pub struct OSD {
     pub fov: u8,
     pub font: &'static str,
-    pub aspect_ratio: AspectRatio,
+    pub aspect_ratio: Ratio,
     pub standard: Standard,
     pub offset: Offset,
 }
@@ -116,7 +91,7 @@ impl Default for OSD {
         Self {
             fov: 120,
             font: "",
-            aspect_ratio: AspectRatio(16, 9),
+            aspect_ratio: Ratio::default(),
             standard: Standard::default(),
             offset: Offset::default(),
         }
@@ -125,14 +100,20 @@ impl Default for OSD {
 
 impl FromYAML for OSD {
     fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> OSD {
-        let mut aspect_ratio = AspectRatio::default();
+        let mut aspect_ratio = Ratio::default();
         let mut font = "";
         let mut fov = 120u8;
         let mut standard = Standard::default();
         let mut offset = Offset::default();
         while let Some(key) = parser.next_entry() {
             match key {
-                "aspect-ratio" => aspect_ratio = AspectRatio::from_yaml(parser),
+                "aspect-ratio" => {
+                    if let Some(value) = parser.next_value() {
+                        if let Some(ratio) = Ratio::from_str(value) {
+                            aspect_ratio = ratio;
+                        }
+                    }
+                }
                 "font" => {
                     if let Some(value) = parser.next_value() {
                         let length = value.as_bytes().len();
@@ -163,8 +144,7 @@ impl FromYAML for OSD {
 impl ToYAML for OSD {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
         self.write_indent(indent, w)?;
-        writeln!(w, "aspect-ratio:")?;
-        self.aspect_ratio.write_to(indent + 1, w)?;
+        writeln!(w, "aspect-ratio: '{}'", self.aspect_ratio)?;
 
         if self.font != "" {
             self.write_indent(indent, w)?;

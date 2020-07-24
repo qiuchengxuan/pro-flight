@@ -37,12 +37,12 @@ pub fn allocate(size: usize, dma: bool) -> Option<&'static mut [u8]> {
     if !dma && total > 0 {
         let no_dma_allocated = &mut allocate_info.no_dma_allocated;
         loop {
-            let allocated = no_dma_allocated.load(Ordering::Acquire);
+            let allocated = no_dma_allocated.load(Ordering::Relaxed);
             if total - allocated < aligned_size {
                 break;
             }
             let new = allocated + aligned_size;
-            if no_dma_allocated.compare_and_swap(allocated, new, Ordering::SeqCst) == allocated {
+            if no_dma_allocated.compare_and_swap(allocated, new, Ordering::Relaxed) == allocated {
                 return Some(&mut allocate_info.no_dma[allocated..allocated + size]);
             }
         }
@@ -51,12 +51,12 @@ pub fn allocate(size: usize, dma: bool) -> Option<&'static mut [u8]> {
     let total = allocate_info.primary.len();
     let primary_allocated = &mut allocate_info.primary_allocated;
     loop {
-        let allocated = primary_allocated.load(Ordering::Acquire);
+        let allocated = primary_allocated.load(Ordering::Relaxed);
         if total - allocated < aligned_size {
             break;
         }
         let new = allocated + aligned_size;
-        if primary_allocated.compare_and_swap(allocated, new, Ordering::SeqCst) == allocated {
+        if primary_allocated.compare_and_swap(allocated, new, Ordering::Relaxed) == allocated {
             return Some(&mut allocate_info.primary[allocated..allocated + size]);
         }
     }

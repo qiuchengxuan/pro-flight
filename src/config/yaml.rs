@@ -22,17 +22,9 @@ impl<'a> From<&'a str> for YamlParser<'a> {
     }
 }
 
-pub fn strip<'a>(bytes: &'a [u8]) -> &'a [u8] {
-    if let Some(start) = bytes.iter().position(|&b| b != ' ' as u8) {
-        if let Some(end) = bytes.iter().rposition(|&b| b != ' ' as u8) {
-            if bytes[start] == '"' as u8 && bytes[end] == '"' as u8 {
-                return &bytes[start + 1..end];
-            } else {
-                return &bytes[start..end + 1];
-            }
-        }
-    }
-    bytes
+#[inline]
+fn trim(string: &str) -> &str {
+    string.trim().trim_matches('\'').trim_matches('"')
 }
 
 impl<'a> YamlParser<'a> {
@@ -96,7 +88,7 @@ impl<'a> YamlParser<'a> {
         if let Some(line) = self.next_indent_matched_line() {
             if let Some(key) = line.splitn(2, ':').next() {
                 self.enter(key.len() + 1);
-                return Some(key.trim().trim_matches('"'));
+                return Some(trim(key));
             }
         }
         self.leave();
@@ -135,7 +127,7 @@ impl<'a> YamlParser<'a> {
             self.string = split.next().unwrap_or_default();
             if !line.trim_start().is_empty() {
                 self.leave();
-                return Some(line.trim().trim_matches('"'));
+                return Some(line.trim().trim_matches('\''));
             }
         }
         self.leave();
@@ -155,7 +147,7 @@ impl<'a> YamlParser<'a> {
         let mut splitter = line.splitn(2, ':');
         if let Some(key) = splitter.next() {
             if let Some(value) = splitter.next() {
-                return Some((key.trim().trim_matches('"'), value.trim().trim_matches('"')));
+                return Some((trim(key), trim(value)));
             }
         }
         self.leave();
@@ -172,7 +164,7 @@ impl<'a> YamlParser<'a> {
         };
         if line.starts_with("- ") {
             self.string = &self.string[line.len()..];
-            return Some((&line[INDENT_WIDTH as usize..]).trim().trim_matches('"'));
+            return Some(trim(&line[INDENT_WIDTH as usize..]));
         }
         self.leave();
         None

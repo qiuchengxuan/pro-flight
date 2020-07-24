@@ -15,9 +15,7 @@ battery:
   max-cell-voltage: 4200
   warning-cell-voltage: 3500
 osd:
-  aspect-ratio:
-    width: 16
-    height: 9
+  aspect-ratio: '16:9'
   font: sdcard://font.mcm
   fov: 145
   offset:

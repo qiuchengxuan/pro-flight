@@ -2,7 +2,6 @@ use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
-use ascii_osd_hud::PixelRatio;
 
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::registers::Register;
@@ -10,6 +9,7 @@ use embedded_hal::digital::v2::OutputPin;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::config;
+use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
 use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
@@ -72,11 +72,15 @@ unsafe fn DMA1_STREAM2() {
 
     on_dma_receive(&DMA_BUFFER);
 
-    { &mut *CS_BARO.as_mut_ptr() }.set_high().ok();
-    { &mut *CS_OSD.as_mut_ptr() }.set_low().ok();
-    (&mut *OSD.as_mut_ptr()).start_draw(|screen| {
-        process_screen(screen, dma1_stream7_transfer_spi3);
-    });
+    let dma1 = &*(stm32::DMA1::ptr());
+    let stream = &dma1.st[7];
+    if stream.ndtr.read().ndt().bits() == 0 {
+        { &mut *CS_BARO.as_mut_ptr() }.set_high().ok();
+        { &mut *CS_OSD.as_mut_ptr() }.set_low().ok();
+        (&mut *OSD.as_mut_ptr()).start_draw(|screen| {
+            process_screen(screen, dma1_stream7_transfer_spi3);
+        });
+    }
 }
 
 #[interrupt]
@@ -148,12 +152,14 @@ pub fn init<'a>(
     spi3.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
     let mut timer = Timer::tim7(tim7, OSD_REFRESH_RATE.hz(), clocks);
     timer.listen(Event::TimeOut);
+
+    let osd = &config::get().osd;
     unsafe {
         OSD = MaybeUninit::new(AsciiHud::new(
             telemetry_source,
             config.fov,
-            pixel_ratio!(12:18),
-            config.aspect_ratio.into(),
+            Ratio(12, 18).into(),
+            osd.aspect_ratio.into(),
         ));
         TIM7 = MaybeUninit::new(timer);
         CS_OSD = MaybeUninit::new(cs_osd);

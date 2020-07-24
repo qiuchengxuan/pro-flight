@@ -16,7 +16,7 @@ use crate::hal::io::Read;
 
 pub use aircraft::Aircraft;
 pub use battery::Battery;
-pub use osd::{AspectRatio, Offset, Standard, OSD};
+pub use osd::{Offset, Standard, OSD};
 pub use output::{Output, Outputs, Protocol};
 pub use receiver::Receiver;
 pub use sensor::Accelerometer;

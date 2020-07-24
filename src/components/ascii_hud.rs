@@ -1,19 +1,26 @@
-use crate::config;
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
 use ascii_osd_hud::telemetry::TelemetrySource;
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
-pub type ScreenConsumer = fn(&[[u8; 29]; 16]);
+use crate::datastructures::Ratio;
+
+pub type ScreenConsumer = fn(&[[u8; 29]; 15]);
 
 pub struct AsciiHud<'a> {
     hud: HUD<'a>,
-    screen: [[u8; 29]; 16],
+    screen: [[u8; 29]; 15],
 }
 
-impl From<config::AspectRatio> for AspectRatio {
-    fn from(aspect_ratio: config::AspectRatio) -> AspectRatio {
-        AspectRatio(aspect_ratio.0, aspect_ratio.1)
+impl From<Ratio> for AspectRatio {
+    fn from(ratio: Ratio) -> AspectRatio {
+        AspectRatio(ratio.0, ratio.1)
+    }
+}
+
+impl From<Ratio> for PixelRatio {
+    fn from(ratio: Ratio) -> PixelRatio {
+        PixelRatio(ratio.0, ratio.1)
     }
 }
 
@@ -47,10 +54,10 @@ impl<'a> AsciiHud<'a> {
             Symbol::LineRight1 => 228,
         };
         let hud = HUD::new(telemetry, &symbol_table, fov, pixel_ratio, aspect_ratio);
-        Self { hud, screen: [[0u8; 29]; 16] }
+        Self { hud, screen: [[0u8; 29]; 15] }
     }
 
-    pub fn start_draw<C: Fn(&[[u8; 29]; 16]) -> ()>(&mut self, consumer: C) {
+    pub fn start_draw<C: Fn(&[[u8; 29]; 15]) -> ()>(&mut self, consumer: C) {
         self.hud.draw(&mut self.screen);
         consumer(&self.screen);
     }

@@ -107,9 +107,12 @@ where
 }
 
 pub fn process_screen<T: AsRef<[u8]>>(screen: &[T], dma_consumer: DmaConsumer) {
-    static mut S_DMA_BUFFER: [u8; 1000] = [0u8; 1000];
+    static mut S_DMA_BUFFER: [u8; 800] = [0u8; 800];
     let mut dma_buffer = unsafe { S_DMA_BUFFER };
     let mut writer = NotNullWriter::new(screen, Default::default());
     let display = writer.write(&mut dma_buffer);
+    if display.0.len() >= unsafe { S_DMA_BUFFER }.len() {
+        warn!("DMA Buffer overflow")
+    }
     dma_consumer(&display.0);
 }
