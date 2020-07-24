@@ -166,8 +166,10 @@ impl ToYAML for OSD {
         writeln!(w, "aspect-ratio:")?;
         self.aspect_ratio.write_to(indent + 1, w)?;
 
-        self.write_indent(indent, w)?;
-        writeln!(w, "font: {}", self.font)?;
+        if self.font != "" {
+            self.write_indent(indent, w)?;
+            writeln!(w, "font: {}", self.font)?;
+        }
 
         self.write_indent(indent, w)?;
         writeln!(w, "fov: {}", self.fov)?;

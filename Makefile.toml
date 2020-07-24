@@ -16,3 +16,12 @@ args = [
     "omnibusf4v3.bin",
 ]
 dependencies = ["omnibusf4v3-elf"]
+
+[tasks.omnibusf4v3-hex]
+command = "arm-none-eabi-objcopy"
+args = [
+    "-O", "ihex",
+    "boards/omnibusf4v3/target/thumbv7em-none-eabihf/release/omnibusf4v3",
+    "omnibusf4v3.hex",
+]
+dependencies = ["omnibusf4v3-elf"]

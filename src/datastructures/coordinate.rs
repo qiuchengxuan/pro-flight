@@ -14,30 +14,31 @@ pub struct Longitude(i32);
 
 impl Longitude {
     pub fn from_str(string: &str) -> Option<Self> {
-        if string.len() != "Dhhh*mm.sss".len() {
-            return None;
-        }
-        if &string[4..5] != "*" || &string[7..8] != "." {
-            return None;
-        }
-        let degree: i32 = match string[1..4].parse().ok() {
+        let positive = match string.chars().next() {
+            Some('E') => true,
+            Some('W') => false,
+            _ => return None,
+        };
+
+        let mut split = string[1..].split('°');
+        let degree: i32 = match split.next().map(|d| d.parse().ok()).flatten() {
             Some(d) => d,
             None => return None,
         };
-        let minute: i32 = match string[5..7].parse().ok() {
+        let mut split = match split.next() {
+            Some(remain) => remain.split('.'),
+            None => return None,
+        };
+        let minute: i32 = match split.next().map(|m| m.parse().ok()).flatten() {
             Some(m) => m,
             None => return None,
         };
-        let sub_second: i32 = match string[8..11].parse().ok() {
-            Some(m) => m,
+        let sub_second: i32 = match split.next().map(|s| s.parse().ok()).flatten() {
+            Some(s) => s,
             None => return None,
         };
         let value = (degree * 3600 * SUB_SECOND + minute * 60 * SUB_SECOND + sub_second) * SCALE;
-        match &string[0..1] {
-            "E" => Some(Longitude(value)),
-            "W" => Some(Longitude(-value)),
-            _ => None,
-        }
+        Some(Self(if positive { value } else { -value }))
     }
 }
 
@@ -63,7 +64,7 @@ impl core::fmt::Display for Longitude {
         let sub_second = if self.0 >= 0 { self.0 } else { -self.0 } / SCALE;
         let degree = sub_second / SUB_SECOND / 3600;
         let minute = (sub_second / SUB_SECOND / 60) % 60;
-        write!(f, "{}{:03}*{:02}.{:03}", direction, degree, minute, sub_second % 600)
+        write!(f, "{}{:03}°{:02}.{:03}", direction, degree, minute, sub_second % 600)
     }
 }
 
@@ -78,30 +79,31 @@ pub struct Latitude(i32);
 
 impl Latitude {
     pub fn from_str(string: &str) -> Option<Self> {
-        if string.len() != "Dhh*mm.sss".len() {
-            return None;
-        }
-        if &string[3..4] != "*" || &string[6..7] != "." {
-            return None;
-        }
-        let degree: i32 = match string[1..3].parse().ok() {
+        let positive = match string.chars().next() {
+            Some('N') => true,
+            Some('S') => false,
+            _ => return None,
+        };
+
+        let mut split = string[1..].split('°');
+        let degree: i32 = match split.next().map(|d| d.parse().ok()).flatten() {
             Some(d) => d,
             None => return None,
         };
-        let minute: i32 = match string[4..6].parse().ok() {
+        let mut split = match split.next() {
+            Some(remain) => remain.split('.'),
+            None => return None,
+        };
+        let minute: i32 = match split.next().map(|m| m.parse().ok()).flatten() {
             Some(m) => m,
             None => return None,
         };
-        let sub_second: i32 = match string[7..10].parse().ok() {
-            Some(m) => m,
+        let sub_second: i32 = match split.next().map(|s| s.parse().ok()).flatten() {
+            Some(s) => s,
             None => return None,
         };
         let value = (degree * 3600 * SUB_SECOND + minute * 60 * SUB_SECOND + sub_second) * SCALE;
-        match &string[0..1] {
-            "N" => Some(Latitude(value)),
-            "S" => Some(Latitude(-value)),
-            _ => None,
-        }
+        Some(Self(if positive { value } else { -value }))
     }
 }
 
@@ -133,7 +135,7 @@ impl core::fmt::Display for Latitude {
         let sub_second = if self.0 >= 0 { self.0 } else { -self.0 } / SCALE;
         let degree = sub_second / SUB_SECOND / 3600;
         let minute = (sub_second / SUB_SECOND / 60) % 60;
-        write!(f, "{}{:02}*{:02}.{:03}", direction, degree, minute, sub_second % 600)
+        write!(f, "{}{:02}°{:02}.{:03}", direction, degree, minute, sub_second % 600)
     }
 }
 
@@ -186,11 +188,7 @@ impl Displacement {
 impl Into<SphericalCoordinate> for Displacement {
     fn into(self) -> SphericalCoordinate {
         let (x, y, z) = (self.x.0 as f32, self.y.0 as f32, self.z.0 as f32);
-        let mut square_sum = x * x + y * y + z * z;
-        if square_sum <= 0.0 {
-            square_sum = 0.0
-        }
-        let rho = square_sum.sqrt();
+        let rho = (x * x + y * y + z * z).sqrt();
         let theta = (x.atan2(y) * DEGREE_PER_DAG) as i16;
         let phi = if rho.is_normal() { ((z / rho).acos() * DEGREE_PER_DAG) as i16 } else { 90 };
         SphericalCoordinate { rho: Distance(rho as isize), theta: theta, phi: (90 - phi) as i8 }
@@ -243,12 +241,12 @@ mod test {
     fn test_latitude_longitude() {
         use super::{Latitude, Longitude};
 
-        let latitude = Latitude::from_str("N40*19.480").unwrap();
-        let longitude = Longitude::from_str("E116*44.540").unwrap();
+        let latitude = Latitude::from_str("N40°19.480").unwrap();
+        let longitude = Longitude::from_str("E116°44.540").unwrap();
         let s = format!("{}", latitude);
-        assert_eq!("N40*19.480", s);
+        assert_eq!("N40°19.480", s);
         let s = format!("{}", longitude);
-        assert_eq!("E116*44.540", s);
+        assert_eq!("E116°44.540", s);
     }
 
     #[test]

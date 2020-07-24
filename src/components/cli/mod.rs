@@ -48,7 +48,7 @@ where
                 "" => (),
                 _ => {
                     if !extra(line, serial) {
-                        console!(serial, "unknown input\n");
+                        console!(serial, "unknown input: {:?}\n", line);
                     }
                 }
             }
