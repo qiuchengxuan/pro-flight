@@ -72,15 +72,11 @@ unsafe fn DMA1_STREAM2() {
 
     on_dma_receive(&DMA_BUFFER);
 
-    let dma1 = &*(stm32::DMA1::ptr());
-    let stream = &dma1.st[7];
-    if stream.ndtr.read().ndt().bits() == 0 {
-        { &mut *CS_BARO.as_mut_ptr() }.set_high().ok();
-        { &mut *CS_OSD.as_mut_ptr() }.set_low().ok();
-        (&mut *OSD.as_mut_ptr()).start_draw(|screen| {
-            process_screen(screen, dma1_stream7_transfer_spi3);
-        });
-    }
+    { &mut *CS_BARO.as_mut_ptr() }.set_high().ok();
+    { &mut *CS_OSD.as_mut_ptr() }.set_low().ok();
+    (&mut *OSD.as_mut_ptr()).start_draw(|screen| {
+        process_screen(screen, dma1_stream7_transfer_spi3);
+    });
 }
 
 #[interrupt]

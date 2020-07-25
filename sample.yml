@@ -37,6 +37,7 @@ serials:
   USART1:
     type: GNSS
     baudrate: 38400
+    protocol: UBX
   USART6:
     type: SBUS
     fast: false

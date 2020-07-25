@@ -82,7 +82,8 @@ impl SbusReceiver {
         self.control_input.write(control_input);
     }
 
-    pub fn handle(&mut self, ring: &[u8], offset: usize, num_bytes: usize) {
+    pub fn handle(&mut self, ring: &[u8], half: bool, num_bytes: usize) {
+        let offset = if !half { 0 } else { ring.len() / 2 };
         let mut index = SBUS_PACKET_SIZE;
         let mut packet = [0u8; 1 + SBUS_PACKET_SIZE];
         for i in 0..num_bytes {

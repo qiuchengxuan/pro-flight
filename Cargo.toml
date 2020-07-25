@@ -15,7 +15,8 @@ cortex-m = "0.6"
 embedded-hal = "0.2"
 embedded-sdmmc = "0.3"
 enum-map = { version = "0.6", default-features = false }
-integer-sqrt = "0.1.3"
+hex-literal = "0.3"
+integer-sqrt = "0.1"
 max7456 = { path = "../max7456" }
 md5 = { version = "0.7.0", default-features = false }
 micromath = "1.0"

@@ -111,8 +111,5 @@ pub fn process_screen<T: AsRef<[u8]>>(screen: &[T], dma_consumer: DmaConsumer) {
     let mut dma_buffer = unsafe { S_DMA_BUFFER };
     let mut writer = NotNullWriter::new(screen, Default::default());
     let display = writer.write(&mut dma_buffer);
-    if display.0.len() >= unsafe { S_DMA_BUFFER }.len() {
-        warn!("DMA Buffer overflow")
-    }
     dma_consumer(&display.0);
 }

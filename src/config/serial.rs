@@ -38,6 +38,23 @@ impl core::fmt::Display for Identifier {
 }
 
 #[derive(PartialEq, Copy, Clone)]
+pub enum GNSSProtocol {
+    UBX,
+}
+
+impl core::fmt::Display for GNSSProtocol {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "UBX")
+    }
+}
+
+#[derive(PartialEq, Copy, Clone)]
+pub struct GNSSConfig {
+    pub baudrate: u32,
+    pub protocol: GNSSProtocol,
+}
+
+#[derive(PartialEq, Copy, Clone)]
 pub struct SbusConfig {
     pub fast: bool,
     pub rx_inverted: bool,
@@ -57,7 +74,7 @@ impl SbusConfig {
 #[derive(PartialEq, Copy, Clone)]
 pub enum Config {
     None,
-    GNSS(u32),
+    GNSS(GNSSConfig),
     SBUS(SbusConfig),
 }
 
@@ -75,12 +92,13 @@ impl FromYAML for Config {
                 "fast" => fast = value == "true",
                 "rx-inverted" => rx_inverted = value == "true",
                 "half-duplex" => half_duplex = value == "true",
+                "protocol" => continue,
                 _ => continue,
             }
         }
         match type_string {
             "SBUS" => Config::SBUS(SbusConfig { fast, rx_inverted, half_duplex }),
-            "GNSS" => Config::GNSS(baudrate),
+            "GNSS" => Config::GNSS(GNSSConfig { baudrate, protocol: GNSSProtocol::UBX }),
             _ => Config::None,
         }
     }
@@ -91,10 +109,12 @@ impl ToYAML for Config {
         self.write_indent(indent, w)?;
         match self {
             Self::None => writeln!(w, "type: NONE"),
-            Self::GNSS(baudrate) => {
+            Self::GNSS(gnss) => {
                 writeln!(w, "type: GNSS")?;
                 self.write_indent(indent, w)?;
-                writeln!(w, "baudrate: {}", baudrate)
+                writeln!(w, "baudrate: {}", gnss.baudrate)?;
+                self.write_indent(indent, w)?;
+                writeln!(w, "protocol: {}", gnss.protocol)
             }
             Self::SBUS(sbus) => {
                 writeln!(w, "type: SBUS")?;

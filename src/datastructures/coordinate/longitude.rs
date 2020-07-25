@@ -4,7 +4,7 @@ const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
-pub struct Longitude(i32);
+pub struct Longitude(pub i32);
 
 impl Longitude {
     pub fn from_str(string: &str) -> Option<Self> {

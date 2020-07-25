@@ -174,6 +174,17 @@ fn main() -> ! {
     let navigation = alloc::into_static(navigation, false).unwrap();
     navigation.set_altimeter(alloc::into_static(altimeter.as_data_source(), false).unwrap());
 
+    if let Some(config) = config.serials.get("USART1") {
+        info!("Initialize USART1");
+        let pins = (gpio_a.pa9, gpio_a.pa10);
+        match usart1::init(peripherals.USART1, pins, &config, clocks) {
+            Device::GNSS(ref mut gnss) => {
+                navigation.set_gnss(alloc::into_static(gnss.as_position_source(), false).unwrap());
+            }
+            _ => (),
+        }
+    }
+
     let mut telemetry = TelemetryUnit::new(
         altimeter.as_data_source(),
         battery,
@@ -195,8 +206,7 @@ fn main() -> ! {
         }
 
         let pins = (gpio_c.pc6, gpio_c.pc7);
-        let device = usart6::init(peripherals.USART6, pins, &serial_config, clocks);
-        match device {
+        match usart6::init(peripherals.USART6, pins, &serial_config, clocks) {
             Device::SBUS(ref mut sbus) => {
                 telemetry.set_receiver(alloc::into_static(sbus.as_receiver(), false).unwrap());
                 let input = alloc::into_static(sbus.as_control_input(), false).unwrap();
@@ -238,12 +248,6 @@ fn main() -> ! {
     };
 
     let (mut serial, mut device) = usb_serial::init(usb);
-
-    if let Some(config) = config.serials.get("USART1") {
-        info!("Initialize USART1");
-        let pins = (gpio_a.pa9, gpio_a.pa10);
-        usart1::init(peripherals.USART1, pins, &config, clocks);
-    }
 
     info!("Initialize PWMs");
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);

@@ -4,7 +4,7 @@ const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
-pub struct Latitude(i32);
+pub struct Latitude(pub i32);
 
 impl Latitude {
     pub fn from_str(string: &str) -> Option<Self> {

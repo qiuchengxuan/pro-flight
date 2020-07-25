@@ -45,3 +45,7 @@ extern crate pretty_assertions;
 #[cfg(test)]
 #[macro_use]
 extern crate serial_test;
+
+#[cfg(test)]
+#[macro_use]
+extern crate hex_literal;

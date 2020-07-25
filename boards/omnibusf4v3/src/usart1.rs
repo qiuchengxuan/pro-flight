@@ -1,6 +1,7 @@
 use core::mem::MaybeUninit;
 
 use rs_flight::config::SerialConfig;
+use rs_flight::drivers::gnss::GNSS;
 use rs_flight::drivers::uart::Device;
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::{Alternate, Floating, Input, AF7};
@@ -17,7 +18,6 @@ type PINS = (gpioa::PA9<Alternate<AF7>>, gpioa::PA10<Alternate<AF7>>);
 const HTIF_OFFSET: usize = 4;
 const STREAM5_OFFSET: usize = 6;
 
-#[export_name = "USART1_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
 static mut DEVICE: Device = Device::None;
 static mut USART1: MaybeUninit<Serial<stm32::USART1, PINS>> = MaybeUninit::uninit();
@@ -31,8 +31,7 @@ unsafe fn DMA2_STREAM5() {
         half = (dma2.hisr.read().bits() & (1 << HTIF_OFFSET) << STREAM5_OFFSET) > 0;
         dma2.hifcr.write(|w| w.bits(0x3D << STREAM5_OFFSET));
     });
-    let offset = if half { 0 } else { DMA_BUFFER.len() / 2 };
-    DEVICE.handle(&DMA_BUFFER, offset, DMA_BUFFER.len() / 2);
+    DEVICE.handle(&DMA_BUFFER, half, DMA_BUFFER.len() / 2);
 }
 
 pub fn init(
@@ -45,9 +44,9 @@ pub fn init(
 
     let mut cfg = Config::default();
     match config {
-        SerialConfig::GNSS(baudrate) => {
+        SerialConfig::GNSS(gnss) => {
             debug!("Config USART6 as GNSS receiver");
-            cfg = cfg.baudrate(baudrate.bps());
+            cfg = cfg.baudrate(gnss.baudrate.bps());
         }
         _ => return unsafe { &mut DEVICE },
     };
@@ -79,7 +78,7 @@ pub fn init(
     }
 
     let device = match config {
-        SerialConfig::GNSS(_) => Device::GNSS,
+        SerialConfig::GNSS(gnss) => Device::GNSS(GNSS::new(gnss.protocol)),
         _ => Device::None,
     };
     unsafe {

@@ -1,4 +1,5 @@
 pub mod bmp280;
+pub mod gnss;
 pub mod max7456;
 pub mod mpu6000;
 pub mod pwm;

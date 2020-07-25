@@ -18,7 +18,6 @@ type PINS = (gpioc::PC6<Alternate<AF8>>, gpioc::PC7<Alternate<AF8>>);
 const HTIF_OFFSET: usize = 4;
 const STREAM1_OFFSET: usize = 6;
 
-#[export_name = "USART6_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
 static mut DEVICE: Device = Device::None;
 static mut USART6: MaybeUninit<Serial<stm32::USART6, PINS>> = MaybeUninit::uninit();
@@ -32,8 +31,7 @@ unsafe fn DMA2_STREAM1() {
         half = (dma2.lisr.read().bits() & (1 << HTIF_OFFSET) << STREAM1_OFFSET) > 0;
         dma2.lifcr.write(|w| w.bits(0x3D << STREAM1_OFFSET));
     });
-    let offset = if half { 0 } else { DMA_BUFFER.len() / 2 };
-    DEVICE.handle(&DMA_BUFFER, offset, DMA_BUFFER.len() / 2);
+    DEVICE.handle(&DMA_BUFFER, half, DMA_BUFFER.len() / 2);
 }
 
 pub fn init(
@@ -81,7 +79,6 @@ pub fn init(
     unsafe {
         cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA2_STREAM1);
     }
-    // FIXME: use a timer to ensure remaining data be received
 
     let device = match config {
         SerialConfig::SBUS(_) => Device::SBUS(SbusReceiver::new()),

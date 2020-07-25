@@ -36,7 +36,6 @@ const DMA_SIZE: usize = 16;
 
 static mut CS: MaybeUninit<gpioa::PA4<Output<PushPull>>> = MaybeUninit::uninit();
 static mut INT: MaybeUninit<gpioc::PC4<Input<PullUp>>> = MaybeUninit::uninit();
-#[export_name = "MPU6000_DMA_BUFFER"]
 static mut DMA_BUFFER: [u8; DMA_SIZE + 4] = [0u8; DMA_SIZE + 4]; // a little bit larger to avoid out-of-range
 
 #[interrupt]
