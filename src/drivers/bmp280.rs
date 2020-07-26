@@ -4,12 +4,12 @@ use bmp280::bus::Bus;
 use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::{PressureOversampling, StandbyTime, TemperatureOversampling};
 use bmp280::{Mode, BMP280};
-use embedded_hal::blocking::delay::DelayMs;
 
 use crate::alloc;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::Pressure;
+use crate::sys::timer::SysTimer;
 
 pub const BMP280_SAMPLE_RATE: usize = 16;
 
@@ -31,13 +31,10 @@ pub fn init_data_source() -> impl DataSource<Pressure> {
     OverwritingDataSource::new(unsafe { &*BUFFER.as_ptr() })
 }
 
-pub fn init<E, BUS, D>(bus: BUS, delay: &mut D) -> Result<bool, E>
-where
-    BUS: Bus<Error = E>,
-    D: DelayMs<u8>,
-{
+pub fn init<E, BUS: Bus<Error = E>>(bus: BUS) -> Result<bool, E> {
     let mut bmp280 = BMP280::new(bus);
-    bmp280.reset(delay)?;
+    let mut delay = SysTimer::new();
+    bmp280.reset(&mut delay)?;
     if !bmp280.verify()? {
         return Ok(false);
     }

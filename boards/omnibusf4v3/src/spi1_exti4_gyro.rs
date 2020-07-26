@@ -4,9 +4,7 @@ use core::mem::MaybeUninit;
 use mpu6000::bus::{self, DelayNs, SpiBus};
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
-
 use rs_flight::drivers::mpu6000::{init as mpu6000_init, on_dma_receive};
-use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::gpioc;
 use stm32f4xx_hal::gpio::ExtiPin;
@@ -98,7 +96,6 @@ pub fn init(
     pa4: PA4,
     int: PC4,
     clocks: Clocks,
-    delay: &mut Delay,
     sample_rate: u16,
 ) -> Result<bool, SpiError> {
     let mut cs = pa4.into_push_pull_output();
@@ -110,7 +107,7 @@ pub fn init(
     let freq: stm32f4xx_hal::time::Hertz = 1.mhz().into();
     let spi1 = Spi::spi1(spi1, (sclk, miso, mosi), SPI_MODE, freq, clocks);
     let bus = SpiBus::new(spi1, &mut cs, TickDelay(clocks.sysclk().0));
-    if !mpu6000_init(bus, sample_rate, delay)? {
+    if !mpu6000_init(bus, sample_rate)? {
         return Ok(false);
     }
 

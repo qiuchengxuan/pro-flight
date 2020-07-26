@@ -14,7 +14,6 @@ cast = { version = "0.2.2", default-features = false }
 chips = { path = "../../chips" }
 cortex-m = "0.6"
 cortex-m-rt = "0.6"
-cortex-m-systick-countdown = "0.1"
 embedded-hal = "0.2"
 embedded-sdmmc = "0.3"
 log = { version = "0.4", features = ["max_level_off"] }

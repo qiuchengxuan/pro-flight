@@ -8,7 +8,6 @@ extern crate chips;
 extern crate cortex_m;
 #[macro_use]
 extern crate cortex_m_rt;
-extern crate cortex_m_systick_countdown;
 extern crate embedded_sdmmc;
 extern crate max7456;
 extern crate mpu6000;
@@ -30,11 +29,12 @@ mod usb_serial;
 
 use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
+use core::time::Duration;
 
+use chips::cortex_m4::{get_jiffies, systick_init};
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
-use cortex_m_systick_countdown::{MillisCountDown, PollingSysTick, SysTickCalibration};
 use rs_flight::alloc;
 use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cli::memory;
@@ -55,7 +55,7 @@ use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
 use rs_flight::drivers::uart::Device;
 use rs_flight::logger::{self, Level};
 use rs_flight::sys::fs::File;
-use stm32f4xx_hal::delay::Delay;
+use rs_flight::sys::timer::{self, SysTimer};
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
 use stm32f4xx_hal::{prelude::*, stm32};
@@ -87,6 +87,9 @@ fn main() -> ! {
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
+    systick_init(cortex_m_peripherals.SYST, clocks.sysclk().0);
+    timer::init(get_jiffies);
+
     unsafe { alloc::init(&mut [], &mut CCM_MEMORY) };
 
     logger::init(alloc::allocate(1024, false).unwrap(), Level::Debug);
@@ -99,16 +102,14 @@ fn main() -> ! {
 
     let (hclk, pclk1, pclk2) =
         (clocks.hclk().0 / MHZ, clocks.pclk1().0 / MHZ, clocks.pclk2().0 / MHZ);
-    info!("hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", hclk, pclk1, pclk2);
-    info!("stack top: {:x}", cortex_m::register::msp::read());
+    debug!("hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", hclk, pclk1, pclk2);
+    debug!("stack top: {:x}", cortex_m::register::msp::read());
 
     unsafe {
         let rcc = &*stm32::RCC::ptr();
         rcc.apb2enr.write(|w| w.syscfgen().enabled());
         rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled());
     }
-
-    let mut delay = Delay::new(cortex_m_peripherals.SYST, clocks);
 
     let gpio_a = peripherals.GPIOA.split();
     let gpio_b = peripherals.GPIOB.split();
@@ -157,7 +158,6 @@ fn main() -> ! {
         gpio_a.pa4,
         int,
         clocks,
-        &mut delay,
         GYRO_SAMPLE_RATE as u16,
     )
     .ok();
@@ -228,15 +228,11 @@ fn main() -> ! {
         gpio_b.pb3,
         clocks,
         telemetry,
-        &mut delay,
     )
     .ok();
 
-    let calibration = SysTickCalibration::from_clock_hz(clocks.sysclk().0);
-    let systick = PollingSysTick::new(delay.free(), &calibration);
-
     let pin = gpio_b.pb5.into_push_pull_output();
-    let mut sysled = Sysled::new(pin, MillisCountDown::new(&systick));
+    let mut sysled = Sysled::new(pin);
 
     info!("Initialize USB CDC");
     let usb = USB {
@@ -259,18 +255,18 @@ fn main() -> ! {
     };
 
     let (primary, no_dma) = alloc::available();
-    info!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
+    debug!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
 
-    let mut cli = CLI::new(MillisCountDown::new(&systick));
-    let mut schedule = MillisCountDown::new(&systick);
-    schedule.start_ms(20);
+    let mut cli = CLI::new();
+    let mut timer = SysTimer::new();
+    timer.start(Duration::from_millis(20));
     loop {
-        if schedule.wait().is_ok() {
+        if timer.wait().is_ok() {
             altimeter.schedule();
             imu.schedule();
             navigation.schedule();
             control_surface.schedule();
-            schedule.start_ms(20);
+            timer.start(Duration::from_millis(20));
         }
         sysled.check_toggle().unwrap();
         if !device.poll(&mut [&mut serial]) {

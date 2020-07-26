@@ -91,7 +91,7 @@ impl UBXDecoder {
         if self.remain == 0 {
             if !self.running {
                 self.running = true;
-                info!("GNSS UBX start working");
+                info!("GNSS UBX detected");
             }
             self.handle_pvt_message();
             self.remain = NAV_PVT_SIZE;

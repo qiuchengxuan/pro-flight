@@ -1,6 +1,8 @@
 use core::fmt::{Display, Result, Write};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::sys::timer::get_jiffies;
+
 pub enum Level {
     Debug = 0,
     Info,
@@ -70,18 +72,20 @@ impl Write for Logger {
 }
 
 #[doc(hidden)]
-pub fn __write_log(args: core::fmt::Arguments, level: Level, file: &'static str, line: u32) {
+pub fn __write_log(args: core::fmt::Arguments, level: Level) {
     let mut logger = Logger {};
-    let filename = file.rsplitn(2, "/").next().unwrap_or("?.rs");
-    write!(logger, "{} {}:{} ", level, filename, line).ok();
+    let jiffies = get_jiffies();
+    let seconds = jiffies.as_secs() as u32;
+    write!(logger, "[{:5}.{:03}] {} ", seconds, jiffies.subsec_millis(), level).ok();
     writeln!(logger, "{}", args).ok();
 }
 
 #[doc(hidden)]
-pub fn __write_log_literal(message: &'static str, level: Level, file: &'static str, line: u32) {
+pub fn __write_log_literal(message: &'static str, level: Level) {
     let mut logger = Logger {};
-    let filename = file.rsplitn(2, "/").next().unwrap_or("?.rs");
-    write!(logger, "{} {}:{} ", level, filename, line).ok();
+    let jiffies = get_jiffies();
+    let seconds = jiffies.as_secs() as u32;
+    write!(logger, "[{:5}.{:03}] {} ", seconds, jiffies.subsec_millis(), level).ok();
     writeln!(logger, "{}", message).ok();
 }
 
@@ -97,10 +101,10 @@ macro_rules! __format_args {
 macro_rules! log {
     ($level:expr, $message:expr) => ({
         let _ = __format_args!($message);
-        $crate::logger::__write_log_literal($message, $level, file!(), line!());
+        $crate::logger::__write_log_literal($message, $level);
     });
     ($level:expr, $($arg:tt)+) => {
-        $crate::logger::__write_log(__format_args!($($arg)+), $level, file!(), line!());
+        $crate::logger::__write_log(__format_args!($($arg)+), $level);
     };
 }
 

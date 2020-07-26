@@ -1,4 +1,3 @@
-use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use max7456::character_memory::{CharData, CHAR_DATA_SIZE};
 use max7456::font::{char_block_to_byte, validate_header, ByteBlock, HeaderBlock};
@@ -10,6 +9,7 @@ use md5::Context;
 use crate::config;
 use crate::hal::io::Read;
 use crate::sys::fs::File;
+use crate::sys::timer::SysTimer;
 
 impl From<config::Standard> for Standard {
     fn from(standard: config::Standard) -> Standard {
@@ -45,11 +45,7 @@ fn read_char<E: core::fmt::Debug>(reader: &mut dyn Read<Error = E>) -> Option<Ch
     Some(char_data)
 }
 
-fn upload_font<E, BUS>(
-    file: &mut File,
-    max7456: &mut MAX7456<BUS>,
-    delay: &mut dyn DelayMs<u8>,
-) -> Result<bool, E>
+fn upload_font<E, BUS>(file: &mut File, max7456: &mut MAX7456<BUS>) -> Result<bool, E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
@@ -67,11 +63,12 @@ where
         return Ok(false);
     }
 
+    let mut delay = SysTimer::new();
     let mut md5_context = Context::new();
     for i in 0..256 {
         if let Some(char_data) = read_char(file) {
             md5_context.consume(&char_data[..]);
-            max7456.store_char(i as u8, &char_data, delay)?;
+            max7456.store_char(i as u8, &char_data, &mut delay)?;
         }
     }
     let v: u128 = unsafe { core::mem::transmute(md5_context.compute()) };
@@ -79,13 +76,14 @@ where
     Ok(true)
 }
 
-pub fn init<BUS, E>(bus: BUS, delay: &mut dyn DelayMs<u8>) -> Result<(), E>
+pub fn init<BUS, E>(bus: BUS) -> Result<(), E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
     let config = &config::get().osd;
     let mut max7456 = MAX7456::new(bus);
-    max7456.reset(delay)?;
+    let mut delay = SysTimer::new();
+    max7456.reset(&mut delay)?;
     max7456.set_standard(config.standard.into())?;
     if config.offset.horizental != 0 {
         max7456.set_horizental_offset(config.offset.horizental)?;
@@ -96,7 +94,7 @@ where
     if config.font != "" {
         match File::open(config.font) {
             Ok(mut file) => {
-                upload_font(&mut file, &mut max7456, delay)?;
+                upload_font(&mut file, &mut max7456)?;
                 file.close();
             }
             Err(e) => warn!("Open file {} failed: {:?}", config.font, e),

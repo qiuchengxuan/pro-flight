@@ -1,6 +1,6 @@
 use core::mem::MaybeUninit;
 
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::blocking::delay::DelayUs;
 use mpu6000::bus::Bus;
 use mpu6000::measurement;
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
@@ -10,6 +10,7 @@ use crate::alloc;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, Measurement, Temperature};
+use crate::sys::timer::SysTimer;
 
 pub const ACCELEROMETER_SENSITIVE: AccelerometerSensitive =
     accelerometer_sensitive!(+/-4g, 8192/LSB);
@@ -68,13 +69,10 @@ pub unsafe fn on_dma_receive(dma_buffer: &[u8; 16]) {
     temperature_data.write(temperature.0);
 }
 
-pub fn init<E, BUS, D>(bus: BUS, sample_rate: u16, delay: &mut D) -> Result<bool, E>
-where
-    BUS: Bus<Error = E>,
-    D: DelayUs<u8> + DelayMs<u8>,
-{
+pub fn init<E, BUS: Bus<Error = E>>(bus: BUS, sample_rate: u16) -> Result<bool, E> {
     let mut mpu6000 = MPU6000::new(bus);
-    mpu6000.reset(delay)?;
+    let mut delay = SysTimer::new();
+    mpu6000.reset(&mut delay)?;
     if !mpu6000.verify()? {
         return Ok(false);
     }

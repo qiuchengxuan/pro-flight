@@ -29,6 +29,7 @@ sbus-parser = { path = "../sbus" }
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }
 sval_json = "0.5"
+void = { version = "1", default-features = false }
 
 [lib]
 name = "rs_flight"

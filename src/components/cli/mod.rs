@@ -1,26 +1,21 @@
 mod config;
 pub mod memory;
 
-use core::time::Duration;
-
 use arrayvec::ArrayVec;
 use embedded_hal::serial::{Read, Write};
-use embedded_hal::timer::CountDown;
 
 use crate::components::console;
 use crate::logger;
+use crate::sys::timer::SysTimer;
 
-pub struct CLI<C> {
+pub struct CLI {
     vec: ArrayVec<[u8; 80]>,
-    count_down: C,
+    timer: SysTimer,
 }
 
-impl<C> CLI<C>
-where
-    C: CountDown<Time = Duration>,
-{
-    pub fn new(count_down: C) -> Self {
-        CLI { vec: ArrayVec::new(), count_down }
+impl CLI {
+    pub fn new() -> Self {
+        CLI { vec: ArrayVec::new(), timer: SysTimer::new() }
     }
 
     pub fn interact<RE, WE, S, E>(&mut self, serial: &mut S, mut extra: E)
@@ -41,7 +36,7 @@ where
                 }
                 "read" | "readx" | "readf" => memory::read(line, serial),
                 "dump" => memory::dump(line, serial),
-                "write" => memory::write(line, serial, &mut self.count_down),
+                "write" => memory::write(line, serial, &mut self.timer),
                 "set" => config::set(serial, line),
                 "show" => config::show(serial),
                 "save" => config::save(),

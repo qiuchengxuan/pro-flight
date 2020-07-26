@@ -13,7 +13,6 @@ use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
 use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
-use stm32f4xx_hal::delay::Delay;
 use stm32f4xx_hal::gpio::gpioa::PA15;
 use stm32f4xx_hal::gpio::gpiob::PB3;
 use stm32f4xx_hal::gpio::gpioc::{PC10, PC11, PC12};
@@ -123,7 +122,6 @@ pub fn init<'a>(
     pb3: PB3<Input<Floating>>,
     clocks: Clocks,
     telemetry_source: &'static dyn TelemetrySource,
-    delay: &mut Delay,
 ) -> Result<bool, Error> {
     let mut cs_osd = pa15.into_push_pull_output();
     let mut cs_baro = pb3.into_push_pull_output();
@@ -138,10 +136,10 @@ pub fn init<'a>(
 
     let mut dummy_cs = DummyOutputPin {};
     let bus = SpiBus::new(VirtualSpi::new(&spi, 0), &mut dummy_cs, TickDelay(clocks.sysclk().0));
-    if !bmp280_init(bus, delay).is_ok() {
+    if !bmp280_init(bus).is_ok() {
         return Ok(false);
     }
-    max7456_init(VirtualSpi::new(&spi, 1), delay)?;
+    max7456_init(VirtualSpi::new(&spi, 1))?;
 
     let config = &config::get().osd;
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
