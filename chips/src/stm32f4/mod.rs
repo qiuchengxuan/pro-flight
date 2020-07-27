@@ -1,3 +1,5 @@
+#[cfg(feature = "stm32f4xx-hal")]
+pub mod crc;
 pub mod dfu;
 
 pub fn valid_memory_address(address: u32) -> bool {

@@ -30,6 +30,7 @@ Progress
   - [ ] DMA based SDCARD read & write
   - [ ] Stabilizer
   - [ ] Navigation
+  - [ ] CRC based OSD font check
 
 data-flow
 =========

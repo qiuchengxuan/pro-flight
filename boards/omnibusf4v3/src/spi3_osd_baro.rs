@@ -5,7 +5,7 @@ use ascii_osd_hud::telemetry::TelemetrySource;
 
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::registers::Register;
-
+use crc::Hasher32;
 use embedded_hal::digital::v2::OutputPin;
 use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
@@ -131,11 +131,12 @@ impl<'a> Schedulable for OSDScheduler<'a> {
     }
 }
 
-pub fn init<'a>(
+pub fn init<'a, CRC: Hasher32>(
     spi3: stm32::SPI3,
     spi3_pins: (PC10<Input<Floating>>, PC11<Input<Floating>>, PC12<Input<Floating>>),
     pa15: PA15<Input<Floating>>,
     pb3: PB3<Input<Floating>>,
+    crc: &mut CRC,
     clocks: Clocks,
     telemetry_source: &'static dyn TelemetrySource,
 ) -> Result<(impl Schedulable, impl Schedulable), Error> {
@@ -154,7 +155,7 @@ pub fn init<'a>(
     if !bmp280_init(bus).is_ok() {
         warn!("BMP280 init not ok")
     }
-    max7456_init(VirtualSpi::new(&spi, 1))?;
+    max7456_init(VirtualSpi::new(&spi, 1), crc)?;
 
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
     spi3.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());

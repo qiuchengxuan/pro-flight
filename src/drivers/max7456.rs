@@ -1,9 +1,9 @@
+use crc::Hasher32;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use max7456::character_memory::{CharData, CHAR_DATA_SIZE};
 use max7456::font::{char_block_to_byte, validate_header, ByteBlock, HeaderBlock};
 use max7456::registers::Standard;
 use max7456::MAX7456;
-use md5::Context;
 
 use crate::config;
 use crate::hal::io::Read;
@@ -42,11 +42,12 @@ fn read_char<E: core::fmt::Debug>(reader: &mut dyn Read<Error = E>) -> Option<Ch
     Some(char_data)
 }
 
-fn upload_font<E, BUS>(file: &mut File, max7456: &mut MAX7456<BUS>) -> Result<bool, E>
+fn upload<E, BUS, CRC>(file: &mut File, osd: &mut MAX7456<BUS>, crc: &mut CRC) -> Result<bool, E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
+    CRC: Hasher32,
 {
-    max7456.enable_display(false)?;
+    osd.enable_display(false)?;
     let mut header_block: HeaderBlock = Default::default();
     let size = match file.read(&mut header_block) {
         Ok(size) => size,
@@ -60,20 +61,19 @@ where
         return Ok(false);
     }
 
+    crc.reset();
     let mut delay = SysTimer::new();
-    let mut md5_context = Context::new();
     for i in 0..256 {
         if let Some(char_data) = read_char(file) {
-            md5_context.consume(&char_data[..]);
-            max7456.store_char(i as u8, &char_data, &mut delay)?;
+            crc.write(&char_data);
+            osd.store_char(i as u8, &char_data, &mut delay)?;
         }
     }
-    let v: u128 = unsafe { core::mem::transmute(md5_context.compute()) };
-    info!("Uploaded complete, md5sum = {:#x}", v);
+    info!("Upload complete, checksum = {:#x}", crc.sum32());
     Ok(true)
 }
 
-pub fn init<BUS, E>(bus: BUS) -> Result<(), E>
+pub fn init<BUS, E, CRC: Hasher32>(bus: BUS, crc: &mut CRC) -> Result<(), E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
@@ -91,7 +91,7 @@ where
     if config.font != "" {
         match File::open(config.font) {
             Ok(mut file) => {
-                upload_font(&mut file, &mut max7456)?;
+                upload(&mut file, &mut max7456, crc)?;
                 file.close();
             }
             Err(e) => warn!("Open file {} failed: {:?}", config.font, e),

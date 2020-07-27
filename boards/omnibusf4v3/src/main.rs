@@ -8,6 +8,7 @@ extern crate chips;
 extern crate cortex_m;
 #[macro_use]
 extern crate cortex_m_rt;
+extern crate crc;
 extern crate embedded_sdmmc;
 extern crate max7456;
 extern crate mpu6000;
@@ -32,6 +33,7 @@ use core::panic::PanicInfo;
 use core::time::Duration;
 
 use chips::cortex_m4::{get_jiffies, systick_init};
+use chips::stm32f4::crc::CRC;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
@@ -108,7 +110,7 @@ fn main() -> ! {
     unsafe {
         let rcc = &*stm32::RCC::ptr();
         rcc.apb2enr.write(|w| w.syscfgen().enabled());
-        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled());
+        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled().crcen().enabled());
     }
 
     let gpio_a = peripherals.GPIOA.split();
@@ -225,6 +227,7 @@ fn main() -> ! {
         (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12),
         gpio_a.pa15,
         gpio_b.pb3,
+        &mut CRC(peripherals.CRC),
         clocks,
         telemetry,
     );
