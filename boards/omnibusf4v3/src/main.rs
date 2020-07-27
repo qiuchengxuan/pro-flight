@@ -22,7 +22,7 @@ mod adc2_vbat;
 mod pwm;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
-mod spi3_tim7_osd_baro;
+mod spi3_osd_baro;
 mod usart1;
 mod usart6;
 mod usb_serial;
@@ -220,16 +220,15 @@ fn main() -> ! {
     let telemetry = alloc::into_static(telemetry, false).unwrap();
 
     info!("Initialize OSD & Barometer");
-    spi3_tim7_osd_baro::init(
+    let result = spi3_osd_baro::init(
         peripherals.SPI3,
-        peripherals.TIM7,
         (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12),
         gpio_a.pa15,
         gpio_b.pb3,
         clocks,
         telemetry,
-    )
-    .ok();
+    );
+    let (mut baro, mut osd) = result.ok().unwrap();
 
     let pin = gpio_b.pb5.into_push_pull_output();
     let mut sysled = Sysled::new(pin);
@@ -262,10 +261,12 @@ fn main() -> ! {
     timer.start(Duration::from_millis(20));
     loop {
         if timer.wait().is_ok() {
+            baro.schedule();
             altimeter.schedule();
             imu.schedule();
             navigation.schedule();
             control_surface.schedule();
+            osd.schedule();
             timer.start(Duration::from_millis(20));
         }
         sysled.check_toggle().unwrap();
