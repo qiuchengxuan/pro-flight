@@ -1,26 +1,74 @@
 use core::cell::{Cell, RefCell};
+use core::marker::PhantomData;
 
 use embedded_hal::blocking::spi;
 use embedded_hal::digital::v2::OutputPin;
 
-// NOTE: thread unsafe
-pub struct SharedSpi<'a, E, SPI> {
-    cell: RefCell<SPI>,
-    chip_selects: RefCell<&'a mut [&'a mut dyn OutputPin<Error = E>]>,
-    owner: Cell<isize>,
+pub trait ChipSelects<E> {
+    fn with<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, index: usize, f: F);
+    fn for_each<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, f: F);
 }
 
-impl<'a, E, SPI> SharedSpi<'a, E, SPI> {
-    pub fn new(spi: SPI, chip_selects: &'a mut [&'a mut dyn OutputPin<Error = E>]) -> Self {
-        for cs in chip_selects.iter_mut() {
-            cs.set_high().ok();
+macro_rules! peel {
+    (($idx0:tt) -> $P0:ident
+     $(
+         ($idx:tt) -> $P:ident
+     )*
+    ) => (chip_selects! { $(($idx) -> $P)* })
+}
+
+macro_rules! chip_selects {
+    () => ();
+    ($(($idx:tt) -> $CS:ident)+) => {
+        impl<E, $($CS: OutputPin<Error = E>,)+> ChipSelects<E> for ($($CS,)+) {
+            fn with<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, index: usize, mut f: F) {
+                match index {
+                    $(
+                        $idx => f(&mut self.$idx),
+                    )+
+                    _ => (),
+                }
+            }
+
+            fn for_each<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, mut f: F) {
+                $(f(&mut self.$idx);)+
+            }
         }
-        chip_selects[0].set_low().ok();
+        peel!{ $(($idx) -> $CS)+ }
+    }
+}
+
+chip_selects! {
+    (1) -> CS1
+    (0) -> CS0
+}
+
+// NOTE: thread unsafe
+pub struct SharedSpi<E, SPI, CSS> {
+    cell: RefCell<SPI>,
+    chip_selects: RefCell<CSS>,
+    owner: Cell<isize>,
+    _e: PhantomData<E>,
+}
+
+impl<E, SPI, CSS: ChipSelects<E>> SharedSpi<E, SPI, CSS> {
+    pub fn new(spi: SPI, mut chip_selects: CSS) -> Self {
+        chip_selects.for_each(|cs| {
+            cs.set_high().ok();
+        });
+        chip_selects.with(0, |cs| {
+            cs.set_low().ok();
+        });
         Self {
             cell: RefCell::new(spi),
             chip_selects: RefCell::new(chip_selects),
             owner: Cell::new(0),
+            _e: PhantomData,
         }
+    }
+
+    pub fn into_inner(self) -> (SPI, CSS) {
+        (self.cell.into_inner(), self.chip_selects.into_inner())
     }
 
     pub fn owner(&self, index: usize) -> bool {
@@ -33,11 +81,15 @@ impl<'a, E, SPI> SharedSpi<'a, E, SPI> {
             return;
         }
         match self.chip_selects.try_borrow_mut() {
-            Ok(mut cs) => {
+            Ok(mut css) => {
                 if owner >= 0 {
-                    cs[owner as usize].set_high().ok();
+                    css.with(owner as usize, |cs| {
+                        cs.set_high().ok();
+                    })
                 }
-                cs[index].set_low().ok();
+                css.with(index, |cs| {
+                    cs.set_low().ok();
+                });
                 self.owner.set(index as isize);
             }
             _ => (),
@@ -49,8 +101,10 @@ impl<'a, E, SPI> SharedSpi<'a, E, SPI> {
             return;
         }
         match self.chip_selects.try_borrow_mut() {
-            Ok(mut cs) => {
-                cs[index].set_high().ok();
+            Ok(mut css) => {
+                css.with(index, |cs| {
+                    cs.set_high().ok();
+                });
                 self.owner.set(-1);
             }
             _ => (),
@@ -58,24 +112,24 @@ impl<'a, E, SPI> SharedSpi<'a, E, SPI> {
     }
 }
 
-pub struct VirtualSpi<'a, E, SPI> {
-    shared: &'a SharedSpi<'a, E, SPI>,
+pub struct VirtualSpi<'a, E, SPI, CSS> {
+    shared: &'a SharedSpi<E, SPI, CSS>,
     index: usize,
 }
 
-impl<'a, E, SPI> VirtualSpi<'a, E, SPI> {
-    pub fn new(shared: &'a SharedSpi<'a, E, SPI>, index: usize) -> Self {
+impl<'a, E, SPI, CSS> VirtualSpi<'a, E, SPI, CSS> {
+    pub fn new(shared: &'a SharedSpi<E, SPI, CSS>, index: usize) -> Self {
         Self { shared, index }
     }
 }
 
-impl<'a, E, T, SPI> spi::Write<u8> for VirtualSpi<'a, T, SPI>
+impl<'a, E, T, SPI, CSS: ChipSelects<E>> spi::Write<u8> for VirtualSpi<'a, E, SPI, CSS>
 where
-    SPI: spi::Write<u8, Error = E>,
+    SPI: spi::Write<u8, Error = T>,
 {
-    type Error = E;
+    type Error = T;
 
-    fn write(&mut self, bytes: &[u8]) -> Result<(), E> {
+    fn write(&mut self, bytes: &[u8]) -> Result<(), T> {
         self.shared.acquire(self.index);
         let result = self.shared.cell.borrow_mut().write(bytes);
         if bytes.len() > 1 {
@@ -85,13 +139,13 @@ where
     }
 }
 
-impl<'a, E, T, SPI> spi::Transfer<u8> for VirtualSpi<'a, T, SPI>
+impl<'a, E, T, SPI, CSS: ChipSelects<E>> spi::Transfer<u8> for VirtualSpi<'a, E, SPI, CSS>
 where
-    SPI: spi::Transfer<u8, Error = E>,
+    SPI: spi::Transfer<u8, Error = T>,
 {
-    type Error = E;
+    type Error = T;
 
-    fn transfer<'b>(&mut self, bytes: &'b mut [u8]) -> Result<&'b [u8], E> {
+    fn transfer<'b>(&mut self, bytes: &'b mut [u8]) -> Result<&'b [u8], T> {
         self.shared.acquire(self.index);
         let result = self.shared.cell.borrow_mut().transfer(bytes);
         self.shared.release(self.index);

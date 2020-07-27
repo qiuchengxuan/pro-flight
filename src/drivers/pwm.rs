@@ -4,46 +4,45 @@ use crate::config::output::Identifier;
 
 pub trait PwmByIdentifier {
     fn with<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, identifier: Identifier, f: F);
+    fn for_each<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, f: F);
 }
 
-macro_rules! pwms_impls {
-    ($(
-        $PWM:ident {
-            $(($idx:tt) -> $P:ident)+
-        }
-    )+) => {
-        $(
-            pub struct $PWM<$($P,)+>($($P,)+);
+macro_rules! peel {
+    (($idx0:tt) -> $P0:ident
+     $(
+         ($idx:tt) -> $P:ident
+     )*
+    ) => (pwms! { $(($idx) -> $P)* })
+}
 
-            impl<$($P,)+> $PWM<$($P,)+> {
-                pub fn new(pwms: ($($P,)+)) -> Self {
-                    Self($(pwms.$idx,)+)
-                }
-            }
-
-            impl<$($P: PwmPin<Duty = u16>,)+> PwmByIdentifier for $PWM<$($P,)+> {
-                fn with<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, identifier: Identifier, mut f: F){
-                    match identifier {
-                        Identifier::PWM(id) => match (id - 1) {
-                            $(
-                                $idx => f(&mut self.$idx),
-                            )+
-                            _ => (),
-                        }
+macro_rules! pwms {
+    () => ();
+    ($(($idx:tt) -> $P:ident)+) => {
+        impl<$($P: PwmPin<Duty = u16>,)+> PwmByIdentifier for ($($P,)+) {
+            fn with<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, identifier: Identifier, mut f: F) {
+                match identifier {
+                    Identifier::PWM(id) => match (id - 1) {
+                        $(
+                            $idx => f(&mut self.$idx),
+                        )+
+                        _ => (),
                     }
                 }
             }
-        )+
+
+            fn for_each<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, mut f: F) {
+                $(f(&mut self.$idx);)+
+            }
+        }
+        peel!{ $(($idx) -> $P)+ }
     }
 }
 
-pwms_impls! {
-    PWM6 {
-        (0) -> P0
-        (1) -> P1
-        (2) -> P2
-        (3) -> P3
-        (4) -> P4
-        (5) -> P5
-    }
+pwms! {
+   (5) -> P5
+   (4) -> P4
+   (3) -> P3
+   (2) -> P2
+   (1) -> P1
+   (0) -> P0
 }

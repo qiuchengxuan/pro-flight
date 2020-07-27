@@ -1,7 +1,6 @@
 use embedded_hal::blocking::spi::{Transfer, Write};
 use max7456::character_memory::{CharData, CHAR_DATA_SIZE};
 use max7456::font::{char_block_to_byte, validate_header, ByteBlock, HeaderBlock};
-use max7456::not_null_writer::NotNullWriter;
 use max7456::registers::Standard;
 use max7456::MAX7456;
 use md5::Context;
@@ -19,8 +18,6 @@ impl From<config::Standard> for Standard {
         }
     }
 }
-
-type DmaConsumer = fn(&[u8]);
 
 fn read_char<E: core::fmt::Debug>(reader: &mut dyn Read<Error = E>) -> Option<CharData> {
     let mut byte_block: ByteBlock = Default::default();
@@ -102,12 +99,4 @@ where
     }
     max7456.enable_display(true)?;
     Ok(())
-}
-
-pub fn process_screen<T: AsRef<[u8]>>(screen: &[T], dma_consumer: DmaConsumer) {
-    static mut S_DMA_BUFFER: [u8; 800] = [0u8; 800];
-    let mut dma_buffer = unsafe { S_DMA_BUFFER };
-    let mut writer = NotNullWriter::new(screen, Default::default());
-    let display = writer.write(&mut dma_buffer);
-    dma_consumer(&display.0);
 }

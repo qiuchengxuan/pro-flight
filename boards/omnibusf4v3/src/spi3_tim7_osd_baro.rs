@@ -1,17 +1,18 @@
-use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
 use ascii_osd_hud::telemetry::TelemetrySource;
 
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::registers::Register;
+
 use embedded_hal::digital::v2::OutputPin;
+use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::config;
 use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
-use rs_flight::drivers::max7456::{init as max7456_init, process_screen};
+use rs_flight::drivers::max7456::init as max7456_init;
 use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
 use stm32f4xx_hal::gpio::gpioa::PA15;
 use stm32f4xx_hal::gpio::gpiob::PB3;
@@ -73,9 +74,13 @@ unsafe fn DMA1_STREAM2() {
 
     { &mut *CS_BARO.as_mut_ptr() }.set_high().ok();
     { &mut *CS_OSD.as_mut_ptr() }.set_low().ok();
-    (&mut *OSD.as_mut_ptr()).start_draw(|screen| {
-        process_screen(screen, dma1_stream7_transfer_spi3);
-    });
+    let screen = (&mut *OSD.as_mut_ptr()).draw();
+
+    static mut OSD_DMA_BUFFER: [u8; 800] = [0u8; 800];
+    let mut dma_buffer = OSD_DMA_BUFFER;
+    let mut writer = NotNullWriter::new(screen, Default::default());
+    let display = writer.write(&mut dma_buffer);
+    dma1_stream7_transfer_spi3(&display.0);
 }
 
 #[interrupt]
@@ -123,16 +128,15 @@ pub fn init<'a>(
     clocks: Clocks,
     telemetry_source: &'static dyn TelemetrySource,
 ) -> Result<bool, Error> {
-    let mut cs_osd = pa15.into_push_pull_output();
-    let mut cs_baro = pb3.into_push_pull_output();
+    let cs_osd = pa15.into_push_pull_output();
+    let cs_baro = pb3.into_push_pull_output();
     let (pc10, pc11, pc12) = spi3_pins;
     let sclk = pc10.into_alternate_af6();
     let miso = pc11.into_alternate_af6();
     let mosi = pc12.into_alternate_af6();
     let freq: stm32f4xx_hal::time::Hertz = 10.mhz().into();
     let spi3 = Spi::spi3(spi3, (sclk, miso, mosi), SPI_MODE, freq, clocks);
-    let mut css: [&mut dyn OutputPin<Error = Infallible>; 2] = [&mut cs_baro, &mut cs_osd];
-    let spi = SharedSpi::new(spi3, &mut css);
+    let spi = SharedSpi::new(spi3, (cs_baro, cs_osd));
 
     let mut dummy_cs = DummyOutputPin {};
     let bus = SpiBus::new(VirtualSpi::new(&spi, 0), &mut dummy_cs, TickDelay(clocks.sysclk().0));
@@ -140,6 +144,8 @@ pub fn init<'a>(
         return Ok(false);
     }
     max7456_init(VirtualSpi::new(&spi, 1))?;
+
+    let (_, (cs_baro, cs_osd)) = spi.into_inner();
 
     let config = &config::get().osd;
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };

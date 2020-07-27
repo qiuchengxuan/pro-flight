@@ -1,7 +1,7 @@
 use core::cmp::min;
 
 use rs_flight::config::Outputs;
-use rs_flight::drivers::pwm::{PwmByIdentifier, PWM6};
+use rs_flight::drivers::pwm::PwmByIdentifier;
 use stm32f4xx_hal::gpio::gpioa::{PA1, PA2, PA3, PA8};
 use stm32f4xx_hal::gpio::gpiob::{PB0, PB1};
 use stm32f4xx_hal::gpio::{Floating, Input};
@@ -21,25 +21,20 @@ pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmBy
     let (pb0, pb1, pa2, pa3, pa1, pa8) = pins;
     let pb0_1 = (pb0.into_alternate_af2(), pb1.into_alternate_af2());
     let rate = if rate1 > 0 && rate2 > 0 { min(rate1, rate2) } else { rate1 + rate2 };
-    let (mut pwm1, mut pwm2) = pwm::tim3(tim3, pb0_1, clocks, rate.hz());
+    let (pwm1, pwm2) = pwm::tim3(tim3, pb0_1, clocks, rate.hz());
 
     let rate3 = cfg.get("PWM3").map(|o| o.rate()).unwrap_or(50) as u32;
     let rate4 = cfg.get("PWM4").map(|o| o.rate()).unwrap_or(50) as u32;
     let pa2_3 = (pa2.into_alternate_af1(), pa3.into_alternate_af1());
     let rate = if rate3 > 0 && rate4 > 0 { min(rate3, rate4) } else { rate3 + rate4 };
-    let (mut pwm4, mut pwm3) = pwm::tim2(tim2, pa2_3, clocks, rate.hz());
+    let (pwm4, pwm3) = pwm::tim2(tim2, pa2_3, clocks, rate.hz());
 
     let rate = cfg.get("PWM5").map(|o| o.rate()).unwrap_or(50) as u32;
-    let mut pwm5 = pwm::tim5(tim5, pa1.into_alternate_af2(), clocks, rate.hz());
+    let pwm5 = pwm::tim5(tim5, pa1.into_alternate_af2(), clocks, rate.hz());
     let rate = cfg.get("PWM6").map(|o| o.rate()).unwrap_or(50) as u32;
-    let mut pwm6 = pwm::tim1(tim1, pa8.into_alternate_af1(), clocks, rate.hz());
+    let pwm6 = pwm::tim1(tim1, pa8.into_alternate_af1(), clocks, rate.hz());
 
-    pwm1.enable();
-    pwm2.enable();
-    pwm3.enable();
-    pwm4.enable();
-    pwm5.enable();
-    pwm6.enable();
-
-    PWM6::new((pwm1, pwm2, pwm3, pwm4, pwm5, pwm6))
+    let mut pwms = (pwm1, pwm2, pwm3, pwm4, pwm5, pwm6);
+    pwms.for_each(|pwm| pwm.enable());
+    pwms
 }
