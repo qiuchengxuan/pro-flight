@@ -14,7 +14,6 @@ extern crate integer_sqrt;
 extern crate micromath;
 #[macro_use]
 extern crate mpu6000;
-extern crate md5;
 extern crate nalgebra;
 extern crate nb;
 extern crate ryu;

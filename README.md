@@ -20,17 +20,17 @@ Progress
   - [x] SBUS Receiver
   - [x] GNSS UBX Protocol
   - [x] Displacement integral
+  - [x] CRC based OSD font check
 * WIP
   - [ ] Software interrupt based task scheduler
-  - [ ] Speed integral
+  - [ ] Complementary filter
 * Future
-  - [ ] GNSS based heading correction for IMU
   - [ ] GNSS NMEA Protocol
   - [ ] Blackbox
   - [ ] DMA based SDCARD read & write
   - [ ] Stabilizer
   - [ ] Navigation
-  - [ ] CRC based OSD font check
+  - [ ] EKF filter
 
 data-flow
 =========
@@ -39,21 +39,25 @@ data-flow
 @startuml
 ditaa
 
-+-----------+         +-----------+  Altitude & V/S                                  +----------+
-| Barometer |-------->| Altimeter |---------------------------------------+       +->| Blackbox |
-+-----------+         +-----------+                                       |       |  +----------+
-                                                                          |       |
-+---------------+        +-------+                                        |       |
-| Accelerometer |------->|       |  Quaternion & Calibrated Acceleration  |       |
-+---------------+        |  IMU  |----------+-------------------------+   |       |
-                   +---->|       |          |                         |   |       |
-+---------------+  |     +-------+          v                         v   v       |
-| Gyroscope     |--+         |            +------------+  Waypoint  +-----------+ |  +----------+
-+---------------+    +------------------->| Navigation |-----+----->| Telemetry |-+->| HUD(OSD) |
-                     |       |            +------------+     |      +-----------+    +----------+
-+------+             |       v Calibrated Gyro               v        ^
-| GNSS |-------------+ +------------+                     +-----+     |
-+------+    Position   | Stabilizer |                     | EAC |     |
++-----------+         +-----------+  Altitude                                        +----------+
+| Barometer |-------->| Altimeter |-------------+-------------------------+       +->| Blackbox |
++-----------+         +-----------+             |                         |       |  +----------+
+                                                v                         |       |
++------+ Position                        +-------------+                  |       |
+| GNSS |---------------------+-------+-->| Speedometer |----------------+ |       |
++------+                     |       |   +-------------+                | |       |
+                             v       |      ^                           | |       |
++---------------+        +-------+   |      |  Quaternion &             | |       |
+| Accelerometer |------->|       |   |      |  Acceleration             | |       |
++---------------+        |  IMU  |----------+-------------------------+ | |       |
+                   +---->|       |   |      |                         | | |       |
++---------------+  |     +-------+   v      v                         v v v       |
+| Gyroscope     |--+         |     +------------+         Waypoint  +-----------+ |  +----------+
++---------------+            |     | Navigation |------------+----->| Telemetry |-+->| HUD(OSD) |
+                        Gyro |     +------------+            |      +-----------+    +----------+
+                             v                               v        ^
+                       +------------+                     +-----+     |
+                       | Stabilizer |                     | EAC |     |
                        +------------+                     +-----+     |
                              |                      +--------|--------+
                              +-----------------------------+ |      +-----------+    +----------+

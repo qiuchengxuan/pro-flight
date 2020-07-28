@@ -6,7 +6,7 @@ name = "rs-flight"
 version = "0.0.2"
 
 [dependencies]
-ahrs = { version = "0.2", default-features = false}
+ahrs = { version = "0.2", default-features = false }
 arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"]}
 ascii = { version = "1.0", default-features = false }
 ascii-osd-hud = { path = "../ascii-osd-hud" }
@@ -16,17 +16,14 @@ crc = { version = "1.8", default-features = false }
 embedded-hal = "0.2"
 embedded-sdmmc = "0.3"
 enum-map = { version = "0.6", default-features = false }
-hex-literal = "0.3"
 integer-sqrt = "0.1"
-max7456 = { path = "../max7456" }
-md5 = { version = "0.7.0", default-features = false }
+max7456 = "0.1"
 micromath = "1.0"
 mpu6000 = "0.1"
 nalgebra = { version = "0.18", default-features = false }
 nb = "0.1"
-nmea0183 = "0.2.3"
 ryu = "1.0"
-sbus-parser = { path = "../sbus" }
+sbus-parser = "0.0.2"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }
 sval_json = "0.5"
@@ -36,5 +33,6 @@ void = { version = "1", default-features = false }
 name = "rs_flight"
 
 [dev-dependencies]
+hex-literal = "0.3"
 pretty_assertions = "0.4"
 serial_test = "*"

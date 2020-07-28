@@ -20,9 +20,9 @@ impl From<config::Standard> for Standard {
     }
 }
 
-fn upload<E, BUS, CRC>(file: &mut File, osd: &mut MAX7456<BUS>, crc: &mut CRC) -> Result<bool, E>
+fn check_font<E, B, CRC>(file: &mut File, osd: &mut MAX7456<B>, crc: &mut CRC) -> Result<bool, E>
 where
-    BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
+    B: Write<u8, Error = E> + Transfer<u8, Error = E>,
     CRC: Hasher32,
 {
     let length = match file.metadata() {
@@ -42,21 +42,29 @@ where
     if &bytes != b"7456" {
         return Ok(false);
     }
-
     file.read(&mut bytes).ok();
 
     osd.enable_display(false)?;
     crc.reset();
+    let mut char_data: CharData = [0u8; CHAR_DATA_SIZE];
+    for i in 0..256 {
+        osd.load_char(i as u8, &mut char_data)?;
+        crc.write(&char_data);
+    }
+    if crc.sum32() == u32::from_be_bytes(bytes) {
+        return Ok(true);
+    }
+
+    info!("Uploading OSD font");
     let mut delay = SysTimer::new();
     for i in 0..256 {
-        let mut char_data: CharData = [0u8; CHAR_DATA_SIZE];
         if file.read(&mut char_data).ok().unwrap_or(0) != CHAR_DATA_SIZE {
             return Ok(false);
         }
         crc.write(&char_data);
         osd.store_char(i as u8, &char_data, &mut delay)?;
     }
-    info!("Upload complete, checksum = {:#x}", crc.sum32());
+    info!("Upload complete");
     Ok(true)
 }
 
@@ -78,7 +86,7 @@ where
     if config.font != "" {
         match File::open(config.font) {
             Ok(mut file) => {
-                upload(&mut file, &mut max7456, crc)?;
+                check_font(&mut file, &mut max7456, crc)?;
                 file.close();
             }
             Err(e) => warn!("Open file {} failed: {:?}", config.font, e),
