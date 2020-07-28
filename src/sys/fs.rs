@@ -61,6 +61,7 @@ pub trait Media {
     fn close(&self, fd: FileDescriptor);
     fn read(&self, fd: &FileDescriptor, buf: &mut [u8]) -> Result<usize, Error>;
     fn write(&self, fd: &FileDescriptor, bytes: &[u8]) -> Result<usize, Error>;
+    fn metadata(&self, fd: &FileDescriptor) -> Result<Metadata, Error>;
 }
 
 pub struct NoMedia;
@@ -79,6 +80,10 @@ impl Media for NoMedia {
     fn write(&self, _: &FileDescriptor, _: &[u8]) -> Result<usize, Error> {
         Err(Error::NoMedia)
     }
+
+    fn metadata(&self, _: &FileDescriptor) -> Result<Metadata, Error> {
+        Err(Error::Generic)
+    }
 }
 
 static mut SCHEMAS: [&dyn Media; 2] = [&NoMedia {}, &NoMedia {}];
@@ -93,6 +98,16 @@ fn get_media(schema: Schema) -> &'static dyn Media {
     unsafe { SCHEMAS[schema as usize] }
 }
 
+pub struct Metadata {
+    pub length: u64,
+}
+
+impl Metadata {
+    pub fn len(&self) -> u64 {
+        self.length
+    }
+}
+
 pub struct File {
     schema: Schema,
     fd: Option<FileDescriptor>,
@@ -101,6 +116,13 @@ pub struct File {
 impl File {
     pub fn open(path: &str) -> Result<File, Error> {
         OpenOptions::default().open(path)
+    }
+
+    pub fn metadata(&self) -> Result<Metadata, Error> {
+        if let Some(ref fd) = self.fd {
+            return get_media(self.schema).metadata(fd);
+        }
+        Err(Error::Generic)
     }
 
     pub fn close(&mut self) {

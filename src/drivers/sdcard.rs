@@ -5,7 +5,7 @@ use embedded_sdmmc::{
     BlockDevice, Controller, Directory, Error, File, Mode, TimeSource, Volume, VolumeIdx,
 };
 
-use crate::sys::fs::{self, FileDescriptor, Media, OpenOptions};
+use crate::sys::fs::{self, FileDescriptor, Media, Metadata, OpenOptions};
 
 impl Into<Mode> for OpenOptions {
     fn into(self) -> Mode {
@@ -152,5 +152,16 @@ impl<D: BlockDevice, T: TimeSource> Media for Sdcard<D, T> {
             };
         }
         Err(fs::Error::NotFound)
+    }
+
+    fn metadata(&self, fd: &FileDescriptor) -> Result<Metadata, fs::Error> {
+        if let Some(ref filesystem) = self.filesystem {
+            if let Some(fs) = filesystem.try_borrow().ok() {
+                if let Some(ref file) = fs.2[fd.0] {
+                    return Ok(Metadata { length: file.length() as u64 });
+                }
+            }
+        }
+        Err(fs::Error::Generic)
     }
 }
