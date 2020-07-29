@@ -86,7 +86,7 @@ impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G>
         50
     }
 
-    fn schedule(&mut self) {
+    fn schedule(&mut self) -> bool {
         while let Some(gyro) = self.gyroscope.read() {
             if let Some(acceleration) = self.accelerometer.read() {
                 if !self.calibrated {
@@ -98,5 +98,6 @@ impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G>
                 }
             }
         }
+        true
     }
 }

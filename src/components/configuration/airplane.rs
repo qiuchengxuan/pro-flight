@@ -24,7 +24,7 @@ impl<PWMS: PwmByIdentifier, S: DataSource<ControlInput>> Schedulable for Airplan
         50
     }
 
-    fn schedule(&mut self) {
+    fn schedule(&mut self) -> bool {
         let input = self.mixer.mix();
         let outputs = &config::get().outputs.0;
         for &(identifier, output) in outputs.iter() {
@@ -46,5 +46,6 @@ impl<PWMS: PwmByIdentifier, S: DataSource<ControlInput>> Schedulable for Airplan
                 pwm.set_duty(duty);
             })
         }
+        true
     }
 }

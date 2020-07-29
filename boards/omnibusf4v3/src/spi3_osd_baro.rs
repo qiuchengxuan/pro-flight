@@ -4,7 +4,6 @@ use ascii_osd_hud::telemetry::TelemetrySource;
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::registers::Register;
 use crc::Hasher32;
-use embedded_hal::digital::v2::OutputPin;
 use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
@@ -57,9 +56,9 @@ unsafe fn DMA1_STREAM2() {
 
 pub struct BaroScheduler;
 
-fn bmp280_rx_done() -> bool {
+fn spi3_dma_ready() -> bool {
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
-    dma1.st[2].ndtr.read().ndt().bits() == 0
+    dma1.st[2].cr.read().en().is_disabled() && dma1.st[7].cr.read().en().is_disabled()
 }
 
 fn select_bmp280() {
@@ -72,74 +71,79 @@ fn select_max7456() {
     unsafe { { &mut *CS_MAX7456.as_mut_ptr() }.set_low().ok() };
 }
 
-impl Schedulable for BaroScheduler {
-    fn rate(&self) -> Hertz {
-        50
-    }
-
-    fn schedule(&mut self) {
-        select_bmp280();
-        let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
-        let data_register = &spi3.dr as *const _ as u32;
-        let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
-        unsafe { dma1.hifcr.write(|w| w.bits(0x3D << 22)) }; // stream 7
-        unsafe { dma1.lifcr.write(|w| w.bits(0x3D << 16)) }; // stream 2
-        let stream = &dma1.st[2]; // dma1 channel 0 stream 2 rx
-        let dma_buffer = unsafe { &DMA_BUFFER };
-        stream.ndtr.write(|w| w.ndt().bits(dma_buffer.len() as u16));
-        stream.par.write(|w| w.pa().bits(data_register));
-        let m0ar = &stream.m0ar;
-        m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
-        #[rustfmt::skip]
-        stream.cr.write(|w| {
-            w.chsel().bits(0).minc().incremented().dir().peripheral_to_memory()
-                .tcie().enabled().en().enabled()
-        });
-        static READ_REG: [u8; 1] = [Register::PressureMsb as u8 | 0x80];
-        let read_reg = &READ_REG;
-
-        // dma1 channel 0 stream 7 tx
-        let stream = &dma1.st[7];
-        stream.ndtr.write(|w| w.ndt().bits(dma_buffer.len() as u16));
-        stream.par.write(|w| w.pa().bits(data_register));
-        stream.m0ar.write(|w| w.m0a().bits(read_reg.as_ptr() as u32));
-        let cr = &stream.cr;
-        cr.write(|w| w.chsel().bits(0).dir().memory_to_peripheral().en().enabled());
-    }
+fn spi3_prepare_rx(dma_buffer: &[u8]) {
+    let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
+    let data_register = &spi3.dr as *const _ as u32;
+    let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
+    unsafe { dma1.lifcr.write(|w| w.bits(0x3D << 16)) }; // stream 2
+    let stream = &dma1.st[2]; // dma1 channel 0 stream 2 rx
+    stream.ndtr.write(|w| w.ndt().bits(dma_buffer.len() as u16));
+    stream.par.write(|w| w.pa().bits(data_register));
+    let m0ar = &stream.m0ar;
+    m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
+    #[rustfmt::skip]
+    stream.cr.write(|w| {
+        w.chsel().bits(0).minc().incremented().dir().peripheral_to_memory()
+            .tcie().enabled().en().enabled()
+    });
 }
 
-pub struct OSDScheduler<'a>(AsciiHud<'a>);
-
-impl<'a> OSDScheduler<'a> {
-    fn dma_transfer(&self, buffer: &[u8]) {
-        let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
-        let stream = &dma1.st[7];
-        stream.ndtr.write(|w| w.ndt().bits(buffer.len() as u16));
-        let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
-        let data_register = &spi3.dr as *const _ as u32;
-        stream.par.write(|w| w.pa().bits(data_register));
-        stream.m0ar.write(|w| w.m0a().bits(buffer.as_ptr() as u32));
-        stream.cr.write(|w| {
+fn spi3_start_tx(dma_buffer: &[u8], size: usize) {
+    let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
+    let data_register = &spi3.dr as *const _ as u32;
+    let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
+    unsafe { dma1.hifcr.write(|w| w.bits(0x3D << 22)) }; // stream 7
+    let stream = &dma1.st[7]; // dma1 channel 0 stream 7 tx
+    stream.ndtr.write(|w| w.ndt().bits(size as u16));
+    stream.par.write(|w| w.pa().bits(data_register));
+    stream.m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
+    let cr = &stream.cr;
+    if dma_buffer.len() != size {
+        cr.write(|w| w.chsel().bits(0).dir().memory_to_peripheral().en().enabled());
+    } else {
+        cr.write(|w| {
             w.chsel().bits(0).minc().incremented().dir().memory_to_peripheral().en().enabled()
         });
     }
 }
+
+impl Schedulable for BaroScheduler {
+    fn rate(&self) -> Hertz {
+        16
+    }
+
+    fn schedule(&mut self) -> bool {
+        if !spi3_dma_ready() {
+            return false;
+        }
+        select_bmp280();
+
+        spi3_prepare_rx(unsafe { &DMA_BUFFER });
+        spi3_start_tx(&[Register::PressureMsb as u8 | 0x80], unsafe { DMA_BUFFER.len() });
+        true
+    }
+}
+
+pub struct OSDScheduler<'a>(AsciiHud<'a>);
 
 impl<'a> Schedulable for OSDScheduler<'a> {
     fn rate(&self) -> Hertz {
         50
     }
 
-    fn schedule(&mut self) {
-        let screen = self.0.draw();
-        while !bmp280_rx_done() {}
+    fn schedule(&mut self) -> bool {
+        if !spi3_dma_ready() {
+            return false;
+        }
         select_max7456();
 
+        let screen = self.0.draw();
         static mut OSD_DMA_BUFFER: [u8; 800] = [0u8; 800];
         let mut dma_buffer = unsafe { OSD_DMA_BUFFER };
         let mut writer = NotNullWriter::new(screen, Default::default());
         let display = writer.write(&mut dma_buffer);
-        self.dma_transfer(&display.0);
+        spi3_start_tx(&display.0, display.0.len());
+        true
     }
 }
 

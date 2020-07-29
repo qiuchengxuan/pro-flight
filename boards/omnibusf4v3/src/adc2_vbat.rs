@@ -44,8 +44,7 @@ static mut ADC2_VBAT: MaybeUninit<Adc2VBat> = MaybeUninit::uninit();
 unsafe fn DMA2_STREAM2() {
     cortex_m::interrupt::free(|_| {
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM2);
-        let dma2 = &*stm32::DMA2::ptr();
-        dma2.lifcr.write(|w| w.bits(0x3D << 16));
+        { &*stm32::DMA2::ptr() }.lifcr.write(|w| w.bits(0x3D << 16));
     });
 
     (&mut *ADC2_VBAT.as_mut_ptr()).dma_rx_done();

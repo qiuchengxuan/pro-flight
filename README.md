@@ -21,8 +21,9 @@ Progress
   - [x] GNSS UBX Protocol
   - [x] Displacement integral
   - [x] CRC based OSD font check
+  - [x] timer based task scheduler
 * WIP
-  - [ ] Software interrupt based task scheduler
+  - [ ] Involve async syntax
   - [ ] Complementary filter
 * Future
   - [ ] GNSS NMEA Protocol

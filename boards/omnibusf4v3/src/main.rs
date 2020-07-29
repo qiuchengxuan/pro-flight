@@ -24,6 +24,7 @@ mod pwm;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_osd_baro;
+mod tim7_scheduler;
 mod usart1;
 mod usart6;
 mod usb_serial;
@@ -52,7 +53,7 @@ use rs_flight::config::aircraft::Configuration;
 use rs_flight::config::{self, Config, SerialConfig};
 use rs_flight::datastructures::data_source::{DataSource, NoDataSource};
 use rs_flight::datastructures::input::ControlInput;
-use rs_flight::datastructures::schedule::{Schedulable, Scheduler};
+use rs_flight::datastructures::schedule::Scheduler;
 use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
 use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
 use rs_flight::drivers::uart::Device;
@@ -189,13 +190,14 @@ fn main() -> ! {
         }
     }
 
-    let mut telemetry = TelemetryUnit::new(
+    let telemetry = TelemetryUnit::new(
         altimeter.as_data_source(),
         battery,
         imu.as_accelerometer(),
         imu.as_imu(),
         navigation.as_data_source(),
     );
+    let telemetry = alloc::into_static(telemetry, false).unwrap();
 
     let mut control_input: &mut dyn DataSource<ControlInput> =
         alloc::into_static(NoDataSource::new(), false).unwrap();
@@ -229,7 +231,7 @@ fn main() -> ! {
         gpio_b.pb3,
         &mut CRC(peripherals.CRC),
         clocks,
-        &telemetry,
+        telemetry,
     );
     let (baro, osd) = result.ok().unwrap();
 
@@ -257,15 +259,15 @@ fn main() -> ! {
 
     let mut watchdog = watchdog::init(peripherals.IWDG);
 
-    let scheduler_rate = 50;
-    let schedulables = (baro, altimeter, imu, navigation, control_surface, osd);
-    let mut scheduler = Scheduler::new(schedulables, scheduler_rate as usize);
+    let group = Scheduler::new((baro, altimeter, imu, navigation, control_surface, osd), 100);
+    let group = alloc::into_static(group, false).unwrap();
+    tim7_scheduler::init(peripherals.TIM7, group, clocks, 100);
+
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
     loop {
         if timer.wait().is_ok() {
-            timer.start(Duration::from_millis(20));
-            scheduler.schedule();
+            timer.start(Duration::from_millis(50));
             watchdog.feed();
             led.toggle().ok();
         }

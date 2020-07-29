@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from pathlib import Path
 import sys
 sys.path.pop(0)
 from serial import Serial
@@ -6,6 +7,10 @@ from serial import Serial
 from pexpect_serial import SerialSpawn
 
 def main():
+    if not Path(sys.argv[1]).exists():
+        print("{}")
+        return
+
     with Serial(sys.argv[1], 115200, timeout=0) as s:
         console = SerialSpawn(s)
         console.send('\r')

@@ -36,7 +36,7 @@ impl<D: DataSource<Pressure>> Altimeter<D> {
 }
 
 impl<D: DataSource<Pressure>> Schedulable for Altimeter<D> {
-    fn schedule(&mut self) {
+    fn schedule(&mut self) -> bool {
         if let Some(value) = self.data_source.read_last() {
             let altitude: Altitude = value.into();
             let meters = altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Meter, 1) as i16;
@@ -45,6 +45,7 @@ impl<D: DataSource<Pressure>> Schedulable for Altimeter<D> {
             let delta = meters - self.records[self.counter as usize];
             self.data.write((altitude, delta * SECONDS_PER_MINUTE))
         }
+        true
     }
 
     fn rate(&self) -> Hertz {

@@ -88,7 +88,7 @@ where
         50
     }
 
-    fn schedule(&mut self) {
+    fn schedule(&mut self) -> bool {
         if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read_last()).flatten() {
             if self.waypoints[HOME].position.latitude == 0 {
                 self.waypoints[HOME].position = position;
@@ -123,5 +123,6 @@ where
                 self.output.write((position, steerpoint));
             }
         }
+        true
     }
 }
