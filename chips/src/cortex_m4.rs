@@ -3,7 +3,7 @@ use core::time::Duration;
 use cortex_m::peripheral::{syst::SystClkSource, SYST};
 
 const INTERRUPTS_PER_SECOND: u32 = 100;
-const MICROSECONDS_PER_CYCLE: u32 = 1000_000 / INTERRUPTS_PER_SECOND;
+const NANOSECONDS_PER_CYCLE: u32 = 1000_000_000 / INTERRUPTS_PER_SECOND;
 
 static mut COUNTER: u32 = 0;
 
@@ -20,8 +20,8 @@ pub fn get_jiffies() -> Duration {
     let millis = counter % INTERRUPTS_PER_SECOND * 10;
     let reload = systick.rvr.read();
     let elapsed = reload - systick.cvr.read();
-    let micros = (elapsed as u64 * MICROSECONDS_PER_CYCLE as u64 / reload as u64) as u32;
-    Duration::new(secs, millis * 1000_000 + micros * 1000)
+    let nanos = (elapsed as u64 * NANOSECONDS_PER_CYCLE as u64 / reload as u64) as u32;
+    Duration::new(secs, millis * 1000_000 + nanos)
 }
 
 pub fn systick_init(mut systick: SYST, hz: u32) {
