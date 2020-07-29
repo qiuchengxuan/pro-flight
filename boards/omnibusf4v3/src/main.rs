@@ -146,8 +146,7 @@ fn main() -> ! {
 
     let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
     let rate = GYRO_SAMPLE_RATE as u16;
-    let imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
-    let imu = alloc::into_static(imu, false).unwrap();
+    let mut imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
 
     info!("Initialize MPU6000");
     let mut int = gpio_c.pc4.into_pull_up_input();
@@ -168,12 +167,10 @@ fn main() -> ! {
     let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2).data_source();
 
     let barometer = init_bmp280_data_source();
-    let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
-    let altimeter = alloc::into_static(altimeter, false).unwrap();
+    let mut altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
-    let navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
-    let navigation = alloc::into_static(navigation, false).unwrap();
+    let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
     navigation.set_altimeter(alloc::into_static(altimeter.as_data_source(), false).unwrap());
 
     if let Some(config) = config.serials.get("USART1") {
@@ -195,7 +192,7 @@ fn main() -> ! {
         navigation.as_data_source(),
     );
 
-    let mut control_input: &'static mut dyn DataSource<ControlInput> =
+    let mut control_input: &mut dyn DataSource<ControlInput> =
         alloc::into_static(NoDataSource::new(), false).unwrap();
 
     if let Some(serial_config) = config.serials.get("USART6") {
@@ -219,8 +216,6 @@ fn main() -> ! {
         }
     }
 
-    let telemetry = alloc::into_static(telemetry, false).unwrap();
-
     info!("Initialize OSD & Barometer");
     let result = spi3_osd_baro::init(
         peripherals.SPI3,
@@ -229,7 +224,7 @@ fn main() -> ! {
         gpio_b.pb3,
         &mut CRC(peripherals.CRC),
         clocks,
-        telemetry,
+        &telemetry,
     );
     let (mut baro, mut osd) = result.ok().unwrap();
 

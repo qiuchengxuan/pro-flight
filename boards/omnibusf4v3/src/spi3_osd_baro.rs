@@ -138,8 +138,8 @@ pub fn init<'a, CRC: Hasher32>(
     pb3: PB3<Input<Floating>>,
     crc: &mut CRC,
     clocks: Clocks,
-    telemetry_source: &'static dyn TelemetrySource,
-) -> Result<(impl Schedulable, impl Schedulable), Error> {
+    telemetry_source: &'a dyn TelemetrySource,
+) -> Result<(impl Schedulable + 'a, impl Schedulable + 'a), Error> {
     let cs_osd = pa15.into_push_pull_output();
     let cs_baro = pb3.into_push_pull_output();
     let (pc10, pc11, pc12) = spi3_pins;
