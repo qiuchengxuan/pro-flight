@@ -1,7 +1,5 @@
 use core::ptr::{read_volatile, write_volatile};
 
-use cortex_m;
-
 const DFU_SAFE: usize = 0xCAFEFEED;
 const DFU_MAGIC: usize = 0xDEADBEEF;
 
@@ -35,8 +33,11 @@ impl Dfu {
         }
     }
 
-    pub fn reboot_into(&mut self) {
+    pub fn arm(&mut self) {
         unsafe { write_volatile(&mut self.0, DFU_MAGIC) };
-        cortex_m::peripheral::SCB::sys_reset();
+    }
+
+    pub fn disarm(&mut self) {
+        unsafe { write_volatile(&mut self.0, DFU_SAFE) };
     }
 }

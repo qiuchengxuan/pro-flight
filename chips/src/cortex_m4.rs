@@ -9,7 +9,7 @@ static mut COUNTER: u32 = 0;
 
 #[exception]
 unsafe fn SysTick() {
-    COUNTER += 1;
+    core::ptr::write_volatile(&mut COUNTER, COUNTER + 1)
 }
 
 // unit microsecond

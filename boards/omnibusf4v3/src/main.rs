@@ -27,6 +27,7 @@ mod spi3_osd_baro;
 mod usart1;
 mod usart6;
 mod usb_serial;
+mod watchdog;
 
 use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
@@ -46,7 +47,7 @@ use rs_flight::components::imu::IMU;
 use rs_flight::components::mixer::ControlMixer;
 use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::{log_panic, PanicLogger};
-use rs_flight::components::{Sysled, TelemetryUnit};
+use rs_flight::components::TelemetryUnit;
 use rs_flight::config::aircraft::Configuration;
 use rs_flight::config::{self, Config, SerialConfig};
 use rs_flight::datastructures::data_source::{DataSource, NoDataSource};
@@ -81,7 +82,9 @@ static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
 
 #[entry]
 fn main() -> ! {
-    unsafe { &mut *DFU.as_mut_ptr() }.check();
+    let dfu = unsafe { &mut *DFU.as_mut_ptr() };
+    dfu.check();
+    dfu.arm();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
@@ -102,9 +105,11 @@ fn main() -> ! {
         panic_logger.invalidate();
     }
 
-    let (hclk, pclk1, pclk2) =
-        (clocks.hclk().0 / MHZ, clocks.pclk1().0 / MHZ, clocks.pclk2().0 / MHZ);
-    debug!("hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", hclk, pclk1, pclk2);
+    let sysclk = clocks.sysclk().0 / MHZ;
+    let hclk = clocks.hclk().0 / MHZ;
+    let pclk1 = clocks.pclk1().0 / MHZ;
+    let pclk2 = clocks.pclk2().0 / MHZ;
+    debug!("sysclk: {}mhz, hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", sysclk, hclk, pclk1, pclk2);
     debug!("stack top: {:x}", cortex_m::register::msp::read());
 
     unsafe {
@@ -228,8 +233,7 @@ fn main() -> ! {
     );
     let (mut baro, mut osd) = result.ok().unwrap();
 
-    let pin = gpio_b.pb5.into_push_pull_output();
-    let mut sysled = Sysled::new(pin);
+    let mut led = gpio_b.pb5.into_push_pull_output();
 
     info!("Initialize USB CDC");
     let usb = USB {
@@ -251,30 +255,32 @@ fn main() -> ! {
         Configuration::Airplane => Airplane::new(mixer, pwms),
     };
 
-    let (primary, no_dma) = alloc::available();
-    debug!("Remain heap size: primary: {}, no-dma: {}", primary, no_dma);
+    let mut watchdog = watchdog::init(peripherals.IWDG);
 
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
-    timer.start(Duration::from_millis(20));
     loop {
         if timer.wait().is_ok() {
+            timer.start(Duration::from_millis(20));
             baro.schedule();
             altimeter.schedule();
             imu.schedule();
             navigation.schedule();
             control_surface.schedule();
             osd.schedule();
-            timer.start(Duration::from_millis(20));
+            watchdog.feed();
+            led.toggle().ok();
         }
-        sysled.check_toggle().unwrap();
         if !device.poll(&mut [&mut serial]) {
             continue;
         }
         cli.interact(&mut serial, |line, serial| -> bool {
             match line.split(' ').next() {
-                Some("dfu") => unsafe { &mut *DFU.as_mut_ptr() }.reboot_into(),
-                Some("reboot") => cortex_m::peripheral::SCB::sys_reset(),
+                Some("dfu") => cortex_m::peripheral::SCB::sys_reset(),
+                Some("reboot") => {
+                    dfu.disarm();
+                    cortex_m::peripheral::SCB::sys_reset()
+                }
                 Some("telemetry") => console!(serial, "{}\n", telemetry.get_data()),
                 _ => return false,
             }
@@ -286,19 +292,17 @@ fn main() -> ! {
 #[panic_handler]
 unsafe fn panic(panic_info: &PanicInfo) -> ! {
     log_panic(format_args!("{}", panic_info), panic_logger!());
-    (&mut *DFU.as_mut_ptr()).reboot_into();
-    loop {}
+    cortex_m::peripheral::SCB::sys_reset();
 }
 
 #[exception]
 unsafe fn HardFault(exception_frame: &ExceptionFrame) -> ! {
     log_panic(format_args!("{:?}", exception_frame), panic_logger!());
-    (&mut *DFU.as_mut_ptr()).reboot_into();
-    loop {}
+    cortex_m::peripheral::SCB::sys_reset();
 }
 
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
     log_panic(format_args!("{}", irqn), panic_logger!());
-    (&mut *DFU.as_mut_ptr()).reboot_into();
+    cortex_m::peripheral::SCB::sys_reset();
 }

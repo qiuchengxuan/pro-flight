@@ -23,7 +23,7 @@ pub struct SysTimer(Duration);
 
 impl SysTimer {
     pub fn new() -> Self {
-        Self(Duration::default())
+        Self(get_jiffies())
     }
 }
 

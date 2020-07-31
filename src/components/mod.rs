@@ -11,9 +11,7 @@ pub mod mixer;
 pub mod monitor;
 pub mod navigation;
 pub mod panic;
-pub mod sysled;
 pub mod telemetry;
 
 pub use imu::IMU;
-pub use sysled::Sysled;
 pub use telemetry::TelemetryUnit;

@@ -4,9 +4,10 @@ pub mod memory;
 use arrayvec::ArrayVec;
 use embedded_hal::serial::{Read, Write};
 
+use crate::alloc;
 use crate::components::console;
 use crate::logger;
-use crate::sys::timer::SysTimer;
+use crate::sys::timer::{get_jiffies, SysTimer};
 
 pub struct CLI {
     vec: ArrayVec<[u8; 80]>,
@@ -34,6 +35,11 @@ impl CLI {
                         console!(serial, "{}", s);
                     }
                 }
+                "free" => {
+                    let (primary, no_dma) = alloc::available();
+                    console!(serial, "Primary: {}, no-dma: {}\n", primary, no_dma);
+                }
+                "uptime" => console!(serial, "{:?}", get_jiffies()),
                 "read" | "readx" | "readf" => memory::read(line, serial),
                 "dump" => memory::dump(line, serial),
                 "write" => memory::write(line, serial, &mut self.timer),
