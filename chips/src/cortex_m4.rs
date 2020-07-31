@@ -15,11 +15,14 @@ unsafe fn SysTick() {
 // unit microsecond
 pub fn get_jiffies() -> Duration {
     let systick = unsafe { &*SYST::ptr() };
-    let counter = unsafe { COUNTER };
+
+    let counter1 = unsafe { core::ptr::read_volatile(&COUNTER) };
+    let current = systick.cvr.read();
+    let counter = unsafe { core::ptr::read_volatile(&COUNTER) };
+    let reload = systick.rvr.read();
+    let elapsed = if counter1 != counter { 0 } else { reload - current };
     let secs = (counter / INTERRUPTS_PER_SECOND) as u64;
     let millis = counter % INTERRUPTS_PER_SECOND * 10;
-    let reload = systick.rvr.read();
-    let elapsed = reload - systick.cvr.read();
     let nanos = (elapsed as u64 * NANOSECONDS_PER_CYCLE as u64 / reload as u64) as u32;
     Duration::new(secs, millis * 1000_000 + nanos)
 }

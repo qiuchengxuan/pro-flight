@@ -68,7 +68,7 @@ where
     Ok(true)
 }
 
-pub fn init<BUS, E, CRC: Hasher32>(bus: BUS, crc: &mut CRC) -> Result<(), E>
+pub fn init<BUS, E, CRC: Hasher32>(bus: BUS, crc: &mut CRC) -> Result<MAX7456<BUS>, E>
 where
     BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
 {
@@ -93,5 +93,5 @@ where
         };
     }
     max7456.enable_display(true)?;
-    Ok(())
+    Ok(max7456)
 }

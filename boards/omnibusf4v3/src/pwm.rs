@@ -35,6 +35,6 @@ pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmBy
     let pwm6 = pwm::tim1(tim1, pa8.into_alternate_af1(), clocks, rate.hz());
 
     let mut pwms = (pwm1, pwm2, pwm3, pwm4, pwm5, pwm6);
-    pwms.for_each(|pwm| pwm.enable());
+    pwms.foreach(|pwm| pwm.enable());
     pwms
 }

@@ -5,8 +5,8 @@ use embedded_hal::blocking::spi;
 use embedded_hal::digital::v2::OutputPin;
 
 pub trait ChipSelects<E> {
-    fn with<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, index: usize, f: F);
-    fn for_each<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, f: F);
+    fn with(&mut self, index: usize, f: impl FnMut(&mut dyn OutputPin<Error = E>));
+    fn foreach(&mut self, f: impl FnMut(&mut dyn OutputPin<Error = E>));
 }
 
 macro_rules! peel {
@@ -21,7 +21,7 @@ macro_rules! chip_selects {
     () => ();
     ($(($idx:tt) -> $CS:ident)+) => {
         impl<E, $($CS: OutputPin<Error = E>,)+> ChipSelects<E> for ($($CS,)+) {
-            fn with<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, index: usize, mut f: F) {
+            fn with(&mut self, index: usize, mut f: impl FnMut(&mut dyn OutputPin<Error = E>)) {
                 match index {
                     $(
                         $idx => f(&mut self.$idx),
@@ -30,7 +30,7 @@ macro_rules! chip_selects {
                 }
             }
 
-            fn for_each<F: FnMut(&mut dyn OutputPin<Error = E>)>(&mut self, mut f: F) {
+            fn foreach(&mut self, mut f: impl FnMut(&mut dyn OutputPin<Error = E>)) {
                 $(f(&mut self.$idx);)+
             }
         }
@@ -53,7 +53,7 @@ pub struct SharedSpi<E, SPI, CSS> {
 
 impl<E, SPI, CSS: ChipSelects<E>> SharedSpi<E, SPI, CSS> {
     pub fn new(spi: SPI, mut chip_selects: CSS) -> Self {
-        chip_selects.for_each(|cs| {
+        chip_selects.foreach(|cs| {
             cs.set_high().ok();
         });
         chip_selects.with(0, |cs| {

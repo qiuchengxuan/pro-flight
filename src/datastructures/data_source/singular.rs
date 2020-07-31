@@ -16,10 +16,9 @@ impl<T: Default + Copy> Default for SingularData<T> {
 
 impl<T: Copy> DataWriter<T> for SingularData<T> {
     fn write(&self, data: T) {
-        let counter = self.counter.load(Ordering::Relaxed);
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
         let buffer = unsafe { &mut *self.buffer.get() };
         buffer[counter & 1] = data;
-        self.counter.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -46,7 +45,7 @@ impl<'a, T: Copy> DataSource<T> for SingularDataSource<'a, T> {
         }
         self.counter = counter;
         let buffer = unsafe { &*self.source.buffer.get() };
-        Some(buffer[(counter & 1) ^ 1])
+        Some(buffer[counter & 1])
     }
 
     fn read_last(&mut self) -> Option<T> {
@@ -56,6 +55,6 @@ impl<'a, T: Copy> DataSource<T> for SingularDataSource<'a, T> {
     fn read_last_unchecked(&self) -> T {
         let counter = self.source.counter.load(Ordering::Relaxed);
         let buffer = unsafe { &*self.source.buffer.get() };
-        buffer[(counter & 1) ^ 1]
+        buffer[counter & 1]
     }
 }

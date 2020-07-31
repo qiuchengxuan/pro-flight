@@ -3,8 +3,8 @@ use embedded_hal::PwmPin;
 use crate::config::output::Identifier;
 
 pub trait PwmByIdentifier {
-    fn with<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, identifier: Identifier, f: F);
-    fn for_each<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, f: F);
+    fn with(&mut self, identifier: Identifier, f: impl FnMut(&mut dyn PwmPin<Duty = u16>));
+    fn foreach(&mut self, f: impl FnMut(&mut dyn PwmPin<Duty = u16>));
 }
 
 macro_rules! peel {
@@ -19,7 +19,7 @@ macro_rules! pwms {
     () => ();
     ($(($idx:tt) -> $P:ident)+) => {
         impl<$($P: PwmPin<Duty = u16>,)+> PwmByIdentifier for ($($P,)+) {
-            fn with<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, identifier: Identifier, mut f: F) {
+            fn with(&mut self, identifier: Identifier, mut f: impl FnMut(&mut dyn PwmPin<Duty = u16>)) {
                 match identifier {
                     Identifier::PWM(id) => match (id - 1) {
                         $(
@@ -30,7 +30,7 @@ macro_rules! pwms {
                 }
             }
 
-            fn for_each<F: FnMut(&mut dyn PwmPin<Duty = u16>)>(&mut self, mut f: F) {
+            fn foreach(&mut self, mut f: impl FnMut(&mut dyn PwmPin<Duty = u16>)) {
                 $(f(&mut self.$idx);)+
             }
         }

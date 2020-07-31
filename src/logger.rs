@@ -136,13 +136,6 @@ macro_rules! error {
     };
 }
 
-pub fn init(buffer: &'static mut [u8], level: Level) {
-    unsafe {
-        LOG_BUFFER = buffer;
-        LEVEL = level
-    }
-}
-
 pub struct LogReader((usize, usize));
 
 impl Iterator for LogReader {
@@ -162,7 +155,7 @@ impl Iterator for LogReader {
         if count == 0 {
             self.0 = (index, 1);
             let bytes = unsafe { &LOG_BUFFER[index % log_buffer.len()..] };
-            return unsafe { core::str::from_utf8_unchecked(bytes) }.splitn(1, "\n").next();
+            return unsafe { core::str::from_utf8_unchecked(bytes) }.splitn(1, '\n').next();
         } else if count == 1 {
             self.0 = (index, 2);
             let bytes = unsafe { &LOG_BUFFER[..index % log_buffer.len()] };
@@ -176,5 +169,12 @@ pub fn reader() -> LogReader {
     unsafe {
         let index = WRITE_INDEX.load(Ordering::Relaxed);
         LogReader((index, 0))
+    }
+}
+
+pub fn init(buffer: &'static mut [u8], level: Level) {
+    unsafe {
+        LOG_BUFFER = buffer;
+        LEVEL = level
     }
 }

@@ -97,7 +97,7 @@ fn main() -> ! {
 
     unsafe { alloc::init(&mut [], &mut CCM_MEMORY) };
 
-    logger::init(alloc::allocate(1024, false).unwrap(), Level::Debug);
+    logger::init(alloc::allocate(4096, false).unwrap(), Level::Debug);
 
     let panic_logger = unsafe { panic_logger!() };
     if panic_logger.is_valid() {

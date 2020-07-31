@@ -162,13 +162,11 @@ pub fn init<'a, CRC: Hasher32>(
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA1_STREAM2) }
     let config = &config::get().osd;
-    Ok((
-        BaroScheduler,
-        OSDScheduler(AsciiHud::new(
-            telemetry_source,
-            config.fov,
-            Ratio(12, 18).into(),
-            config.aspect_ratio.into(),
-        )),
-    ))
+    let ascii_hud = AsciiHud::new(
+        telemetry_source,
+        config.fov,
+        Ratio(12, 18).into(),
+        config.aspect_ratio.into(),
+    );
+    Ok((BaroScheduler, OSDScheduler(ascii_hud)))
 }

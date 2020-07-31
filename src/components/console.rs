@@ -21,11 +21,16 @@ where
     A: Array<Item = u8>,
     S: Read<u8, Error = RE> + Write<u8, Error = WE>,
 {
+    let mut skip = false;
     loop {
         let b = match serial.read() {
             Ok(b) => b,
             Err(_) => return None,
         };
+        if skip {
+            skip = false;
+            continue;
+        }
         match unsafe { b.to_ascii_char_unchecked() } {
             AsciiChar::BackSpace => {
                 if let Some(_) = vec.pop() {
@@ -50,7 +55,10 @@ where
                     writes!(serial, &BACKSPACE);
                 }
             }
-            AsciiChar::ESC => continue,
+            AsciiChar::ESC => {
+                skip = true;
+                continue;
+            }
             _ => match vec.try_push(b) {
                 Ok(()) => serial.write(b).ok().unwrap(),
                 _ => (),
