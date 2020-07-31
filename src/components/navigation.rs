@@ -5,7 +5,7 @@ use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
-use crate::datastructures::schedule::Schedulable;
+use crate::datastructures::schedule::{Hertz, Schedulable};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
 use crate::math::runge_kutta4;
 
@@ -84,6 +84,10 @@ where
     IMU: DataSource<UnitQuaternion<f32>>,
     A: DataSource<Acceleration>,
 {
+    fn rate(&self) -> Hertz {
+        50
+    }
+
     fn schedule(&mut self) {
         if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read_last()).flatten() {
             if self.waypoints[HOME].position.latitude == 0 {

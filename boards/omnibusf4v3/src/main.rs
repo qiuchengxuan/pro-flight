@@ -52,7 +52,7 @@ use rs_flight::config::aircraft::Configuration;
 use rs_flight::config::{self, Config, SerialConfig};
 use rs_flight::datastructures::data_source::{DataSource, NoDataSource};
 use rs_flight::datastructures::input::ControlInput;
-use rs_flight::datastructures::schedule::Schedulable;
+use rs_flight::datastructures::schedule::{Schedulable, Scheduler};
 use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
 use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
 use rs_flight::drivers::uart::Device;
@@ -151,7 +151,7 @@ fn main() -> ! {
 
     let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
     let rate = GYRO_SAMPLE_RATE as u16;
-    let mut imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
+    let imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
 
     info!("Initialize MPU6000");
     let mut int = gpio_c.pc4.into_pull_up_input();
@@ -172,7 +172,7 @@ fn main() -> ! {
     let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2).data_source();
 
     let barometer = init_bmp280_data_source();
-    let mut altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
+    let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
@@ -231,7 +231,7 @@ fn main() -> ! {
         clocks,
         &telemetry,
     );
-    let (mut baro, mut osd) = result.ok().unwrap();
+    let (baro, osd) = result.ok().unwrap();
 
     let mut led = gpio_b.pb5.into_push_pull_output();
 
@@ -251,26 +251,25 @@ fn main() -> ! {
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = pwm::init(tims, pins, clocks, &config.outputs);
     let mixer = ControlMixer::new(control_input, NoDataSource::new());
-    let mut control_surface = match config.aircraft.configuration {
+    let control_surface = match config.aircraft.configuration {
         Configuration::Airplane => Airplane::new(mixer, pwms),
     };
 
     let mut watchdog = watchdog::init(peripherals.IWDG);
 
+    let scheduler_rate = 50;
+    let schedulables = (baro, altimeter, imu, navigation, control_surface, osd);
+    let mut scheduler = Scheduler::new(schedulables, scheduler_rate as usize);
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
     loop {
         if timer.wait().is_ok() {
             timer.start(Duration::from_millis(20));
-            baro.schedule();
-            altimeter.schedule();
-            imu.schedule();
-            navigation.schedule();
-            control_surface.schedule();
-            osd.schedule();
+            scheduler.schedule();
             watchdog.feed();
             led.toggle().ok();
         }
+
         if !device.poll(&mut [&mut serial]) {
             continue;
         }

@@ -9,7 +9,7 @@ use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::config;
-use rs_flight::datastructures::schedule::Schedulable;
+use rs_flight::datastructures::schedule::{Hertz, Schedulable};
 use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::init as max7456_init;
@@ -73,6 +73,10 @@ fn select_max7456() {
 }
 
 impl Schedulable for BaroScheduler {
+    fn rate(&self) -> Hertz {
+        50
+    }
+
     fn schedule(&mut self) {
         select_bmp280();
         let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
@@ -122,6 +126,10 @@ impl<'a> OSDScheduler<'a> {
 }
 
 impl<'a> Schedulable for OSDScheduler<'a> {
+    fn rate(&self) -> Hertz {
+        50
+    }
+
     fn schedule(&mut self) {
         let screen = self.0.draw();
         while !bmp280_rx_done() {}

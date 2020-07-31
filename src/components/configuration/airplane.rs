@@ -3,7 +3,7 @@ use crate::config;
 use crate::config::output::{Output, ServoType};
 use crate::datastructures::data_source::DataSource;
 use crate::datastructures::input::ControlInput;
-use crate::datastructures::schedule::Schedulable;
+use crate::datastructures::schedule::{Hertz, Schedulable};
 use crate::drivers::pwm::PwmByIdentifier;
 
 use super::pwm::{to_motor_pwm_duty, to_servo_pwm_duty};
@@ -20,6 +20,10 @@ impl<S, PWMS> Airplane<S, PWMS> {
 }
 
 impl<PWMS: PwmByIdentifier, S: DataSource<ControlInput>> Schedulable for Airplane<S, PWMS> {
+    fn rate(&self) -> Hertz {
+        50
+    }
+
     fn schedule(&mut self) {
         let input = self.mixer.mix();
         let outputs = &config::get().outputs.0;

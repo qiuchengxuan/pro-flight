@@ -7,7 +7,7 @@ use crate::datastructures::data_source::overwriting::{OverwritingData, Overwriti
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, DEGREE_PER_DAG};
-use crate::datastructures::schedule::Schedulable;
+use crate::datastructures::schedule::{Hertz, Schedulable};
 
 pub struct IMU<A, G> {
     accelerometer: A,
@@ -82,6 +82,10 @@ where
 }
 
 impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G> {
+    fn rate(&self) -> Hertz {
+        50
+    }
+
     fn schedule(&mut self) {
         while let Some(gyro) = self.gyroscope.read() {
             if let Some(acceleration) = self.accelerometer.read() {
