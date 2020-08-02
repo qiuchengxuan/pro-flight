@@ -110,7 +110,7 @@ impl PartialOrd for Axes {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Value)]
+#[derive(Debug, Copy, Clone, PartialEq, Value)]
 pub struct Measurement {
     pub axes: Axes,
     pub sensitive: i32,
@@ -144,7 +144,7 @@ impl Default for Measurement {
     }
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct Acceleration(pub Measurement);
 
 impl sval::value::Value for Acceleration {

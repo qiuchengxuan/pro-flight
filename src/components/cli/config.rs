@@ -19,7 +19,7 @@ pub fn set<WE, S: serial::Write<u8, Error = WE>>(serial: &mut S, line: &str) {
             Ok(()) => (),
             Err(e) => console!(serial, "{}\n", e),
         }
-        config::replace(&config);
+        config::replace(config);
     }
 }
 

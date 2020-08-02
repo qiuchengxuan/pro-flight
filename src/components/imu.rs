@@ -1,7 +1,8 @@
+use alloc::rc::Rc;
+
 use ahrs::{Ahrs, Mahony};
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
-use crate::alloc;
 use crate::config::Accelerometer as Config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
@@ -19,9 +20,9 @@ pub struct IMU<A, G> {
     gyro_bias: Axes,
     counter: usize,
     calibrated: bool,
-    acceleration: &'static OverwritingData<'static, Acceleration>,
-    quaternion: &'static OverwritingData<'static, UnitQuaternion<f32>>,
-    gyro: &'static SingularData<Gyro>,
+    acceleration: Rc<OverwritingData<Acceleration>>,
+    quaternion: Rc<OverwritingData<UnitQuaternion<f32>>>,
+    gyro: Rc<SingularData<Gyro>>,
 }
 
 impl<A, G> IMU<A, G>
@@ -31,17 +32,15 @@ where
 {
     pub fn new(accelerometer: A, gyroscope: G, sample_rate: u16, config: &Config) -> Self {
         let size = accelerometer.capacity();
-        let accel = alloc::typed_allocate(Acceleration::default(), size, false).unwrap();
         let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(0.0, 0.0, 0.0, 0.0));
-        let quat = alloc::typed_allocate(unit, size, false).unwrap();
         Self {
             accelerometer,
             gyroscope,
             accelerometer_bias: config.bias.into(),
             calibration_loop: 200,
-            acceleration: alloc::into_static(OverwritingData::new(accel), false).unwrap(),
-            quaternion: alloc::into_static(OverwritingData::new(quat), false).unwrap(),
-            gyro: alloc::into_static(SingularData::default(), false).unwrap(),
+            acceleration: Rc::new(OverwritingData::sized(size)),
+            quaternion: Rc::new(OverwritingData::new(vec![unit; size])),
+            gyro: Rc::new(SingularData::default()),
 
             ahrs: Mahony::new(1.0 / sample_rate as f32, 0.5, 0.0),
             gyro_bias: Default::default(),
@@ -55,15 +54,15 @@ where
     }
 
     pub fn as_accelerometer(&self) -> impl DataSource<Acceleration> {
-        OverwritingDataSource::new(self.acceleration)
+        OverwritingDataSource::new(&self.acceleration)
     }
 
     pub fn as_imu(&self) -> impl DataSource<UnitQuaternion<f32>> {
-        OverwritingDataSource::new(self.quaternion)
+        OverwritingDataSource::new(&self.quaternion)
     }
 
     pub fn as_gyroscope(&self) -> impl DataSource<Gyro> {
-        SingularDataSource::new(self.gyro)
+        SingularDataSource::new(&self.gyro)
     }
 
     pub fn update_imu(&mut self, raw: (Acceleration, Gyro)) {

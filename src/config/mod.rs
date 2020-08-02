@@ -51,7 +51,7 @@ impl ToYAML for Axes {
     }
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Clone)]
 pub struct Config {
     pub accelerometer: Accelerometer,
     pub battery: Battery,
@@ -153,8 +153,8 @@ pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     get()
 }
 
-pub fn replace(config: &Config) {
-    unsafe { CONFIG = Some(*config) }
+pub fn replace(config: Config) {
+    unsafe { CONFIG = Some(config) }
 }
 
 mod test {
@@ -170,9 +170,6 @@ mod test {
 
         use super::yaml::{FromYAML, ToYAML, YamlParser};
         use super::Config;
-
-        static mut PRIMARY_BUFFER: [u8; 256] = [0u8; 256];
-        unsafe { crate::alloc::init(&mut PRIMARY_BUFFER, &mut []) };
 
         let mut file = File::open("sample.yml")?;
         let mut yaml_string = String::new();

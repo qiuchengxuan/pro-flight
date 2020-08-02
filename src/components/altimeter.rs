@@ -1,4 +1,6 @@
-use crate::alloc;
+use alloc::rc::Rc;
+use alloc::vec::Vec;
+
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Altitude, DistanceUnit, Pressure, Velocity};
@@ -9,16 +11,16 @@ const MAX_RECORDS: usize = 25;
 
 pub struct Altimeter<D> {
     data_source: D,
-    data: &'static SingularData<(Altitude, Velocity)>,
+    data: Rc<SingularData<(Altitude, Velocity)>>,
 
-    records: &'static mut [i16],
+    records: Vec<i16>,
     rate: u16, // hz
     counter: u8,
 }
 
 impl<D: DataSource<Pressure>> Altimeter<D> {
     pub fn new(data_source: D, rate: u16) -> Self {
-        let data = alloc::into_static(SingularData::default(), false).unwrap();
+        let data = Rc::new(SingularData::default());
         let mut size = MAX_RECORDS;
         for i in 0..16 {
             size = (rate >> i) as usize;
@@ -26,7 +28,7 @@ impl<D: DataSource<Pressure>> Altimeter<D> {
                 break;
             }
         }
-        let records = alloc::typed_allocate(0, size, false).unwrap();
+        let records = vec![0; size];
         Self { data_source, data, records, rate, counter: 0 }
     }
 

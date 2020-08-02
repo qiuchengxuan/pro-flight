@@ -2,7 +2,8 @@
 #![feature(trait_alias)]
 
 extern crate ahrs;
-extern crate arrayvec;
+#[macro_use]
+extern crate alloc;
 extern crate ascii;
 extern crate ascii_osd_hud;
 extern crate bmp280_core as bmp280;
@@ -25,7 +26,6 @@ extern crate sval_json;
 #[macro_use]
 pub mod logger;
 
-pub mod alloc;
 #[macro_use]
 pub mod components;
 pub mod config;

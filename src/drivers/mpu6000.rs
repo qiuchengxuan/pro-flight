@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use core::mem::MaybeUninit;
 
 use embedded_hal::blocking::delay::DelayUs;
@@ -16,9 +17,13 @@ pub const ACCELEROMETER_SENSITIVE: AccelerometerSensitive =
     accelerometer_sensitive!(+/-4g, 8192/LSB);
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 
-static mut ACCELEROMETER_DATA: MaybeUninit<OverwritingData<Acceleration>> = MaybeUninit::uninit();
-static mut GYROSCOPE_DATA: MaybeUninit<OverwritingData<Gyro>> = MaybeUninit::uninit();
-static mut TEMPERATURE_DATA: MaybeUninit<OverwritingData<Temperature>> = MaybeUninit::uninit();
+pub struct MPU6000Data {
+    accelerometer: Rc<OverwritingData<Acceleration>>,
+    gyroscope: Rc<OverwritingData<Gyro>>,
+    thermometer: Rc<OverwritingData<Temperature>>,
+}
+
+static mut MPU6000_DATA: MaybeUninit<MPU6000Data> = MaybeUninit::uninit();
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
     fn into(self) -> Measurement {
@@ -39,20 +44,17 @@ impl Into<Measurement> for mpu6000::measurement::Measurement<GyroSensitive> {
 
 pub fn init_data_source(
 ) -> (impl DataSource<Acceleration>, impl DataSource<Gyro>, impl DataSource<Temperature>) {
-    let buffer = [Acceleration::default(); 40];
-    let buffer = alloc::into_static(buffer, false).unwrap();
-    unsafe { ACCELEROMETER_DATA = MaybeUninit::new(OverwritingData::new(&mut buffer[..])) };
-    let accelerometer = OverwritingDataSource::new(unsafe { &*ACCELEROMETER_DATA.as_ptr() });
+    let mpu6000_data = MPU6000Data {
+        accelerometer: Rc::new(OverwritingData::sized(40)),
+        gyroscope: Rc::new(OverwritingData::sized(40)),
+        thermometer: Rc::new(OverwritingData::sized(40)),
+    };
+    unsafe { MPU6000_DATA = MaybeUninit::new(mpu6000_data) };
 
-    let buffer = [Gyro::default(); 40];
-    let buffer = alloc::into_static(buffer, false).unwrap();
-    unsafe { GYROSCOPE_DATA = MaybeUninit::new(OverwritingData::new(&mut buffer[..])) };
-    let gyroscope = OverwritingDataSource::new(unsafe { &*GYROSCOPE_DATA.as_ptr() });
-
-    let buffer = alloc::into_static([Temperature::default(); 40], false).unwrap();
-    unsafe { TEMPERATURE_DATA = MaybeUninit::new(OverwritingData::new(buffer)) };
-    let thermometer = OverwritingDataSource::new(unsafe { &*TEMPERATURE_DATA.as_ptr() });
-
+    let mpu6000_data = unsafe { &*MPU6000_DATA.as_ptr() };
+    let accelerometer = OverwritingDataSource::new(&mpu6000_data.accelerometer);
+    let gyroscope = OverwritingDataSource::new(&mpu6000_data.gyroscope);
+    let thermometer = OverwritingDataSource::new(&mpu6000_data.thermometer);
     return (accelerometer, gyroscope, thermometer);
 }
 
@@ -61,12 +63,10 @@ pub unsafe fn on_dma_receive(dma_buffer: &[u8; 16]) {
     let acceleration = measurement::Measurement::from_array(&buf[1..], ACCELEROMETER_SENSITIVE);
     let temperature = measurement::Temperature(i16::from_be(buf[4]));
     let gyro = measurement::Measurement::from_array(&buf[5..], GYRO_SENSITIVE);
-    let accelerometer_data = &mut *ACCELEROMETER_DATA.as_mut_ptr();
-    accelerometer_data.write(Acceleration(acceleration.into()));
-    let gyroscope_data = &mut *GYROSCOPE_DATA.as_mut_ptr();
-    gyroscope_data.write(gyro.into());
-    let temperature_data = &mut *TEMPERATURE_DATA.as_mut_ptr();
-    temperature_data.write(temperature.0);
+    let mpu6000_data = &mut *MPU6000_DATA.as_mut_ptr();
+    mpu6000_data.accelerometer.write(Acceleration(acceleration.into()));
+    mpu6000_data.gyroscope.write(gyro.into());
+    mpu6000_data.thermometer.write(temperature.0);
 }
 
 pub fn init<E, BUS: Bus<Error = E>>(bus: BUS, sample_rate: u16) -> Result<bool, E> {

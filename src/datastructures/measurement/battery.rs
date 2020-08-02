@@ -1,9 +1,9 @@
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Battery(pub u16); // unit of milli voltage
 
 impl sval::value::Value for Battery {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.any(self.0 as u64)
+        stream.any(self.0)
     }
 }
 

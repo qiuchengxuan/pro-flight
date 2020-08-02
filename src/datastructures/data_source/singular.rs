@@ -1,3 +1,5 @@
+use alloc::rc::Rc;
+
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -22,18 +24,18 @@ impl<T: Copy> DataWriter<T> for SingularData<T> {
     }
 }
 
-pub struct SingularDataSource<'a, T> {
-    source: &'a SingularData<T>,
+pub struct SingularDataSource<T> {
+    source: Rc<SingularData<T>>,
     counter: usize,
 }
 
-impl<'a, T: Copy> SingularDataSource<'a, T> {
-    pub fn new(data: &'a SingularData<T>) -> Self {
-        Self { source: data, counter: 0 }
+impl<T: Copy> SingularDataSource<T> {
+    pub fn new(data: &Rc<SingularData<T>>) -> Self {
+        Self { source: Rc::clone(data), counter: 0 }
     }
 }
 
-impl<'a, T: Copy> DataSource<T> for SingularDataSource<'a, T> {
+impl<T: Copy> DataSource<T> for SingularDataSource<T> {
     fn capacity(&self) -> usize {
         1
     }

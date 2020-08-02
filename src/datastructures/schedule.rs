@@ -1,4 +1,4 @@
-use crate::alloc;
+use alloc::vec::Vec;
 
 pub type Hertz = usize;
 
@@ -36,6 +36,7 @@ schedulables! {0, 1, 2 -> S0, S1, S2}
 schedulables! {0, 1, 2, 3 -> S0, S1, S2, S3}
 schedulables! {0, 1, 2, 3, 4 -> S0, S1, S2, S3, S4}
 schedulables! {0, 1, 2, 3, 4, 5 -> S0, S1, S2, S3, S4, S5}
+schedulables! {0, 1, 2, 3, 4, 5, 6 -> S0, S1, S2, S3, S4, S5, S6}
 
 pub struct TaskInfo {
     counter: usize,
@@ -45,16 +46,16 @@ pub struct TaskInfo {
 pub struct Scheduler<S> {
     schedulables: S,
     rate: Hertz,
-    task_infos: &'static mut [TaskInfo],
+    task_infos: Vec<TaskInfo>,
     running: bool,
 }
 
 impl<S: Schedulables> Scheduler<S> {
     pub fn new(mut schedulables: S, rate: Hertz) -> Self {
-        let task_info = TaskInfo { counter: 0, interval: 1 };
-        let task_infos = alloc::typed_allocate(task_info, S::len(), false).unwrap();
+        let mut task_infos: Vec<TaskInfo> = Vec::with_capacity(S::len());
         for i in 0..S::len() {
-            task_infos[i].interval = rate / schedulables.get(i).unwrap().rate();
+            let interval = rate / schedulables.get(i).unwrap().rate();
+            task_infos.push(TaskInfo { counter: 0, interval });
         }
         Self { schedulables, rate, task_infos, running: false }
     }

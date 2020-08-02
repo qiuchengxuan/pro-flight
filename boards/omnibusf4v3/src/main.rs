@@ -1,6 +1,8 @@
 #![no_main]
 #![no_std]
+#![feature(alloc_error_handler)]
 
+extern crate alloc;
 extern crate ascii_osd_hud;
 extern crate bmp280_core as bmp280;
 extern crate cast;
@@ -30,16 +32,18 @@ mod usart6;
 mod usb_serial;
 mod watchdog;
 
+use alloc::boxed::Box;
+use core::alloc::Layout;
 use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 use core::time::Duration;
 
+use alloc_cortex_m::CortexMHeap;
 use chips::cortex_m4::{get_jiffies, systick_init};
 use chips::stm32f4::crc::CRC;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
 use cortex_m_rt::ExceptionFrame;
-use rs_flight::alloc;
 use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cli::memory;
 use rs_flight::components::cli::CLI;
@@ -70,7 +74,10 @@ const LOG_BUFFER_SIZE: usize = 1024;
 
 #[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
-static mut CCM_MEMORY: [u8; 32768] = [0u8; 32768];
+static mut CCM_MEMORY: [u8; 65536] = [0u8; 65536];
+
+#[global_allocator]
+static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
 macro_rules! panic_logger {
     () => {
@@ -87,6 +94,8 @@ fn main() -> ! {
     dfu.check();
     dfu.arm();
 
+    unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
+
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
 
@@ -95,10 +104,7 @@ fn main() -> ! {
 
     systick_init(cortex_m_peripherals.SYST, clocks.sysclk().0);
     timer::init(get_jiffies);
-
-    unsafe { alloc::init(&mut [], &mut CCM_MEMORY) };
-
-    logger::init(alloc::allocate(4096, false).unwrap(), Level::Debug);
+    logger::init(Level::Debug);
 
     let panic_logger = unsafe { panic_logger!() };
     if panic_logger.is_valid() {
@@ -141,11 +147,11 @@ fn main() -> ! {
     let mut config: Config = Default::default();
     match File::open("sdcard://config.yml") {
         Ok(mut file) => {
-            config = *config::load(&mut file);
+            config = config::load(&mut file).clone();
             file.close();
         }
         Err(e) => {
-            config::replace(&config);
+            config::replace(config.clone());
             warn!("{:?}", e);
         }
     };
@@ -177,30 +183,28 @@ fn main() -> ! {
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
-    navigation.set_altimeter(alloc::into_static(altimeter.as_data_source(), false).unwrap());
+    navigation.set_altimeter(Box::new(altimeter.as_data_source()));
 
     if let Some(config) = config.serials.get("USART1") {
         info!("Initialize USART1");
         let pins = (gpio_a.pa9, gpio_a.pa10);
         match usart1::init(peripherals.USART1, pins, &config, clocks) {
             Device::GNSS(ref mut gnss) => {
-                navigation.set_gnss(alloc::into_static(gnss.as_position_source(), false).unwrap());
+                navigation.set_gnss(Box::new(gnss.as_position_source()));
             }
             _ => (),
         }
     }
 
-    let telemetry = TelemetryUnit::new(
+    let mut telemetry = TelemetryUnit::new(
         altimeter.as_data_source(),
         battery,
         imu.as_accelerometer(),
         imu.as_imu(),
         navigation.as_data_source(),
     );
-    let telemetry = alloc::into_static(telemetry, false).unwrap();
 
-    let mut control_input: &mut dyn DataSource<ControlInput> =
-        alloc::into_static(NoDataSource::new(), false).unwrap();
+    let mut control_input: Box<dyn DataSource<ControlInput>> = Box::new(NoDataSource::new());
 
     if let Some(serial_config) = config.serials.get("USART6") {
         info!("Initialize USART6");
@@ -214,10 +218,10 @@ fn main() -> ! {
         let pins = (gpio_c.pc6, gpio_c.pc7);
         match usart6::init(peripherals.USART6, pins, &serial_config, clocks) {
             Device::SBUS(ref mut sbus) => {
-                telemetry.set_receiver(alloc::into_static(sbus.as_receiver(), false).unwrap());
-                let input = alloc::into_static(sbus.as_control_input(), false).unwrap();
+                telemetry.set_receiver(Box::new(sbus.as_receiver()));
+                let input = Box::new(sbus.as_control_input());
                 telemetry.set_control_input(input);
-                control_input = alloc::into_static(sbus.as_control_input(), false).unwrap();
+                control_input = Box::new(sbus.as_control_input());
             }
             _ => (),
         }
@@ -231,7 +235,7 @@ fn main() -> ! {
         gpio_b.pb3,
         &mut CRC(peripherals.CRC),
         clocks,
-        telemetry,
+        telemetry.as_data_source(),
     );
     let (baro, osd) = result.ok().unwrap();
 
@@ -259,9 +263,10 @@ fn main() -> ! {
 
     let mut watchdog = watchdog::init(peripherals.IWDG);
 
-    let group = Scheduler::new((baro, altimeter, imu, navigation, control_surface, osd), 100);
-    let group = alloc::into_static(group, false).unwrap();
-    tim7_scheduler::init(peripherals.TIM7, group, clocks, 100);
+    let telemetry_source = telemetry.as_data_source();
+    let group =
+        Scheduler::new((baro, altimeter, imu, navigation, control_surface, telemetry, osd), 100);
+    tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
 
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
@@ -282,7 +287,12 @@ fn main() -> ! {
                     dfu.disarm();
                     cortex_m::peripheral::SCB::sys_reset()
                 }
-                Some("telemetry") => console!(serial, "{}\n", telemetry.get_data()),
+                Some("free") => {
+                    console!(serial, "Used: {}, free: {}\n", ALLOCATOR.used(), ALLOCATOR.free());
+                }
+                Some("telemetry") => {
+                    console!(serial, "{}\n", telemetry_source.read_last_unchecked())
+                }
                 _ => return false,
             }
             true
@@ -305,5 +315,11 @@ unsafe fn HardFault(exception_frame: &ExceptionFrame) -> ! {
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
     log_panic(format_args!("{}", irqn), panic_logger!());
+    cortex_m::peripheral::SCB::sys_reset();
+}
+
+#[alloc_error_handler]
+unsafe fn oom(_: Layout) -> ! {
+    log_panic(format_args!("OOM"), panic_logger!());
     cortex_m::peripheral::SCB::sys_reset();
 }

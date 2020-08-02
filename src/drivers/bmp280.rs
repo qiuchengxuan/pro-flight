@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use core::mem::MaybeUninit;
 
 use bmp280::bus::Bus;
@@ -5,7 +6,6 @@ use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
 use bmp280::registers::{PressureOversampling, StandbyTime, TemperatureOversampling};
 use bmp280::{Mode, BMP280};
 
-use crate::alloc;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::Pressure;
@@ -14,7 +14,7 @@ use crate::sys::timer::SysTimer;
 pub const BMP280_SAMPLE_RATE: usize = 16;
 
 static mut CALIBRATION: MaybeUninit<Calibration> = MaybeUninit::uninit();
-static mut BUFFER: MaybeUninit<OverwritingData<Pressure>> = MaybeUninit::uninit();
+static mut BUFFER: MaybeUninit<Rc<OverwritingData<Pressure>>> = MaybeUninit::uninit();
 
 pub unsafe fn on_dma_receive(dma_buffer: &[u8; 8]) {
     let calibration = &*CALIBRATION.as_ptr();
@@ -26,8 +26,7 @@ pub unsafe fn on_dma_receive(dma_buffer: &[u8; 8]) {
 }
 
 pub fn init_data_source() -> impl DataSource<Pressure> {
-    let buffer = alloc::into_static([Pressure(0); 8], false).unwrap();
-    unsafe { BUFFER = MaybeUninit::new(OverwritingData::new(buffer)) };
+    unsafe { BUFFER = MaybeUninit::new(Rc::new(OverwritingData::sized(8))) };
     OverwritingDataSource::new(unsafe { &*BUFFER.as_ptr() })
 }
 

@@ -1,6 +1,6 @@
 use super::coordinate::Position;
 
-#[derive(Copy, Clone, Value)]
+#[derive(Copy, Clone, Debug, Value)]
 pub struct Waypoint {
     pub name: &'static str,
     pub position: Position,
@@ -12,7 +12,7 @@ impl Default for Waypoint {
     }
 }
 
-#[derive(Copy, Clone, Default, Value)]
+#[derive(Copy, Clone, Debug, Default, Value)]
 pub struct Steerpoint {
     pub index: u8,
     pub waypoint: Waypoint,

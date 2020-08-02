@@ -83,8 +83,8 @@ where
     if config.offset.vertical != 0 {
         max7456.set_vertical_offset(config.offset.vertical)?;
     }
-    if config.font != "" {
-        match File::open(config.font) {
+    if config.font.as_str() != "" {
+        match File::open(config.font.as_str()) {
             Ok(mut file) => {
                 check_font(&mut file, &mut max7456, crc)?;
                 file.close();

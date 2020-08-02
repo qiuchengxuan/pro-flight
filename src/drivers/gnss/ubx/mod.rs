@@ -1,7 +1,8 @@
 pub mod message;
 pub mod nav_pos_pvt;
 
-use crate::alloc;
+use alloc::rc::Rc;
+
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
@@ -16,7 +17,7 @@ const NAV_PVT_HEADER: [u8; 4] = [UBX_HEADER[0], UBX_HEADER[1], CLASS, ID];
 pub struct UBXDecoder {
     buffer: [u8; NAV_PVT_SIZE],
     remain: usize,
-    position: &'static SingularData<Position>,
+    position: Rc<SingularData<Position>>,
     fix_type: FixType,
     running: bool,
 }
@@ -26,14 +27,14 @@ impl UBXDecoder {
         Self {
             buffer: [0u8; NAV_PVT_SIZE],
             remain: 0,
-            position: alloc::into_static(SingularData::default(), false).unwrap(),
+            position: Rc::new(SingularData::default()),
             fix_type: FixType::NoFix,
             running: false,
         }
     }
 
     pub fn as_position_source(&self) -> impl DataSource<Position> {
-        SingularDataSource::new(self.position)
+        SingularDataSource::new(&self.position)
     }
 
     fn handle_pvt_message(&mut self) {

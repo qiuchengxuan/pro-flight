@@ -1,3 +1,6 @@
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+
 use nalgebra::UnitQuaternion;
 
 use crate::alloc;
@@ -14,22 +17,22 @@ const HOME: usize = 0;
 const MAX_WAYPOINT: usize = 32;
 const GRAVITY: f32 = 9.80665;
 
-pub struct Navigation<'a, IMU, A> {
+pub struct Navigation<IMU, A> {
     imu: IMU,
     accelerometer: A,
-    gnss: Option<&'a mut dyn DataSource<Position>>,
-    altimeter: Option<&'a mut dyn DataSource<(Altitude, Velocity)>>,
+    gnss: Option<Box<dyn DataSource<Position>>>,
+    altimeter: Option<Box<dyn DataSource<(Altitude, Velocity)>>>,
     waypoints: [Waypoint; MAX_WAYPOINT],
     offset: (f32, f32, f32),
     displacements: [Displacement; MAX_WAYPOINT],
-    output: &'static SingularData<(Position, Steerpoint)>,
+    output: Rc<SingularData<(Position, Steerpoint)>>,
     next_waypoint: u8,
     max_waypoint: u8,
     interval: f32,
     time: f32,
 }
 
-impl<'a, IMU, A> Navigation<'a, IMU, A>
+impl<IMU, A> Navigation<IMU, A>
 where
     IMU: DataSource<UnitQuaternion<f32>>,
     A: DataSource<Acceleration>,
@@ -43,7 +46,7 @@ where
             waypoints: [Waypoint::default(); MAX_WAYPOINT],
             offset: (0.0, 0.0, 0.0),
             displacements: [Displacement::default(); MAX_WAYPOINT],
-            output: alloc::into_static(SingularData::default(), false).unwrap(),
+            output: Rc::new(SingularData::default()),
             next_waypoint: HOME as u8,
             max_waypoint: 1,
             interval,
@@ -55,11 +58,11 @@ where
         SingularDataSource::new(&self.output)
     }
 
-    pub fn set_gnss(&mut self, gnss: &'a mut dyn DataSource<Position>) {
+    pub fn set_gnss(&mut self, gnss: Box<dyn DataSource<Position>>) {
         self.gnss = Some(gnss)
     }
 
-    pub fn set_altimeter(&mut self, altimeter: &'a mut dyn DataSource<(Altitude, Velocity)>) {
+    pub fn set_altimeter(&mut self, altimeter: Box<dyn DataSource<(Altitude, Velocity)>>) {
         self.altimeter = Some(altimeter)
     }
 
@@ -79,7 +82,7 @@ where
     }
 }
 
-impl<'a, IMU, A> Schedulable for Navigation<'a, IMU, A>
+impl<IMU, A> Schedulable for Navigation<IMU, A>
 where
     IMU: DataSource<UnitQuaternion<f32>>,
     A: DataSource<Acceleration>,

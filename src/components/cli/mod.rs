@@ -1,7 +1,8 @@
 mod config;
 pub mod memory;
 
-use arrayvec::ArrayVec;
+use alloc::vec::Vec;
+
 use embedded_hal::serial::{Read, Write};
 
 use crate::alloc;
@@ -10,13 +11,13 @@ use crate::logger;
 use crate::sys::timer::{get_jiffies, SysTimer};
 
 pub struct CLI {
-    vec: ArrayVec<[u8; 80]>,
+    vec: Vec<u8>,
     timer: SysTimer,
 }
 
 impl CLI {
     pub fn new() -> Self {
-        CLI { vec: ArrayVec::new(), timer: SysTimer::new() }
+        CLI { vec: Vec::with_capacity(80), timer: SysTimer::new() }
     }
 
     pub fn interact<RE, WE, S, E>(&mut self, serial: &mut S, mut extra: E)
@@ -35,10 +36,6 @@ impl CLI {
                         console!(serial, "{}", s);
                     }
                 }
-                "free" => {
-                    let (primary, no_dma) = alloc::available();
-                    console!(serial, "Primary: {}, no-dma: {}\n", primary, no_dma);
-                }
                 "uptime" => console!(serial, "{:?}", get_jiffies()),
                 "read" | "readx" | "readf" => memory::read(line, serial),
                 "dump" => memory::dump(line, serial),
@@ -55,6 +52,6 @@ impl CLI {
             }
         }
         console!(serial, "# ");
-        self.vec.clear();
+        self.vec.truncate(0);
     }
 }

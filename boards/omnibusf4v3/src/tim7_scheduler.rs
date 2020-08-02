@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::mem::MaybeUninit;
 
 use rs_flight::datastructures::schedule::Schedulable;
@@ -6,7 +7,7 @@ use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::timer::{Event, Timer};
 use stm32f4xx_hal::{prelude::*, stm32};
 
-static mut SCHEDULER: Option<&'static mut dyn Schedulable> = None;
+static mut SCHEDULER: Option<Box<dyn Schedulable>> = None;
 static mut TIM7: MaybeUninit<Timer<stm32::TIM7>> = MaybeUninit::uninit();
 
 #[interrupt]
@@ -20,7 +21,7 @@ unsafe fn TIM7() {
     }
 }
 
-pub fn init(tim7: stm32::TIM7, scheduler: &'static mut dyn Schedulable, clocks: Clocks, rate: u32) {
+pub fn init(tim7: stm32::TIM7, scheduler: Box<dyn Schedulable>, clocks: Clocks, rate: u32) {
     let mut timer = Timer::tim7(tim7, rate.hz(), clocks);
     timer.listen(Event::TimeOut);
     unsafe { TIM7 = MaybeUninit::new(timer) };

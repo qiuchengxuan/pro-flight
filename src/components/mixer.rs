@@ -1,8 +1,10 @@
+use alloc::boxed::Box;
+
 use crate::datastructures::data_source::DataSource;
 use crate::datastructures::input::ControlInput;
 
 pub struct ControlMixer<S> {
-    receiver: &'static mut dyn DataSource<ControlInput>,
+    receiver: Box<dyn DataSource<ControlInput>>,
     stabilizer: S,
     stablizer_limit: u8,
     // TODO: autopilot
@@ -21,7 +23,7 @@ fn limit_i16(value: i16, limit: u8) -> i16 {
 }
 
 impl<S: DataSource<ControlInput>> ControlMixer<S> {
-    pub fn new(receiver: &'static mut dyn DataSource<ControlInput>, stabilizer: S) -> Self {
+    pub fn new(receiver: Box<dyn DataSource<ControlInput>>, stabilizer: S) -> Self {
         Self { receiver, stabilizer, stablizer_limit: 30 }
     }
 

@@ -1,6 +1,6 @@
 pub type Percentage = u8;
 
-#[derive(Copy, Clone, Default, Value)]
+#[derive(Copy, Clone, Default, Value, Debug)]
 pub struct Receiver {
     pub rssi: u8,
     pub sequence: u8,

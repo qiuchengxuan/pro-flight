@@ -1,16 +1,59 @@
+use alloc::boxed::Box;
+
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
-use ascii_osd_hud::telemetry::TelemetrySource;
+use ascii_osd_hud::telemetry::{Steerpoint, Telemetry, TelemetrySource};
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
-use crate::alloc;
+use crate::components::telemetry::TelemetryData;
+use crate::datastructures::coordinate::{Displacement, SphericalCoordinate};
+use crate::datastructures::data_source::DataSource;
+use crate::datastructures::measurement::DistanceUnit;
 use crate::datastructures::Ratio;
 
-pub type ScreenConsumer = fn(&[[u8; 29]; 15]);
+type Screen = [[u8; 29]; 15];
 
-pub struct AsciiHud<'a> {
-    hud: HUD<'a>,
-    screen: &'static mut [[u8; 29]; 15],
+pub type ScreenConsumer = fn(&Screen);
+
+fn round_up(value: i16) -> i16 {
+    (value + 5) / 10 * 10
+}
+
+pub struct HUDTelemetrySource<T>(T);
+
+impl<T: DataSource<TelemetryData>> TelemetrySource for HUDTelemetrySource<T> {
+    fn get_telemetry(&self) -> Telemetry {
+        let data = self.0.read_last_unchecked();
+
+        let altitude = data.altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1);
+        let delta = data.steerpoint.waypoint.position - data.position;
+        let vector = data.raw.quaternion.inverse_transform_vector(&delta.into_f32_vector());
+        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
+        let coordinate: SphericalCoordinate = transformed.into();
+        let steerpoint = Steerpoint {
+            number: data.steerpoint.index,
+            name: data.steerpoint.waypoint.name,
+            heading: delta.azimuth(),
+            coordinate: coordinate.into(),
+            unit: "NM",
+        };
+        Telemetry {
+            altitude: round_up(altitude as i16),
+            attitude: data.attitude.into(),
+            battery: data.battery.percentage(),
+            heading: data.heading,
+            g_force: data.g_force,
+            height: data.height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
+            velocity: data.velocity / 100 * 100,
+            steerpoint: steerpoint,
+            ..Default::default()
+        }
+    }
+}
+
+pub struct AsciiHud<T> {
+    hud: HUD<HUDTelemetrySource<T>>,
+    screen: Box<[[u8; 29]; 15]>,
 }
 
 impl From<Ratio> for AspectRatio {
@@ -25,13 +68,8 @@ impl From<Ratio> for PixelRatio {
     }
 }
 
-impl<'a> AsciiHud<'a> {
-    pub fn new(
-        telemetry: &'a dyn TelemetrySource,
-        fov: u8,
-        pixel_ratio: PixelRatio,
-        aspect_ratio: AspectRatio,
-    ) -> Self {
+impl<T: DataSource<TelemetryData>> AsciiHud<T> {
+    pub fn new(telemetry: T, fov: u8, pixel_ratio: PixelRatio, aspect_ratio: AspectRatio) -> Self {
         let symbol_table: SymbolTable = enum_map! {
             Symbol::Antenna => 1,
             Symbol::Battery => 144,
@@ -54,12 +92,13 @@ impl<'a> AsciiHud<'a> {
             Symbol::LineRight => 227,
             Symbol::LineRight1 => 228,
         };
-        let hud = HUD::new(telemetry, &symbol_table, fov, pixel_ratio, aspect_ratio);
-        Self { hud, screen: alloc::into_static([[0u8; 29]; 15], false).unwrap() }
+        let hud =
+            HUD::new(HUDTelemetrySource(telemetry), &symbol_table, fov, pixel_ratio, aspect_ratio);
+        Self { hud, screen: Box::new([[0u8; 29]; 15]) }
     }
 
-    pub fn draw(&mut self) -> &[[u8; 29]; 15] {
-        self.hud.draw(self.screen);
-        self.screen
+    pub fn draw(&mut self) -> &Screen {
+        self.hud.draw(self.screen.as_mut());
+        &self.screen
     }
 }

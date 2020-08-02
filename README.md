@@ -33,6 +33,15 @@ Progress
   - [ ] Navigation
   - [ ] EKF filter
 
+Memory allocator
+================
+
+Fow now it's using alloc-cortex-m as memory allocator, 
+but there's some alternatives to choose, e.g.
+
+* linked_list_allocator
+* static-alloc
+
 data-flow
 =========
 

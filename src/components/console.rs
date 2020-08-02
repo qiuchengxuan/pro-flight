@@ -1,9 +1,9 @@
+use alloc::vec::Vec;
 use core::fmt;
 use core::fmt::Write as _;
 
 use embedded_hal::serial::{Read, Write};
 
-use arrayvec::{Array, ArrayVec};
 use ascii::{AsciiChar, ToAsciiChar};
 
 const BACKSPACE: [u8; 3] = [AsciiChar::BackSpace as u8, ' ' as u8, AsciiChar::BackSpace as u8];
@@ -16,9 +16,8 @@ macro_rules! writes {
     };
 }
 
-pub fn read_line<'a, A, RE, WE, S>(serial: &mut S, vec: &'a mut ArrayVec<A>) -> Option<&'a [u8]>
+pub fn read_line<'a, RE, WE, S>(serial: &mut S, vec: &'a mut Vec<u8>) -> Option<&'a [u8]>
 where
-    A: Array<Item = u8>,
     S: Read<u8, Error = RE> + Write<u8, Error = WE>,
 {
     let mut skip = false;
@@ -59,10 +58,10 @@ where
                 skip = true;
                 continue;
             }
-            _ => match vec.try_push(b) {
-                Ok(()) => serial.write(b).ok().unwrap(),
-                _ => (),
-            },
+            _ => {
+                vec.push(b);
+                serial.write(b).ok();
+            }
         }
     }
 }

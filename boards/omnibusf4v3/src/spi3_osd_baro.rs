@@ -1,13 +1,14 @@
 use core::mem::MaybeUninit;
 
-use ascii_osd_hud::telemetry::TelemetrySource;
 use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
 use bmp280::registers::Register;
 use crc::Hasher32;
 use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
+use rs_flight::components::telemetry::TelemetryData;
 use rs_flight::config;
+use rs_flight::datastructures::data_source::DataSource;
 use rs_flight::datastructures::schedule::{Hertz, Schedulable};
 use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
@@ -124,9 +125,9 @@ impl Schedulable for BaroScheduler {
     }
 }
 
-pub struct OSDScheduler<'a>(AsciiHud<'a>);
+pub struct OSDScheduler<T>(AsciiHud<T>);
 
-impl<'a> Schedulable for OSDScheduler<'a> {
+impl<T: DataSource<TelemetryData>> Schedulable for OSDScheduler<T> {
     fn rate(&self) -> Hertz {
         50
     }
@@ -154,8 +155,8 @@ pub fn init<'a, CRC: Hasher32>(
     pb3: PB3<Input<Floating>>,
     crc: &mut CRC,
     clocks: Clocks,
-    telemetry_source: &'a dyn TelemetrySource,
-) -> Result<(impl Schedulable + 'a, impl Schedulable + 'a), Error> {
+    telemetry: impl DataSource<TelemetryData>,
+) -> Result<(impl Schedulable, impl Schedulable), Error> {
     let cs_osd = pa15.into_push_pull_output();
     let cs_baro = pb3.into_push_pull_output();
     let (pc10, pc11, pc12) = spi3_pins;
@@ -178,11 +179,7 @@ pub fn init<'a, CRC: Hasher32>(
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA1_STREAM2) }
     let config = &config::get().osd;
-    let ascii_hud = AsciiHud::new(
-        telemetry_source,
-        config.fov,
-        Ratio(12, 18).into(),
-        config.aspect_ratio.into(),
-    );
+    let ascii_hud =
+        AsciiHud::new(telemetry, config.fov, Ratio(12, 18).into(), config.aspect_ratio.into());
     Ok((BaroScheduler, OSDScheduler(ascii_hud)))
 }

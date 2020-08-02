@@ -1,6 +1,7 @@
+use alloc::rc::Rc;
+
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
-use crate::alloc;
 use crate::config;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
@@ -13,8 +14,8 @@ pub struct SbusReceiver {
     counter: u8,
     loss: u8,
     loss_rate: u8,
-    receiver: &'static SingularData<Receiver>,
-    control_input: &'static SingularData<ControlInput>,
+    receiver: Rc<SingularData<Receiver>>,
+    control_input: Rc<SingularData<ControlInput>>,
 }
 
 #[inline]
@@ -30,17 +31,17 @@ impl SbusReceiver {
             counter: 0,
             loss: 0,
             loss_rate: 0,
-            receiver: alloc::into_static(SingularData::default(), false).unwrap(),
-            control_input: alloc::into_static(SingularData::default(), false).unwrap(),
+            receiver: Rc::new(SingularData::default()),
+            control_input: Rc::new(SingularData::default()),
         }
     }
 
     pub fn as_receiver(&self) -> impl DataSource<Receiver> {
-        SingularDataSource::new(self.receiver)
+        SingularDataSource::new(&self.receiver)
     }
 
     pub fn as_control_input(&self) -> impl DataSource<ControlInput> {
-        SingularDataSource::new(self.control_input)
+        SingularDataSource::new(&self.control_input)
     }
 
     fn handle_sbus_data(&mut self, data: &SbusData) {

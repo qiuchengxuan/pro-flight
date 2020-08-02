@@ -77,7 +77,7 @@ impl core::ops::Sub for Displacement {
     }
 }
 
-#[derive(Default, Copy, Clone, Value, PartialEq)]
+#[derive(Default, Copy, Clone, Value, PartialEq, Debug)]
 pub struct Position {
     pub latitude: Latitude,
     pub longitude: Longitude,
