@@ -22,6 +22,7 @@ Progress
   - [x] Displacement integral
   - [x] CRC based OSD font check
   - [x] timer based task scheduler
+  - [x] software interrupt based event
 * WIP
   - [ ] Involve async syntax
   - [ ] Complementary filter

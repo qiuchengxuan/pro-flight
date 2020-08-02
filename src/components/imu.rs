@@ -8,7 +8,7 @@ use crate::datastructures::data_source::overwriting::{OverwritingData, Overwriti
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, DEGREE_PER_DAG};
-use crate::datastructures::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Hertz, Schedulable};
 
 pub struct IMU<A, G> {
     accelerometer: A,

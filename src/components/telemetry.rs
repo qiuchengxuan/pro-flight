@@ -14,7 +14,7 @@ use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::{
     Acceleration, Altitude, Distance, DistanceUnit, Velocity,
 };
-use crate::datastructures::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Hertz, Schedulable};
 use crate::datastructures::waypoint::Steerpoint;
 
 #[derive(Debug, Default, Copy, Clone, Value)]

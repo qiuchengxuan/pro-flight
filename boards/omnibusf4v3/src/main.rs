@@ -22,6 +22,7 @@ extern crate stm32f4xx_hal;
 extern crate usb_device;
 
 mod adc2_vbat;
+mod exti0_softirq;
 mod pwm;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
@@ -48,16 +49,17 @@ use rs_flight::components::altimeter::Altimeter;
 use rs_flight::components::cli::memory;
 use rs_flight::components::cli::CLI;
 use rs_flight::components::configuration::Airplane;
+use rs_flight::components::event::SchedulableEvent;
 use rs_flight::components::imu::IMU;
 use rs_flight::components::mixer::ControlMixer;
 use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::{log_panic, PanicLogger};
+use rs_flight::components::schedule::Scheduler;
 use rs_flight::components::TelemetryUnit;
 use rs_flight::config::aircraft::Configuration;
 use rs_flight::config::{self, Config, SerialConfig};
 use rs_flight::datastructures::data_source::{DataSource, NoDataSource};
 use rs_flight::datastructures::input::ControlInput;
-use rs_flight::datastructures::schedule::Scheduler;
 use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
 use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
 use rs_flight::drivers::uart::Device;
@@ -188,30 +190,19 @@ fn main() -> ! {
     let barometer = init_bmp280_data_source();
     let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
 
-    let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
-    let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
-    navigation.set_altimeter(Box::new(altimeter.as_data_source()));
+    let mut gnss: Option<&'static mut Device> = None;
+    let mut receiver: Option<&'static mut Device> = None;
 
     if let Some(config) = config.serials.get("USART1") {
         info!("Initialize USART1");
         let pins = (gpio_a.pa9, gpio_a.pa10);
-        match usart1::init(peripherals.USART1, pins, &config, clocks) {
-            Device::GNSS(ref mut gnss) => {
-                navigation.set_gnss(Box::new(gnss.as_position_source()));
+        if let Some(device) = usart1::init(peripherals.USART1, pins, &config, clocks) {
+            match device {
+                Device::GNSS(_) => gnss = Some(device),
+                _ => (),
             }
-            _ => (),
         }
     }
-
-    let mut telemetry = TelemetryUnit::new(
-        altimeter.as_data_source(),
-        battery,
-        imu.as_accelerometer(),
-        imu.as_imu(),
-        navigation.as_data_source(),
-    );
-
-    let mut control_input: Box<dyn DataSource<ControlInput>> = Box::new(NoDataSource::new());
 
     if let Some(serial_config) = config.serials.get("USART6") {
         info!("Initialize USART6");
@@ -223,27 +214,14 @@ fn main() -> ! {
         }
 
         let pins = (gpio_c.pc6, gpio_c.pc7);
-        match usart6::init(peripherals.USART6, pins, &mut nvic, &serial_config, clocks) {
-            Device::SBUS(ref mut sbus) => {
-                telemetry.set_receiver(Box::new(sbus.as_receiver()));
-                let input = Box::new(sbus.as_control_input());
-                telemetry.set_control_input(input);
-                control_input = Box::new(sbus.as_control_input());
+        let option = usart6::init(peripherals.USART6, pins, &mut nvic, &serial_config, clocks);
+        if let Some(device) = option {
+            match device {
+                Device::SBUS(_) => receiver = Some(device),
+                _ => (),
             }
-            _ => (),
         }
     }
-
-    info!("Initialize OSD & Barometer");
-    let result = spi3_osd_baro::init(
-        peripherals.SPI3,
-        (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12),
-        (gpio_a.pa15, gpio_b.pb3),
-        &mut CRC(peripherals.CRC),
-        clocks,
-        telemetry.as_data_source(),
-    );
-    let (baro, osd) = result.ok().unwrap();
 
     let mut led = gpio_b.pb5.into_push_pull_output();
 
@@ -258,6 +236,11 @@ fn main() -> ! {
 
     let (mut serial, mut device) = usb_serial::init(usb);
 
+    let mut control_input: Box<dyn DataSource<ControlInput>> = Box::new(NoDataSource::new());
+    if let Some(Device::SBUS(ref mut sbus)) = receiver {
+        control_input = Box::new(sbus.as_control_input());
+    }
+
     info!("Initialize PWMs");
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
@@ -267,11 +250,47 @@ fn main() -> ! {
         Configuration::Airplane => Airplane::new(mixer, pwms),
     };
 
+    let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
+    let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
+    navigation.set_altimeter(Box::new(altimeter.as_data_source()));
+    if let Some(Device::GNSS(ref mut gnss)) = gnss {
+        navigation.set_gnss(Box::new(gnss.as_position_source()));
+    }
+
+    let mut telemetry = TelemetryUnit::new(
+        altimeter.as_data_source(),
+        battery,
+        imu.as_accelerometer(),
+        imu.as_imu(),
+        navigation.as_data_source(),
+    );
+    if let Some(Device::SBUS(ref mut sbus)) = receiver {
+        telemetry.set_receiver(Box::new(sbus.as_receiver()));
+        telemetry.set_control_input(Box::new(sbus.as_control_input()));
+    }
+
+    info!("Initialize OSD & Barometer");
+    let result = spi3_osd_baro::init(
+        peripherals.SPI3,
+        (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12),
+        (gpio_a.pa15, gpio_b.pb3),
+        &mut CRC(peripherals.CRC),
+        clocks,
+        telemetry.as_data_source(),
+    );
+    let (baro, osd) = result.ok().unwrap();
+
+    let trigger = exti0_softirq::init(&mut peripherals.EXTI, Box::new(control_surface));
+    if let Some(Device::SBUS(ref mut sbus)) = receiver {
+        sbus.set_notify(Box::new(trigger.clone()));
+    }
+
     let mut watchdog = watchdog::init(peripherals.IWDG);
 
     let telemetry_source = telemetry.as_data_source();
+    let schedule_trigger = SchedulableEvent::new(trigger, 50);
     let group =
-        Scheduler::new((control_surface, baro, altimeter, imu, navigation, telemetry, osd), 200);
+        Scheduler::new((schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd), 100);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
 
     let mut cli = CLI::new();

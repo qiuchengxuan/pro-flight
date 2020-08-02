@@ -1,7 +1,9 @@
+use alloc::boxed::Box;
 use alloc::rc::Rc;
 
 use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, SBUS_PACKET_SIZE};
 
+use crate::components::event::Notify;
 use crate::config;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
@@ -16,6 +18,7 @@ pub struct SbusReceiver {
     loss_rate: u8,
     receiver: Rc<SingularData<Receiver>>,
     control_input: Rc<SingularData<ControlInput>>,
+    notify: Option<Box<dyn Notify>>,
 }
 
 #[inline]
@@ -33,6 +36,7 @@ impl SbusReceiver {
             loss_rate: 0,
             receiver: Rc::new(SingularData::default()),
             control_input: Rc::new(SingularData::default()),
+            notify: None,
         }
     }
 
@@ -42,6 +46,10 @@ impl SbusReceiver {
 
     pub fn as_control_input(&self) -> impl DataSource<ControlInput> {
         SingularDataSource::new(&self.control_input)
+    }
+
+    pub fn set_notify(&mut self, notify: Box<dyn Notify>) {
+        self.notify = Some(notify);
     }
 
     fn handle_sbus_data(&mut self, data: &SbusData) {
@@ -78,6 +86,9 @@ impl SbusReceiver {
             }
         }
         self.control_input.write(control_input);
+        if let Some(ref mut notify) = self.notify {
+            notify.notify()
+        }
     }
 
     pub fn handle(&mut self, ring: &[u8], half: bool) {

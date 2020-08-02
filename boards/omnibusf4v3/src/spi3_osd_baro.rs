@@ -9,7 +9,7 @@ use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::components::telemetry::TelemetryData;
 use rs_flight::config;
 use rs_flight::datastructures::data_source::DataSource;
-use rs_flight::datastructures::schedule::{Hertz, Schedulable};
+use rs_flight::components::schedule::{Hertz, Schedulable};
 use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::init as max7456_init;

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Altitude, DistanceUnit, Pressure, Velocity};
-use crate::datastructures::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Hertz, Schedulable};
 
 const SECONDS_PER_MINUTE: i16 = 60;
 const MAX_RECORDS: usize = 25;

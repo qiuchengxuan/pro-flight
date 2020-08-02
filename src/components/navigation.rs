@@ -8,7 +8,7 @@ use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
-use crate::datastructures::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Hertz, Schedulable};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
 use crate::math::runge_kutta4;
 

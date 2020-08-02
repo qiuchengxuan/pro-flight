@@ -2,7 +2,6 @@ use super::gnss::GNSS;
 use super::sbus::SbusReceiver;
 
 pub enum Device {
-    None,
     SBUS(SbusReceiver),
     GNSS(GNSS),
 }
@@ -12,7 +11,6 @@ impl Device {
         match self {
             Device::SBUS(sbus_device) => sbus_device.handle(ring, half),
             Device::GNSS(gnss) => gnss.handle(ring, half),
-            _ => (),
         }
     }
 }

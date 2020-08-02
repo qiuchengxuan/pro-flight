@@ -19,7 +19,7 @@ const HTIF_OFFSET: usize = 4;
 const STREAM1_OFFSET: usize = 6;
 
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
-static mut DEVICE: Device = Device::None;
+static mut DEVICE: Option<Device> = None;
 static mut USART6: MaybeUninit<Serial<stm32::USART6, PINS>> = MaybeUninit::uninit();
 
 #[interrupt]
@@ -31,7 +31,9 @@ unsafe fn DMA2_STREAM1() {
         half = dma2.lisr.read().bits() & (1 << (HTIF_OFFSET + STREAM1_OFFSET)) > 0;
         dma2.lifcr.write(|w| w.bits(0x3D << STREAM1_OFFSET));
     });
-    DEVICE.handle(&DMA_BUFFER, half);
+    if let Some(ref mut device) = DEVICE {
+        device.handle(&DMA_BUFFER, half);
+    }
 }
 
 pub fn init(
@@ -40,9 +42,7 @@ pub fn init(
     nvic: &mut cortex_m::peripheral::NVIC,
     config: &SerialConfig,
     clocks: Clocks,
-) -> &'static mut Device {
-    unsafe { DEVICE = Device::None };
-
+) -> Option<&'static mut Device> {
     let mut cfg = Config::default();
     match config {
         SerialConfig::SBUS(sbus) => {
@@ -51,7 +51,7 @@ pub fn init(
             // word-length-9 must be selected when parity is even
             cfg = cfg.stopbits(StopBits::STOP2).parity_even().wordlength_9();
         }
-        _ => return unsafe { &mut DEVICE },
+        _ => return None,
     };
 
     let (pc6, pc7) = pins;
@@ -86,10 +86,8 @@ pub fn init(
             unsafe { nvic.set_priority(stm32::Interrupt::DMA2_STREAM1, 18) }; // No less than DMA1 stream0
             Device::SBUS(SbusReceiver::new())
         }
-        _ => Device::None,
+        _ => return None,
     };
-    unsafe {
-        DEVICE = device;
-        &mut DEVICE
-    }
+    unsafe { DEVICE = Some(device) }
+    unsafe { DEVICE.as_mut() }
 }
