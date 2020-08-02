@@ -39,7 +39,7 @@ use core::panic::PanicInfo;
 use core::time::Duration;
 
 use alloc_cortex_m::CortexMHeap;
-use chips::cortex_m4::{get_jiffies, systick_init};
+use chips::cortex_m4::{disable_all_irqs, get_jiffies, systick_init};
 use chips::stm32f4::crc::CRC;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
@@ -66,6 +66,7 @@ use rs_flight::sys::fs::File;
 use rs_flight::sys::timer::{self, SysTimer};
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
 use stm32f4xx_hal::otg_fs::USB;
+use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::{prelude::*, stm32};
 
 const MHZ: u32 = 1000_000;
@@ -88,23 +89,20 @@ macro_rules! panic_logger {
 #[link_section = ".uninit.STACKS"]
 static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
 
-#[entry]
-fn main() -> ! {
-    let dfu = unsafe { &mut *DFU.as_mut_ptr() };
-    dfu.check();
-    dfu.arm();
-
-    unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
-
-    let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
-    let mut peripherals = stm32::Peripherals::take().unwrap();
-
-    let rcc = peripherals.RCC.constrain();
+fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
+    let rcc = rcc.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
 
-    systick_init(cortex_m_peripherals.SYST, clocks.sysclk().0);
+    unsafe {
+        let rcc = &*stm32::RCC::ptr();
+        rcc.apb2enr.write(|w| w.syscfgen().enabled());
+        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled().crcen().enabled());
+    }
+
+    systick_init(syst, clocks.sysclk().0);
     timer::init(get_jiffies);
     logger::init(Level::Debug);
+    memory::init(valid_memory_address);
 
     let panic_logger = unsafe { panic_logger!() };
     if panic_logger.is_valid() {
@@ -119,17 +117,26 @@ fn main() -> ! {
     debug!("sysclk: {}mhz, hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", sysclk, hclk, pclk1, pclk2);
     debug!("stack top: {:x}", cortex_m::register::msp::read());
 
-    unsafe {
-        let rcc = &*stm32::RCC::ptr();
-        rcc.apb2enr.write(|w| w.syscfgen().enabled());
-        rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled().crcen().enabled());
-    }
+    clocks
+}
+
+#[entry]
+fn main() -> ! {
+    let dfu = unsafe { &mut *DFU.as_mut_ptr() };
+    dfu.check();
+    dfu.arm();
+
+    unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
+
+    let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
+    let mut peripherals = stm32::Peripherals::take().unwrap();
+    let mut nvic = cortex_m_peripherals.NVIC;
+
+    let clocks = init(cortex_m_peripherals.SYST, peripherals.RCC);
 
     let gpio_a = peripherals.GPIOA.split();
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
-
-    memory::init(valid_memory_address);
 
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
@@ -216,7 +223,7 @@ fn main() -> ! {
         }
 
         let pins = (gpio_c.pc6, gpio_c.pc7);
-        match usart6::init(peripherals.USART6, pins, &serial_config, clocks) {
+        match usart6::init(peripherals.USART6, pins, &mut nvic, &serial_config, clocks) {
             Device::SBUS(ref mut sbus) => {
                 telemetry.set_receiver(Box::new(sbus.as_receiver()));
                 let input = Box::new(sbus.as_control_input());
@@ -231,8 +238,7 @@ fn main() -> ! {
     let result = spi3_osd_baro::init(
         peripherals.SPI3,
         (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12),
-        gpio_a.pa15,
-        gpio_b.pb3,
+        (gpio_a.pa15, gpio_b.pb3),
         &mut CRC(peripherals.CRC),
         clocks,
         telemetry.as_data_source(),
@@ -265,14 +271,14 @@ fn main() -> ! {
 
     let telemetry_source = telemetry.as_data_source();
     let group =
-        Scheduler::new((baro, altimeter, imu, navigation, control_surface, telemetry, osd), 100);
+        Scheduler::new((control_surface, baro, altimeter, imu, navigation, telemetry, osd), 200);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
 
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
     loop {
         if timer.wait().is_ok() {
-            timer.start(Duration::from_millis(50));
+            timer.start(Duration::from_millis(100));
             watchdog.feed();
             led.toggle().ok();
         }
@@ -282,9 +288,13 @@ fn main() -> ! {
         }
         cli.interact(&mut serial, |line, serial| -> bool {
             match line.split(' ').next() {
-                Some("dfu") => cortex_m::peripheral::SCB::sys_reset(),
+                Some("dfu") => {
+                    unsafe { disable_all_irqs() };
+                    cortex_m::peripheral::SCB::sys_reset();
+                }
                 Some("reboot") => {
                     dfu.disarm();
+                    unsafe { disable_all_irqs() };
                     cortex_m::peripheral::SCB::sys_reset()
                 }
                 Some("free") => {

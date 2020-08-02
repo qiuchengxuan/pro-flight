@@ -8,10 +8,10 @@ pub enum Device {
 }
 
 impl Device {
-    pub fn handle(&mut self, ring: &[u8], half: bool, size: usize) {
+    pub fn handle(&mut self, ring: &[u8], half: bool) {
         match self {
-            Device::SBUS(sbus_device) => sbus_device.handle(ring, half, size),
-            Device::GNSS(gnss) => gnss.handle(ring, half, size),
+            Device::SBUS(sbus_device) => sbus_device.handle(ring, half),
+            Device::GNSS(gnss) => gnss.handle(ring, half),
             _ => (),
         }
     }

@@ -21,7 +21,7 @@ impl<S, PWMS> Airplane<S, PWMS> {
 
 impl<PWMS: PwmByIdentifier, S: DataSource<ControlInput>> Schedulable for Airplane<S, PWMS> {
     fn rate(&self) -> Hertz {
-        50
+        usize::MAX
     }
 
     fn schedule(&mut self) -> bool {

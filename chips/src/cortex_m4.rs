@@ -33,3 +33,13 @@ pub fn systick_init(mut systick: SYST, hz: u32) {
     systick.enable_counter();
     systick.enable_interrupt();
 }
+
+pub unsafe fn disable_all_irqs() {
+    let nvic = &*cortex_m::peripheral::NVIC::ptr();
+    for icer in nvic.icer.iter() {
+        icer.write(0xFFFFFFFFu32)
+    }
+    for icpr in nvic.icpr.iter() {
+        icpr.write(0xFFFFFFFFu32)
+    }
+}

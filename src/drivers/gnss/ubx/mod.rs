@@ -60,7 +60,7 @@ impl UBXDecoder {
         }
     }
 
-    pub fn handle(&mut self, ring: &[u8], half: bool, _: usize) {
+    pub fn handle(&mut self, ring: &[u8], half: bool) {
         if half {
             return;
         }

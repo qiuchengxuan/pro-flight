@@ -23,9 +23,9 @@ impl GNSS {
         }
     }
 
-    pub fn handle(&mut self, ring: &[u8], half: bool, size: usize) {
+    pub fn handle(&mut self, ring: &[u8], half: bool) {
         match self {
-            Self::UBX(ubx) => ubx.handle(ring, half, size),
+            Self::UBX(ubx) => ubx.handle(ring, half),
         }
     }
 }

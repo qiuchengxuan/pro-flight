@@ -28,15 +28,16 @@ unsafe fn DMA2_STREAM1() {
     cortex_m::interrupt::free(|_| {
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM1);
         let dma2 = &*stm32::DMA2::ptr();
-        half = (dma2.lisr.read().bits() & (1 << HTIF_OFFSET) << STREAM1_OFFSET) > 0;
+        half = dma2.lisr.read().bits() & (1 << (HTIF_OFFSET + STREAM1_OFFSET)) > 0;
         dma2.lifcr.write(|w| w.bits(0x3D << STREAM1_OFFSET));
     });
-    DEVICE.handle(&DMA_BUFFER, half, DMA_BUFFER.len() / 2);
+    DEVICE.handle(&DMA_BUFFER, half);
 }
 
 pub fn init(
     usart6: stm32::USART6,
     pins: (PC6, PC7),
+    nvic: &mut cortex_m::peripheral::NVIC,
     config: &SerialConfig,
     clocks: Clocks,
 ) -> &'static mut Device {
@@ -81,7 +82,10 @@ pub fn init(
     }
 
     let device = match config {
-        SerialConfig::SBUS(_) => Device::SBUS(SbusReceiver::new()),
+        SerialConfig::SBUS(_) => {
+            unsafe { nvic.set_priority(stm32::Interrupt::DMA2_STREAM1, 18) }; // No less than DMA1 stream0
+            Device::SBUS(SbusReceiver::new())
+        }
         _ => Device::None,
     };
     unsafe {

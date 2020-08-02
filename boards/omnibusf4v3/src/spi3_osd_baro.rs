@@ -151,14 +151,13 @@ impl<T: DataSource<TelemetryData>> Schedulable for OSDScheduler<T> {
 pub fn init<'a, CRC: Hasher32>(
     spi3: stm32::SPI3,
     spi3_pins: (PC10<Input<Floating>>, PC11<Input<Floating>>, PC12<Input<Floating>>),
-    pa15: PA15<Input<Floating>>,
-    pb3: PB3<Input<Floating>>,
+    chip_selects: (PA15<Input<Floating>>, PB3<Input<Floating>>),
     crc: &mut CRC,
     clocks: Clocks,
     telemetry: impl DataSource<TelemetryData>,
 ) -> Result<(impl Schedulable, impl Schedulable), Error> {
-    let cs_osd = pa15.into_push_pull_output();
-    let cs_baro = pb3.into_push_pull_output();
+    let cs_osd = chip_selects.0.into_push_pull_output();
+    let cs_baro = chip_selects.1.into_push_pull_output();
     let (pc10, pc11, pc12) = spi3_pins;
     let sclk = pc10.into_alternate_af6();
     let miso = pc11.into_alternate_af6();

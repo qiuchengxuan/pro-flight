@@ -46,16 +46,13 @@ impl SbusReceiver {
 
     fn handle_sbus_data(&mut self, data: &SbusData) {
         self.sequence = self.sequence.wrapping_add(1);
-        if data.frame_lost {
-            self.loss += 1;
-        }
+        self.loss += data.frame_lost as u8;
         self.counter += 1;
         if self.counter == 100 {
             self.loss_rate = self.loss;
             self.counter = 0;
-            self.loss = 0;
         }
-        self.receiver.write(Receiver { rssi: self.loss_rate, sequence: self.sequence });
+        self.receiver.write(Receiver { rssi: 100 - self.loss_rate, sequence: self.sequence });
 
         let mut control_input = ControlInput::default();
         let channels = &config::get().receiver.channels;
@@ -83,25 +80,26 @@ impl SbusReceiver {
         self.control_input.write(control_input);
     }
 
-    pub fn handle(&mut self, ring: &[u8], half: bool, num_bytes: usize) {
-        let offset = if !half { 0 } else { ring.len() / 2 };
-        let mut index = SBUS_PACKET_SIZE;
+    pub fn handle(&mut self, ring: &[u8], half: bool) {
+        let begin = if half { 0 } else { ring.len() / 2 };
+        let end = if half { ring.len() / 2 } else { ring.len() };
+        let mut offset = usize::MAX;
         let mut packet = [0u8; 1 + SBUS_PACKET_SIZE];
-        for i in 0..num_bytes {
-            if !is_sbus_packet_end(ring[(offset + i) % ring.len()]) {
+        for i in begin..end {
+            if !is_sbus_packet_end(ring[i]) {
                 continue;
             }
-            let start_index = (offset + i + ring.len() - SBUS_PACKET_SIZE) % ring.len();
-            if ring[start_index] == SBUS_PACKET_BEGIN {
-                index = start_index;
+            let index = (i + ring.len() - SBUS_PACKET_SIZE) % ring.len();
+            if ring[index] == SBUS_PACKET_BEGIN {
+                offset = index;
                 break;
             }
         }
-        if index == SBUS_PACKET_SIZE {
+        if offset == usize::MAX {
             return;
         }
         for i in 0..SBUS_PACKET_SIZE {
-            packet[1 + i] = ring[(index + i) % ring.len()];
+            packet[1 + i] = ring[(offset + i) % ring.len()];
         }
         let packet = SbusPacket::from_bytes(&packet).unwrap();
         let sbus_data = packet.parse();

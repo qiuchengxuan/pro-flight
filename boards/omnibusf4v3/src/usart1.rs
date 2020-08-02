@@ -28,10 +28,10 @@ unsafe fn DMA2_STREAM5() {
     cortex_m::interrupt::free(|_| {
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM5);
         let dma2 = &*stm32::DMA2::ptr();
-        half = (dma2.hisr.read().bits() & (1 << HTIF_OFFSET) << STREAM5_OFFSET) > 0;
+        half = dma2.hisr.read().bits() & (1 << (HTIF_OFFSET + STREAM5_OFFSET)) > 0;
         dma2.hifcr.write(|w| w.bits(0x3D << STREAM5_OFFSET));
     });
-    DEVICE.handle(&DMA_BUFFER, half, DMA_BUFFER.len() / 2);
+    DEVICE.handle(&DMA_BUFFER, half);
 }
 
 pub fn init(
