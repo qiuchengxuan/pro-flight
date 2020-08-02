@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::fmt::Write;
 use core::str::Split;
 
@@ -6,26 +7,18 @@ use crate::datastructures::input::InputType;
 use super::setter::{SetError, Setter};
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
-pub const MAX_CHANNEL: usize = 4;
-
 #[derive(Copy, Clone)]
 pub struct Channel {
     pub input_type: InputType,
     pub scale: u8,
 }
 
-#[derive(Copy, Clone)]
-pub struct Channels(pub [Option<Channel>; MAX_CHANNEL]);
-
-impl Default for Channels {
-    fn default() -> Self {
-        Self([None; MAX_CHANNEL])
-    }
-}
+#[derive(Clone, Default)]
+pub struct Channels(pub Vec<Option<Channel>>);
 
 impl FromYAML for Channels {
     fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut channels = Channels::default();
+        let mut channels = Channels(vec![None; 16]);
         while parser.next_list_begin() {
             let mut channel: usize = 0;
             let mut input_type: Option<InputType> = None;
@@ -38,10 +31,11 @@ impl FromYAML for Channels {
                     _ => continue,
                 }
             }
-            if 0 < channel && channel <= MAX_CHANNEL {
-                if let Some(input_type) = input_type {
-                    channels.0[channel - 1] = Some(Channel { input_type, scale });
-                }
+            if channel == 0 {
+                continue;
+            }
+            if let Some(input_type) = input_type {
+                channels.0[channel - 1] = Some(Channel { input_type, scale });
             }
         }
         channels
@@ -51,16 +45,18 @@ impl FromYAML for Channels {
 impl ToYAML for Channels {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         for i in 0..self.0.len() {
-            if let Some(channel) = self.0[i] {
+            let channel = match self.0[i] {
+                Some(c) => c,
+                None => continue,
+            };
+            self.write_indent(indent, w)?;
+            writeln!(w, "- channel: {}", i + 1)?;
+            self.write_indent(indent, w)?;
+            let type_string: &str = channel.input_type.into();
+            writeln!(w, "  type: {}", type_string)?;
+            if channel.scale != 100 {
                 self.write_indent(indent, w)?;
-                writeln!(w, "- channel: {}", i + 1)?;
-                self.write_indent(indent, w)?;
-                let type_string: &str = channel.input_type.into();
-                writeln!(w, "  type: {}", type_string)?;
-                if channel.scale != 100 {
-                    self.write_indent(indent, w)?;
-                    writeln!(w, "  scale: {}", channel.scale)?;
-                }
+                writeln!(w, "  scale: {}", channel.scale)?;
             }
         }
         Ok(())
@@ -99,7 +95,7 @@ impl Setter for Channels {
     }
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Clone)]
 pub struct Receiver {
     pub channels: Channels,
 }
