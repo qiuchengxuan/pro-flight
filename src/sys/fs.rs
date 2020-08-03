@@ -157,7 +157,8 @@ impl Write for File {
 impl fmt::Write for File {
     fn write_char(&mut self, c: char) -> fmt::Result {
         if let Some(fd) = self.fd.as_ref() {
-            match get_media(self.schema).write(fd, &[c as u8]) {
+            let mut bytes = [0u8; 2];
+            match get_media(self.schema).write(fd, c.encode_utf8(&mut bytes).as_bytes()) {
                 Ok(_) => Ok(()),
                 Err(_) => Err(fmt::Error),
             }

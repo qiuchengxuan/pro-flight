@@ -107,7 +107,7 @@ pub fn __write_log_literal(message: &'static str, level: Level) {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __format_args {
+macro_rules! __format_logger_args {
     ($($args:tt)*) => {
         format_args!($($args)*)
     };
@@ -116,39 +116,39 @@ macro_rules! __format_args {
 #[macro_export]
 macro_rules! log {
     ($level:expr, $message:expr) => ({
-        let _ = __format_args!($message);
-        $crate::logger::__write_log_literal($message, $level);
+        let _ = __format_logger_args!($message);
+        $crate::components::logger::__write_log_literal($message, $level);
     });
     ($level:expr, $($arg:tt)+) => {
-        $crate::logger::__write_log(__format_args!($($arg)+), $level);
+        $crate::components::logger::__write_log(__format_logger_args!($($arg)+), $level);
     };
 }
 
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)+) => {
-        log!($crate::logger::Level::Debug, $($arg)+);
+        log!($crate::components::logger::Level::Debug, $($arg)+);
     };
 }
 
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)+) => {
-        log!($crate::logger::Level::Info, $($arg)+);
+        log!($crate::components::logger::Level::Info, $($arg)+);
     };
 }
 
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)+) => {
-        log!($crate::logger::Level::Warning, $($arg)+);
+        log!($crate::components::logger::Level::Warning, $($arg)+);
     };
 }
 
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)+) => {
-        log!($crate::logger::Level::Error, $($arg)+);
+        log!($crate::components::logger::Level::Error, $($arg)+);
     };
 }
 

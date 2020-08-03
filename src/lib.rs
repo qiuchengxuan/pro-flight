@@ -26,9 +26,6 @@ extern crate usb_device;
 extern crate usbd_serial;
 
 #[macro_use]
-pub mod logger;
-
-#[macro_use]
 pub mod components;
 pub mod config;
 pub mod datastructures;

@@ -1,6 +1,6 @@
 use core::fmt::{Arguments, Display, Result, Write};
 
-use crate::logger;
+use crate::components::logger;
 use crate::sys::fs::OpenOptions;
 
 const VALID_LOG: u32 = 0xCAFEFEED;

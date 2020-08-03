@@ -134,6 +134,12 @@ impl ToYAML for Config {
     }
 }
 
+impl core::fmt::Display for Config {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        self.write_to(0, f)
+    }
+}
+
 static mut CONFIG: Option<Config> = None;
 
 #[inline]

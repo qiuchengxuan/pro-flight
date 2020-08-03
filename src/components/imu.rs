@@ -3,12 +3,12 @@ use alloc::rc::Rc;
 use ahrs::{Ahrs, Mahony};
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
+use crate::components::schedule::{Hertz, Schedulable};
 use crate::config::Accelerometer as Config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, DEGREE_PER_DAG};
-use crate::components::schedule::{Hertz, Schedulable};
 
 pub struct IMU<A, G> {
     accelerometer: A,

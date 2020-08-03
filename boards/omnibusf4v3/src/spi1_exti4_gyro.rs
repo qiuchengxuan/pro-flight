@@ -61,13 +61,13 @@ unsafe fn EXTI4() {
             .pburst().incr16().tcie().enabled().en().enabled()
     });
 
-    static READ_REG: [u8; 1] = [Register::AccelerometerXHigh as u8 | 0x80];
+    static READ_REG: u8 = Register::AccelerometerXHigh as u8 | 0x80;
 
     // dma2 channel 3 stream 3 tx
     let stream = &dma2.st[3];
     stream.ndtr.write(|w| w.ndt().bits(DMA_SIZE as u16));
     stream.par.write(|w| w.pa().bits(data_register));
-    stream.m0ar.write(|w| w.m0a().bits(READ_REG.as_ptr() as u32));
+    stream.m0ar.write(|w| w.m0a().bits(&READ_REG as *const _ as u32));
     let cr = &stream.cr;
     cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().pburst().incr16().en().enabled());
 }

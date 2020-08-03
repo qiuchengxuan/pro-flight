@@ -108,13 +108,21 @@ pub fn __write_console_literal<E, S: Write<u8, Error = E>>(serial: &mut S, messa
     write!(&mut Console(serial), "{}", message).ok();
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __format_console_args {
+    ($($args:tt)*) => {
+        format_args!($($args)*)
+    };
+}
+
 #[macro_export]
 macro_rules! console {
     ($serial:expr, $message:expr) => ({
-        let _ = __format_args!($message); // XXX: defined in logger.rs
+        let _ = __format_console_args!($message);
         $crate::components::console::__write_console_literal($serial, $message);
     });
     ($serial:expr, $($arg:tt)+) => {
-        $crate::components::console::__write_console($serial, __format_args!($($arg)+));
+        $crate::components::console::__write_console($serial, __format_console_args!($($arg)+));
     };
 }

@@ -1,5 +1,7 @@
 #[macro_use]
 pub mod console;
+#[macro_use]
+pub mod logger;
 
 pub mod altimeter;
 pub mod ascii_hud;

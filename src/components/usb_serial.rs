@@ -1,4 +1,4 @@
-use usb_device::class_prelude::{UsbBus, UsbBusAllocator};
+use usb_device::bus::{UsbBus, UsbBusAllocator};
 use usb_device::prelude::*;
 use usbd_serial::SerialPort;
 

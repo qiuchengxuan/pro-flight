@@ -6,8 +6,7 @@ use alloc::vec::Vec;
 use embedded_hal::serial::{Read, Write};
 
 use crate::alloc;
-use crate::components::console;
-use crate::logger;
+use crate::components::{console, logger};
 use crate::sys::timer::{get_jiffies, SysTimer};
 
 pub struct CLI {

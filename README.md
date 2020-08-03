@@ -24,7 +24,6 @@ Progress
   - [x] timer based task scheduler
   - [x] software interrupt based event
 * WIP
-  - [ ] Involve async syntax
   - [ ] Complementary filter
 * Future
   - [ ] GNSS NMEA Protocol
@@ -33,6 +32,7 @@ Progress
   - [ ] Stabilizer
   - [ ] Navigation
   - [ ] EKF filter
+  - [ ] Involve async syntax
 
 Memory allocator
 ================

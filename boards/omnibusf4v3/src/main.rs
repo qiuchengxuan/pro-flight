@@ -38,37 +38,49 @@ use core::panic::PanicInfo;
 use core::time::Duration;
 
 use alloc_cortex_m::CortexMHeap;
-use chips::cortex_m4::{get_jiffies, systick_init};
-use chips::stm32f4::crc::CRC;
-use chips::stm32f4::dfu::Dfu;
-use chips::stm32f4::valid_memory_address;
+use chips::{
+    cortex_m4::{get_jiffies, systick_init},
+    stm32f4::crc::CRC,
+    stm32f4::dfu::Dfu,
+    stm32f4::valid_memory_address,
+};
 use cortex_m_rt::ExceptionFrame;
-use rs_flight::components::altimeter::Altimeter;
-use rs_flight::components::cli::memory;
-use rs_flight::components::cli::CLI;
-use rs_flight::components::configuration::Airplane;
-use rs_flight::components::event::SchedulableEvent;
-use rs_flight::components::imu::IMU;
-use rs_flight::components::mixer::ControlMixer;
-use rs_flight::components::navigation::Navigation;
-use rs_flight::components::panic::{log_panic, PanicLogger};
-use rs_flight::components::schedule::Scheduler;
-use rs_flight::components::usb_serial;
-use rs_flight::components::TelemetryUnit;
-use rs_flight::config::aircraft::Configuration;
-use rs_flight::config::{self, Config, SerialConfig};
-use rs_flight::datastructures::data_source::{DataSource, NoDataSource};
-use rs_flight::datastructures::input::ControlInput;
-use rs_flight::drivers::bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE};
-use rs_flight::drivers::mpu6000::init_data_source as init_mpu6000_data_source;
-use rs_flight::drivers::uart::Device;
-use rs_flight::logger::{self, Level};
-use rs_flight::sys::fs::File;
-use rs_flight::sys::timer::{self, SysTimer};
-use stm32f4xx_hal::gpio::{Edge, ExtiPin};
-use stm32f4xx_hal::otg_fs::{UsbBus, USB};
-use stm32f4xx_hal::rcc::Clocks;
-use stm32f4xx_hal::{prelude::*, stm32};
+use rs_flight::{
+    components::{
+        altimeter::Altimeter,
+        cli::{memory, CLI},
+        configuration::Airplane,
+        event::SchedulableEvent,
+        imu::IMU,
+        logger::{self, Level},
+        mixer::ControlMixer,
+        navigation::Navigation,
+        panic::{log_panic, PanicLogger},
+        schedule::Scheduler,
+        usb_serial, TelemetryUnit,
+    },
+    config::{self, aircraft::Configuration, Config, SerialConfig},
+    datastructures::{
+        data_source::{DataSource, NoDataSource},
+        input::ControlInput,
+    },
+    drivers::{
+        bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE},
+        mpu6000::init_data_source as init_mpu6000_data_source,
+        uart::Device,
+    },
+    sys::{
+        fs::File,
+        timer::{self, SysTimer},
+    },
+};
+use stm32f4xx_hal::{
+    gpio::{Edge, ExtiPin},
+    otg_fs::{UsbBus, USB},
+    prelude::*,
+    rcc::Clocks,
+    stm32,
+};
 
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
@@ -138,6 +150,17 @@ fn main() -> ! {
     let gpio_a = peripherals.GPIOA.split();
     let gpio_b = peripherals.GPIOB.split();
     let gpio_c = peripherals.GPIOC.split();
+
+    info!("Initialize USB CDC");
+    let usb = USB {
+        usb_global: peripherals.OTG_FS_GLOBAL,
+        usb_device: peripherals.OTG_FS_DEVICE,
+        usb_pwrclk: peripherals.OTG_FS_PWRCLK,
+        pin_dm: gpio_a.pa11.into_alternate_af10(),
+        pin_dp: gpio_a.pa12.into_alternate_af10(),
+    };
+    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
+    let (mut serial, mut device) = usb_serial::init(&allocator);
 
     let mut int = gpio_b.pb7.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
@@ -223,18 +246,6 @@ fn main() -> ! {
     }
 
     let mut led = gpio_b.pb5.into_push_pull_output();
-
-    info!("Initialize USB CDC");
-    let usb = USB {
-        usb_global: peripherals.OTG_FS_GLOBAL,
-        usb_device: peripherals.OTG_FS_DEVICE,
-        usb_pwrclk: peripherals.OTG_FS_PWRCLK,
-        pin_dm: gpio_a.pa11.into_alternate_af10(),
-        pin_dp: gpio_a.pa12.into_alternate_af10(),
-    };
-    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
-
-    let (mut serial, mut device) = usb_serial::init(&allocator);
 
     let mut control_input: Box<dyn DataSource<ControlInput>> = Box::new(NoDataSource::new());
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
