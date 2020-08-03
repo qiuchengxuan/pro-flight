@@ -14,20 +14,23 @@ use crate::sys::timer::SysTimer;
 pub const BMP280_SAMPLE_RATE: usize = 16;
 
 static mut CALIBRATION: MaybeUninit<Calibration> = MaybeUninit::uninit();
-static mut BUFFER: MaybeUninit<Rc<OverwritingData<Pressure>>> = MaybeUninit::uninit();
+static mut BUFFER: Option<OverwritingData<Pressure>> = None;
 
 pub unsafe fn on_dma_receive(dma_buffer: &[u8; 8]) {
     let calibration = &*CALIBRATION.as_ptr();
     let raw_pressure = RawPressure::from_bytes(&dma_buffer[2..]);
     let t_fine = RawTemperature::from_bytes(&dma_buffer[5..]).t_fine(calibration);
     let pressure = raw_pressure.compensated(t_fine, calibration);
-    let buffer = &mut *BUFFER.as_mut_ptr();
-    buffer.write(Pressure(pressure));
+    if let Some(ref mut buffer) = BUFFER {
+        buffer.write(Pressure(pressure));
+    }
 }
 
 pub fn init_data_source() -> impl DataSource<Pressure> {
-    unsafe { BUFFER = MaybeUninit::new(Rc::new(OverwritingData::sized(8))) };
-    OverwritingDataSource::new(unsafe { &*BUFFER.as_ptr() })
+    unsafe { BUFFER = Some(OverwritingData::sized(8)) };
+    let buffer = unsafe { &Rc::from_raw(BUFFER.as_ref().unwrap()) };
+    core::mem::forget(buffer);
+    OverwritingDataSource::new(buffer)
 }
 
 pub fn init<E, BUS: Bus<Error = E>>(bus: BUS) -> Result<bool, E> {

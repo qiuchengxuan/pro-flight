@@ -2,7 +2,8 @@
 pub mod console;
 #[macro_use]
 pub mod logger;
-
+#[macro_use]
+pub mod serial;
 pub mod altimeter;
 pub mod ascii_hud;
 pub mod cli;

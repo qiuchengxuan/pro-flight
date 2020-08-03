@@ -21,36 +21,32 @@ impl CLI {
 
     pub fn interact<RE, WE, S, E>(&mut self, serial: &mut S, mut extra: E)
     where
-        E: FnMut(&str, &mut S) -> bool,
+        E: FnMut(&str) -> bool,
         S: Read<u8, Error = RE> + Write<u8, Error = WE>,
     {
-        let line = match console::read_line(serial, &mut self.vec) {
+        let line = match console::readline(serial, &mut self.vec) {
             Some(line) => unsafe { core::str::from_utf8_unchecked(line) },
             None => return,
         };
         if let Some(first_word) = line.split(' ').next() {
             match first_word {
-                "logread" => {
-                    for s in logger::reader() {
-                        console!(serial, "{}", s);
-                    }
-                }
-                "uptime" => console!(serial, "{:?}", get_jiffies()),
-                "read" | "readx" | "readf" => memory::read(line, serial),
-                "dump" => memory::dump(line, serial),
-                "write" => memory::write(line, serial, &mut self.timer),
-                "set" => config::set(serial, line),
-                "show" => config::show(serial),
+                "logread" => print!("{}", logger::read()),
+                "uptime" => println!("{:?}", get_jiffies()),
+                "read" | "readx" | "readf" => memory::read(line),
+                "dump" => memory::dump(line),
+                "write" => memory::write(line, &mut self.timer),
+                "set" => config::set(line),
+                "show" => config::show(),
                 "save" => config::save(),
                 "" => (),
                 _ => {
-                    if !extra(line, serial) {
-                        console!(serial, "unknown input: {:?}\n", line);
+                    if !extra(line) {
+                        println!("unknown input: {:?}", line);
                     }
                 }
             }
         }
-        console!(serial, "# ");
+        print!("# ");
         self.vec.truncate(0);
     }
 }

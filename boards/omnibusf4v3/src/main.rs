@@ -32,6 +32,7 @@ mod usart6;
 
 use alloc::boxed::Box;
 use core::alloc::Layout;
+use core::fmt::Write;
 use core::panic::PanicInfo;
 use core::time::Duration;
 
@@ -69,6 +70,7 @@ use rs_flight::{
     },
     sys::{
         fs::File,
+        stdout,
         timer::{self, SysTimer},
     },
 };
@@ -154,6 +156,9 @@ fn main() -> ! {
         pin_dp: gpio_a.pa12.into_alternate_af10(),
     };
     let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
+
+    stdout::init(1024);
+
     let (mut serial, mut device) = usb_serial::init(&allocator);
 
     let mut int = gpio_b.pb7.into_pull_up_input();
@@ -299,6 +304,7 @@ fn main() -> ! {
         Scheduler::new((schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd), 100);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
 
+    let stdout = stdout::reader();
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
     loop {
@@ -310,7 +316,8 @@ fn main() -> ! {
         if !device.poll(&mut [&mut serial]) {
             continue;
         }
-        cli.interact(&mut serial, |line, serial| -> bool {
+
+        cli.interact(&mut serial, |line| -> bool {
             match line.split(' ').next() {
                 Some("dfu") => {
                     cortex_m::peripheral::SCB::sys_reset();
@@ -319,16 +326,14 @@ fn main() -> ! {
                     dfu.disarm();
                     cortex_m::peripheral::SCB::sys_reset()
                 }
-                Some("free") => {
-                    console!(serial, "Used: {}, free: {}\n", ALLOCATOR.used(), ALLOCATOR.free());
-                }
-                Some("telemetry") => {
-                    console!(serial, "{}\n", telemetry_source.read_last_unchecked())
-                }
+                Some("free") => println!("Used: {}, free: {}", ALLOCATOR.used(), ALLOCATOR.free()),
+                Some("telemetry") => println!("{}", telemetry_source.read_last_unchecked()),
                 _ => return false,
             }
             true
         });
+
+        write_serial!(&mut serial, stdout).ok();
     }
 }
 

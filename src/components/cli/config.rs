@@ -1,23 +1,20 @@
-use embedded_hal::serial;
-
-use crate::components::console::Console;
 use crate::config;
 use crate::config::setter::Setter;
 use crate::config::yaml::ToYAML;
 use crate::sys::fs::OpenOptions;
 
-pub fn show<WE, S: serial::Write<u8, Error = WE>>(serial: &mut S) {
-    config::get().write_to(0, &mut Console(serial)).ok();
+pub fn show() {
+    println!("{}", config::get())
 }
 
-pub fn set<WE, S: serial::Write<u8, Error = WE>>(serial: &mut S, line: &str) {
+pub fn set(line: &str) {
     let mut split = line.split(' ');
     split.next();
     if let Some(path) = split.next() {
         let mut config = config::get().clone();
         match config.set(&mut path.split('.'), split.next()) {
             Ok(()) => (),
-            Err(e) => console!(serial, "{}\n", e),
+            Err(e) => println!("{}", e),
         }
         config::replace(config);
     }

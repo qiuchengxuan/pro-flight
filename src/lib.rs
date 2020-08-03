@@ -26,13 +26,14 @@ extern crate usb_device;
 extern crate usbd_serial;
 
 #[macro_use]
+pub mod sys;
+#[macro_use]
 pub mod components;
 pub mod algorithm;
 pub mod config;
 pub mod datastructures;
 pub mod drivers;
 pub mod hal;
-pub mod sys;
 
 #[cfg(test)]
 extern crate std;
