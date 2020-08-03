@@ -1,10 +1,5 @@
 use crate::datastructures::coordinate;
 
-use super::message::ClassAndID;
-
-pub const CLASS: u8 = 0x1;
-pub const ID: u8 = 0x7;
-
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Valid(u8);
 
@@ -145,7 +140,7 @@ pub struct NavPositionVelocityTime {
     pub velocity_east: i32,       // unit mm/s
     pub velocity_down: i32,       // unit mm/s
     pub ground_speed: i32,        // unit mm/s
-    pub heading_motion: i32,      // 1e-5 unit degree
+    pub heading_of_motion: i32,   // 1e-5 unit degree
     pub speed_accuracy: u32,      // unit mm/s
     pub heading_accuracy: u32,    // 1e-5 unit degree
 
@@ -157,43 +152,29 @@ pub struct NavPositionVelocityTime {
     pub magnetic_accuracy: u16,    // 1e-2 degree
 }
 
-impl ClassAndID for NavPositionVelocityTime {
-    fn class_and_id() -> (u8, u8) {
-        (CLASS, ID)
-    }
-}
-
 mod test {
     #[test]
     fn test_ubx_nav_pos_pvt() {
         use crate::datastructures::coordinate::{Latitude, Longitude};
-        use crate::drivers::gnss::ubx::message::{Message, UBX_HEADER};
 
         use super::NavPositionVelocityTime;
 
         assert_eq!(core::mem::size_of::<NavPositionVelocityTime>(), 92);
-        assert_eq!(core::mem::size_of::<Message<NavPositionVelocityTime>>(), 104);
 
         let message = hex!(
-            "00 00
-             B5 62 01 07 92 00 00 00 00 00 E0 07 0A 15 16 0D
-             0A 04 01 00 00 00 01 00 00 00 03 0C E0 0B 86 BE
-             2F FF AD 1F 21 20 E0 F2 09 00 A0 56 09 00 01 00
-             00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00
+            "00 00 00 00 E0 07 0A 15 16 0D 0A 04 01 00 00 00
+             01 00 00 00 03 0C E0 0B 86 BE 2F FF AD 1F 21 20
+             E0 F2 09 00 A0 56 09 00 01 00 00 00 01 00 00 00
              00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
              00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-             00 00 28 F3"
+             00 00 00 00 00 00 00 00 00 00 00 00"
         );
-        let message: &Message<NavPositionVelocityTime> =
+        let nav_pos_pvt: &NavPositionVelocityTime =
             unsafe { core::mem::transmute(message.as_ptr()) };
-        assert_eq!(u16::from_be(message.header), u16::from_be_bytes(UBX_HEADER));
-        assert_eq!(message.valid_class_and_id(), true);
-        assert_eq!(message.checksum, message.calc_checksum());
-        let payload = &message.payload;
-        assert_eq!(payload.year, 2016);
-        let longitude: Longitude = payload.longitude.into();
+        assert_eq!(nav_pos_pvt.year, 2016);
+        let longitude: Longitude = nav_pos_pvt.longitude.into();
         assert_eq!("W001°21.533", format!("{}", longitude));
-        let latitude: Latitude = payload.latitude.into();
+        let latitude: Latitude = nav_pos_pvt.latitude.into();
         assert_eq!("N53°54.150", format!("{}", latitude));
     }
 }

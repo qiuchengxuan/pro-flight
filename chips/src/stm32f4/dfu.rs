@@ -11,7 +11,7 @@ impl Dfu {
     }
 
     #[inline(never)]
-    fn enter(&self) {
+    fn enter(&self) -> ! {
         cortex_m::interrupt::disable();
         unsafe {
             llvm_asm!("ldr r0, =0x40023844
@@ -25,6 +25,7 @@ impl Dfu {
                        ldr r0, [r0, #4]
                        bx r0" :::: "volatile");
         }
+        loop {}
     }
 
     pub fn check(&mut self) {

@@ -3,6 +3,7 @@ pub mod ubx;
 use crate::config::serial::GNSSProtocol;
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::DataSource;
+use crate::datastructures::measurement::{Course, Heading, Velocity};
 
 use ubx::UBXDecoder;
 
@@ -20,6 +21,24 @@ impl GNSS {
     pub fn position(&self) -> impl DataSource<Position> {
         match self {
             Self::UBX(ubx) => ubx.position(),
+        }
+    }
+
+    pub fn velocity(&self) -> impl DataSource<[Velocity<i32>; 3]> {
+        match self {
+            Self::UBX(ubx) => ubx.velocity(),
+        }
+    }
+
+    pub fn heading(&self) -> impl DataSource<Heading> {
+        match self {
+            Self::UBX(ubx) => ubx.heading(),
+        }
+    }
+
+    pub fn course(&self) -> impl DataSource<Course> {
+        match self {
+            Self::UBX(ubx) => ubx.course(),
         }
     }
 

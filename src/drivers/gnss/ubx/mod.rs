@@ -2,34 +2,52 @@ pub mod message;
 pub mod nav_pos_pvt;
 
 use alloc::rc::Rc;
+use core::mem::transmute;
 
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
-use crate::datastructures::measurement::Distance;
+use crate::datastructures::measurement::{Course, Distance, Heading, Velocity};
 
-use message::{Message, UBX_HEADER};
-use nav_pos_pvt::{FixType, NavPositionVelocityTime, CLASS, ID};
+use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
+use nav_pos_pvt::{FixType, NavPositionVelocityTime};
 
-const NAV_PVT_SIZE: usize = core::mem::size_of::<Message<NavPositionVelocityTime>>();
-const NAV_PVT_HEADER: [u8; 4] = [UBX_HEADER[0], UBX_HEADER[1], CLASS, ID];
+const MAX_MESSAGE_SIZE: usize = core::mem::size_of::<Message<NavPositionVelocityTime>>();
+
+#[derive(Copy, Clone)]
+pub enum State {
+    WaitHeader0,
+    WaitHeader1,
+    WaitClass,
+    WaitId,
+    WaitLength1,
+    WaitLength0,
+    Skip(usize),
+    Remain(usize),
+}
 
 pub struct UBXDecoder {
-    buffer: [u8; NAV_PVT_SIZE],
-    remain: usize,
+    buffer: [u8; MAX_MESSAGE_SIZE],
+    state: State,
     position: Rc<SingularData<Position>>,
+    velocity: Rc<SingularData<[Velocity<i32>; 3]>>,
+    heading: Rc<SingularData<Heading>>,
+    course: Rc<SingularData<Course>>,
     fix_type: FixType,
-    running: bool,
+    normal: bool,
 }
 
 impl UBXDecoder {
     pub fn new() -> Self {
         Self {
-            buffer: [0u8; NAV_PVT_SIZE],
-            remain: 0,
+            buffer: [0u8; MAX_MESSAGE_SIZE],
+            state: State::WaitHeader0,
             position: Rc::new(SingularData::default()),
+            velocity: Rc::new(SingularData::<[Velocity<i32>; 3]>::default()),
+            course: Rc::new(SingularData::default()),
+            heading: Rc::new(SingularData::default()),
             fix_type: FixType::NoFix,
-            running: false,
+            normal: true,
         }
     }
 
@@ -37,20 +55,45 @@ impl UBXDecoder {
         SingularDataSource::new(&self.position)
     }
 
+    pub fn velocity(&self) -> impl DataSource<[Velocity<i32>; 3]> {
+        SingularDataSource::new(&self.velocity)
+    }
+
+    pub fn course(&self) -> impl DataSource<Course> {
+        SingularDataSource::new(&self.course)
+    }
+
+    pub fn heading(&self) -> impl DataSource<Heading> {
+        SingularDataSource::new(&self.heading)
+    }
+
     fn handle_pvt_message(&mut self) {
-        let pvt_message: &Message<NavPositionVelocityTime> =
-            unsafe { core::mem::transmute(&self.buffer) };
-        if pvt_message.calc_checksum() != pvt_message.checksum {
-            warn!("Inconsistent UBX checksum");
+        let pvt_message: &Message<NavPositionVelocityTime> = unsafe { transmute(&self.buffer) };
+        if !pvt_message.validate_checksum() && self.normal {
+            warn!("UBX checksum invalid");
             return;
         }
+        self.normal = true;
+
         let payload = &pvt_message.payload;
         if payload.fix_type == FixType::ThreeDemension {
             self.position.write(Position {
                 latitude: payload.latitude.into(),
                 longitude: payload.longitude.into(),
-                altitude: Distance(payload.height_above_msl as i32 / 10),
+                altitude: Distance(payload.height_above_msl / 10),
             });
+            self.velocity.write([
+                Velocity(payload.velocity_north),
+                Velocity(payload.velocity_east),
+                Velocity(payload.velocity_down),
+            ]);
+            let course = payload.heading_of_motion / 10;
+            self.course.write(if course > 0 { course } else { 360 + course } as u16);
+            let hov = payload.heading_of_vehicle / 10;
+            let heading = if hov > 0 { hov } else { 360 + hov } as u16;
+            if payload.flags1.heading_of_vehicle_valid() {
+                self.heading.write(heading);
+            }
         }
 
         if payload.fix_type != self.fix_type {
@@ -65,37 +108,92 @@ impl UBXDecoder {
             return;
         }
         let mut index = 0;
-        if self.remain > NAV_PVT_SIZE - NAV_PVT_HEADER.len() {
-            let mut header_index = NAV_PVT_SIZE - self.remain;
-            while index < ring.len() {
-                let byte = ring[index];
-                index += 1;
-                if byte == NAV_PVT_HEADER[header_index] {
-                    header_index += 1;
-                    if header_index == NAV_PVT_HEADER.len() {
-                        break;
+        let mut message: &mut Message<()> = unsafe { transmute(&mut self.buffer) };
+        while index < ring.len() {
+            match (self.state, ring[index]) {
+                (State::WaitHeader0, UBX_HEADER0) => {
+                    self.state = State::WaitHeader1;
+                }
+                (State::WaitHeader1, UBX_HEADER1) => {
+                    self.state = State::WaitClass;
+                }
+                (State::WaitClass, class) => {
+                    message.class = class;
+                    self.state = State::WaitId;
+                }
+                (State::WaitId, id) => {
+                    message.id = id;
+                    self.state = State::WaitLength0;
+                }
+                (State::WaitLength0, value) => {
+                    message.length = value as u16;
+                    self.state = State::WaitLength1;
+                }
+                (State::WaitLength1, value) => {
+                    message.length = u16::from_le_bytes([message.length as u8, value]);
+                    let length = message.length as usize;
+                    match message.payload_type() {
+                        Some(_) => self.state = State::Remain(length + CHECKSUM_SIZE),
+                        None => self.state = State::Skip(length + CHECKSUM_SIZE),
                     }
-                } else {
-                    header_index = 0;
+                }
+                (State::Skip(size), _) => {
+                    if ring.len() <= size {
+                        self.state = State::Skip(size - ring.len());
+                        return;
+                    } else {
+                        index = size;
+                    }
+                }
+                (State::Remain(remain), _) => {
+                    let offset =
+                        PAYLOAD_OFFSET + (message.length as usize + CHECKSUM_SIZE) - remain;
+                    let size = ring.len() - index;
+                    if size >= remain {
+                        self.state = State::WaitHeader0;
+                        self.buffer[offset..offset + remain]
+                            .copy_from_slice(&ring[index..index + remain]);
+                        self.handle_pvt_message();
+                    } else {
+                        self.buffer[offset..offset + size].copy_from_slice(&ring[index..]);
+                        self.state = State::Remain(remain - (ring.len() - index));
+                        return;
+                    }
+                }
+                _ => {
+                    self.state = State::WaitHeader0;
                 }
             }
+            index += 1;
         }
-        if index == ring.len() {
-            return;
-        }
-        if self.remain <= NAV_PVT_SIZE - NAV_PVT_HEADER.len() {
-            let size = core::cmp::min(self.remain, ring.len() / 2);
-            let offset = NAV_PVT_SIZE - self.remain;
-            self.buffer[offset..offset + size].copy_from_slice(&ring[index..index + size]);
-            self.remain -= size;
-        }
-        if self.remain == 0 {
-            if !self.running {
-                self.running = true;
-                info!("GNSS UBX detected");
-            }
-            self.handle_pvt_message();
-            self.remain = NAV_PVT_SIZE;
-        }
+    }
+}
+
+mod test {
+    #[test]
+    fn test_message() {
+        use crate::datastructures::data_source::DataSource;
+        use crate::drivers::gnss::ubx::message::Message;
+
+        use super::NavPositionVelocityTime;
+        use super::UBXDecoder;
+
+        assert_eq!(core::mem::size_of::<Message<NavPositionVelocityTime>>(), 104);
+
+        let message = hex!(
+            "00 00
+             B5 62 01 07 5C 00 00 00 00 00 E0 07 0A 15 16 0D
+             0A 04 01 00 00 00 01 00 00 00 03 0C E0 0B 86 BE
+             2F FF AD 1F 21 20 E0 F2 09 00 A0 56 09 00 01 00
+             00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00
+             00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+             00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+             00 00 1F F2 00 00"
+        );
+        let mut decoder = UBXDecoder::new();
+        let mut position = decoder.position();
+        decoder.handle(&message[0..64], false);
+        decoder.handle(&message[64..message.len()], false);
+        assert_eq!(position.read_last().is_some(), true);
     }
 }
