@@ -2,7 +2,7 @@
 script = [
 '''
 #!/usr/bin/env bash
-cd boards/omnibusf4v3
+cd boards/omnibusf4v3-rtic
 cargo build --release
 cd -
 '''
@@ -12,7 +12,7 @@ cd -
 command = "arm-none-eabi-objcopy"
 args = [
     "-O", "binary",
-    "boards/omnibusf4v3/target/thumbv7em-none-eabihf/release/omnibusf4v3",
+    "boards/omnibusf4v3-rtic/target/thumbv7em-none-eabihf/release/omnibusf4v3",
     "omnibusf4v3.bin",
 ]
 dependencies = ["omnibusf4v3-elf"]
@@ -21,7 +21,7 @@ dependencies = ["omnibusf4v3-elf"]
 command = "arm-none-eabi-objcopy"
 args = [
     "-O", "ihex",
-    "boards/omnibusf4v3/target/thumbv7em-none-eabihf/release/omnibusf4v3",
+    "boards/omnibusf4v3-rtic/target/thumbv7em-none-eabihf/release/omnibusf4v3",
     "omnibusf4v3.hex",
 ]
 dependencies = ["omnibusf4v3-elf"]
