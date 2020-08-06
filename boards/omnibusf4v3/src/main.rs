@@ -19,7 +19,6 @@ extern crate nb;
 extern crate rs_flight;
 extern crate sbus_parser;
 extern crate stm32f4xx_hal;
-extern crate usb_device;
 
 mod adc2_vbat;
 mod exti0_softirq;
@@ -30,7 +29,6 @@ mod spi3_osd_baro;
 mod tim7_scheduler;
 mod usart1;
 mod usart6;
-mod usb_serial;
 mod watchdog;
 
 use alloc::boxed::Box;
@@ -55,6 +53,7 @@ use rs_flight::components::mixer::ControlMixer;
 use rs_flight::components::navigation::Navigation;
 use rs_flight::components::panic::{log_panic, PanicLogger};
 use rs_flight::components::schedule::Scheduler;
+use rs_flight::components::usb_serial;
 use rs_flight::components::TelemetryUnit;
 use rs_flight::config::aircraft::Configuration;
 use rs_flight::config::{self, Config, SerialConfig};
@@ -67,7 +66,7 @@ use rs_flight::logger::{self, Level};
 use rs_flight::sys::fs::File;
 use rs_flight::sys::timer::{self, SysTimer};
 use stm32f4xx_hal::gpio::{Edge, ExtiPin};
-use stm32f4xx_hal::otg_fs::USB;
+use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::{prelude::*, stm32};
 
@@ -233,8 +232,9 @@ fn main() -> ! {
         pin_dm: gpio_a.pa11.into_alternate_af10(),
         pin_dp: gpio_a.pa12.into_alternate_af10(),
     };
+    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
 
-    let (mut serial, mut device) = usb_serial::init(usb);
+    let (mut serial, mut device) = usb_serial::init(&allocator);
 
     let mut control_input: Box<dyn DataSource<ControlInput>> = Box::new(NoDataSource::new());
     if let Some(Device::SBUS(ref mut sbus)) = receiver {

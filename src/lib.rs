@@ -22,6 +22,8 @@ extern crate sbus_parser;
 #[macro_use]
 extern crate sval;
 extern crate sval_json;
+extern crate usb_device;
+extern crate usbd_serial;
 
 #[macro_use]
 pub mod logger;

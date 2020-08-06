@@ -14,6 +14,7 @@ pub mod navigation;
 pub mod panic;
 pub mod schedule;
 pub mod telemetry;
+pub mod usb_serial;
 
 pub use imu::IMU;
 pub use telemetry::TelemetryUnit;

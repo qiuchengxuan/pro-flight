@@ -25,6 +25,8 @@ sbus-parser = "0.0.2"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }
 sval_json = "0.5"
+usb-device = "0.2"
+usbd-serial = "0.1"
 void = { version = "1", default-features = false }
 
 [lib]
