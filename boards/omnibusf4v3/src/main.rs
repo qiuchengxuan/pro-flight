@@ -40,7 +40,7 @@ use core::panic::PanicInfo;
 use core::time::Duration;
 
 use alloc_cortex_m::CortexMHeap;
-use chips::cortex_m4::{disable_all_irqs, get_jiffies, systick_init};
+use chips::cortex_m4::{get_jiffies, systick_init};
 use chips::stm32f4::crc::CRC;
 use chips::stm32f4::dfu::Dfu;
 use chips::stm32f4::valid_memory_address;
@@ -308,12 +308,12 @@ fn main() -> ! {
         cli.interact(&mut serial, |line, serial| -> bool {
             match line.split(' ').next() {
                 Some("dfu") => {
-                    unsafe { disable_all_irqs() };
+                    cortex_m::interrupt::disable();
                     cortex_m::peripheral::SCB::sys_reset();
                 }
                 Some("reboot") => {
                     dfu.disarm();
-                    unsafe { disable_all_irqs() };
+                    cortex_m::interrupt::disable();
                     cortex_m::peripheral::SCB::sys_reset()
                 }
                 Some("free") => {

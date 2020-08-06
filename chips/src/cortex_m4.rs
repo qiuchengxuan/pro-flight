@@ -9,21 +9,22 @@ static mut COUNTER: u32 = 0;
 
 #[exception]
 unsafe fn SysTick() {
-    core::ptr::write_volatile(&mut COUNTER, COUNTER + 1)
+    COUNTER += 1;
 }
 
-// unit microsecond
 pub fn get_jiffies() -> Duration {
     let systick = unsafe { &*SYST::ptr() };
 
-    let counter1 = unsafe { core::ptr::read_volatile(&COUNTER) };
-    let current = systick.cvr.read();
-    let counter = unsafe { core::ptr::read_volatile(&COUNTER) };
     let reload = systick.rvr.read();
-    let elapsed = if counter1 != counter { 0 } else { reload - current };
+    let counter0 = unsafe { core::ptr::read_volatile(&COUNTER) };
+    let current0 = systick.cvr.read();
+    let counter1 = unsafe { core::ptr::read_volatile(&COUNTER) };
+    let current1 = systick.cvr.read();
+    let (counter, current) =
+        if counter0 != counter1 { (counter1, current1) } else { (counter0, current0) };
     let secs = (counter / INTERRUPTS_PER_SECOND) as u64;
     let millis = counter % INTERRUPTS_PER_SECOND * 10;
-    let nanos = (elapsed as u64 * NANOSECONDS_PER_CYCLE as u64 / reload as u64) as u32;
+    let nanos = ((reload - current) as u64 * NANOSECONDS_PER_CYCLE as u64 / reload as u64) as u32;
     Duration::new(secs, millis * 1000_000 + nanos)
 }
 
@@ -32,14 +33,4 @@ pub fn systick_init(mut systick: SYST, hz: u32) {
     systick.set_reload(hz / INTERRUPTS_PER_SECOND - 1);
     systick.enable_counter();
     systick.enable_interrupt();
-}
-
-pub unsafe fn disable_all_irqs() {
-    let nvic = &*cortex_m::peripheral::NVIC::ptr();
-    for icer in nvic.icer.iter() {
-        icer.write(0xFFFFFFFFu32)
-    }
-    for icpr in nvic.icpr.iter() {
-        icpr.write(0xFFFFFFFFu32)
-    }
 }

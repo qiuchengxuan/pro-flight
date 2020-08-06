@@ -22,7 +22,6 @@ log = { version = "0.4", features = ["max_level_off"] }
 mpu6000 = "0.1"
 max7456 = "0.1"
 nb = "0.1"
-panic-halt = "0.2"
 rs-flight = { path = "../../" }
 sbus-parser = "0.0.2"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }

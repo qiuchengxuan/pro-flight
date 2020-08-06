@@ -3,8 +3,7 @@ MEMORY
   /* NOTE 1 K = 1 KiBi = 1024 bytes */
   /* TODO Adjust these memory regions to match your device memory layout */
   /* These values correspond to the LM3S6965, one of the few devices QEMU can emulate */
-  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 872K
-  CFG (rwx): ORIGIN = 0x080E0000, LENGTH = 128K
+  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 1M
   RAM : ORIGIN = 0x20000000, LENGTH = 128K /* 0x2001FFFF */
   CCMRAM : ORIGIN = 0x10000000, LENGTH = 64K /* 0x1000FFFF */
 }
