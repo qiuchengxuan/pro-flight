@@ -29,7 +29,6 @@ mod spi3_osd_baro;
 mod tim7_scheduler;
 mod usart1;
 mod usart6;
-mod watchdog;
 
 use alloc::boxed::Box;
 use core::alloc::Layout;
@@ -296,8 +295,6 @@ fn main() -> ! {
         sbus.set_notify(Box::new(trigger.clone()));
     }
 
-    let mut watchdog = watchdog::init(peripherals.IWDG);
-
     let telemetry_source = telemetry.as_data_source();
     let schedule_trigger = SchedulableEvent::new(trigger, 50);
     let group =
@@ -309,7 +306,6 @@ fn main() -> ! {
     loop {
         if timer.wait().is_ok() {
             timer.start(Duration::from_millis(100));
-            watchdog.feed();
             led.toggle().ok();
         }
 
@@ -319,12 +315,10 @@ fn main() -> ! {
         cli.interact(&mut serial, |line, serial| -> bool {
             match line.split(' ').next() {
                 Some("dfu") => {
-                    cortex_m::interrupt::disable();
                     cortex_m::peripheral::SCB::sys_reset();
                 }
                 Some("reboot") => {
                     dfu.disarm();
-                    cortex_m::interrupt::disable();
                     cortex_m::peripheral::SCB::sys_reset()
                 }
                 Some("free") => {

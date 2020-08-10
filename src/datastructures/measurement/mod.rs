@@ -90,13 +90,35 @@ pub struct Axes {
     pub z: i32,
 }
 
-impl Axes {
-    pub fn average(self: &Self, other: &Self) -> Self {
-        Self { x: (self.x + other.x) / 2, y: (self.y + other.y) / 2, z: (self.z + other.z) / 2 }
-    }
+impl core::ops::Add for Axes {
+    type Output = Axes;
 
-    pub fn calibrated(&self, calibration: &Self) -> Self {
-        Self { x: self.x - calibration.x, y: self.y - calibration.y, z: self.z - calibration.z }
+    fn add(self, other: Axes) -> Self {
+        Self { x: (self.x + other.x), y: (self.y + other.y), z: (self.z + other.z) }
+    }
+}
+
+impl core::ops::Sub<&Axes> for Axes {
+    type Output = Axes;
+
+    fn sub(self, other: &Axes) -> Self {
+        Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
+    }
+}
+
+impl core::ops::Div<i32> for Axes {
+    type Output = Axes;
+
+    fn div(self, div: i32) -> Self {
+        Self { x: self.x / div, y: self.y / div, z: self.z / div }
+    }
+}
+
+impl core::ops::Mul<&Axes> for Axes {
+    type Output = Axes;
+
+    fn mul(self, other: &Axes) -> Self {
+        Self { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 }
 
@@ -110,6 +132,12 @@ impl PartialOrd for Axes {
     }
 }
 
+impl Axes {
+    pub fn gain(self, gain: &Axes) -> Self {
+        self * gain / 4096
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Value)]
 pub struct Measurement {
     pub axes: Axes,
@@ -118,7 +146,7 @@ pub struct Measurement {
 
 impl Measurement {
     pub fn calibrated(self, axes: &Axes) -> Self {
-        Self { axes: self.axes.calibrated(axes), sensitive: self.sensitive }
+        Self { axes: self.axes - axes, sensitive: self.sensitive }
     }
 }
 
@@ -154,8 +182,9 @@ impl sval::value::Value for Acceleration {
 }
 
 impl Acceleration {
-    pub fn calibrated(self, axes: &Axes) -> Self {
-        return Self(self.0.calibrated(axes));
+    pub fn calibrated(self, zero: &Axes, gain: &Axes) -> Self {
+        let axes = (self.0.axes - zero).gain(gain);
+        return Self(Measurement { axes, sensitive: self.0.sensitive });
     }
 }
 

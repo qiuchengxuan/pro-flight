@@ -13,11 +13,12 @@ use crate::datastructures::measurement::{Acceleration, Axes, Gyro, DEGREE_PER_DA
 pub struct IMU<A, G> {
     accelerometer: A,
     gyroscope: G,
-    accelerometer_bias: Axes,
-    calibration_loop: u16,
 
     ahrs: Mahony<f32>,
+    accelerometer_bias: Axes,
+    accelerometer_gain: Axes,
     gyro_bias: Axes,
+    calibration_loop: u16,
     counter: usize,
     calibrated: bool,
     acceleration: Rc<OverwritingData<Acceleration>>,
@@ -36,16 +37,17 @@ where
         Self {
             accelerometer,
             gyroscope,
+
+            ahrs: Mahony::new(1.0 / sample_rate as f32, 0.5, 0.0),
             accelerometer_bias: config.bias.into(),
+            accelerometer_gain: config.gain.into(),
+            gyro_bias: Default::default(),
             calibration_loop: 200,
+            counter: 0,
+            calibrated: false,
             acceleration: Rc::new(OverwritingData::sized(size)),
             quaternion: Rc::new(OverwritingData::new(vec![unit; size])),
             gyro: Rc::new(SingularData::default()),
-
-            ahrs: Mahony::new(1.0 / sample_rate as f32, 0.5, 0.0),
-            gyro_bias: Default::default(),
-            counter: 0,
-            calibrated: false,
         }
     }
 
@@ -66,7 +68,7 @@ where
     }
 
     pub fn update_imu(&mut self, raw: (Acceleration, Gyro)) {
-        let acceleration = raw.0.calibrated(&self.accelerometer_bias);
+        let acceleration = raw.0.calibrated(&self.accelerometer_bias, &self.accelerometer_gain);
         let gyro = raw.1.calibrated(&self.gyro_bias);
         self.acceleration.write(acceleration);
         self.gyro.write(gyro);
@@ -89,7 +91,7 @@ impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G>
         while let Some(gyro) = self.gyroscope.read() {
             if let Some(acceleration) = self.accelerometer.read() {
                 if !self.calibrated {
-                    self.gyro_bias = self.gyro_bias.average(&gyro.axes);
+                    self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
                     self.calibrated = self.counter >= self.calibration_loop as usize;
                     self.counter += 1;
                 } else {

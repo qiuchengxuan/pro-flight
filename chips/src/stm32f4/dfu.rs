@@ -12,6 +12,7 @@ impl Dfu {
 
     #[inline(never)]
     fn enter(&self) {
+        cortex_m::interrupt::disable();
         unsafe {
             llvm_asm!("ldr r0, =0x40023844
                        ldr r1, =0x00004000

@@ -6,10 +6,10 @@ use crc::Hasher32;
 use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
+use rs_flight::components::schedule::{Hertz, Schedulable};
 use rs_flight::components::telemetry::TelemetryData;
 use rs_flight::config;
 use rs_flight::datastructures::data_source::DataSource;
-use rs_flight::components::schedule::{Hertz, Schedulable};
 use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::init as max7456_init;
@@ -140,7 +140,7 @@ impl<T: DataSource<TelemetryData>> Schedulable for OSDScheduler<T> {
 
         let screen = self.0.draw();
         static mut OSD_DMA_BUFFER: [u8; 800] = [0u8; 800];
-        let mut dma_buffer = unsafe { OSD_DMA_BUFFER };
+        let mut dma_buffer = unsafe { &mut OSD_DMA_BUFFER[..] };
         let mut writer = NotNullWriter::new(screen, Default::default());
         let display = writer.write(&mut dma_buffer);
         spi3_start_tx(&display.0, display.0.len());
