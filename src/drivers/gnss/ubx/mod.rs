@@ -33,7 +33,7 @@ impl UBXDecoder {
         }
     }
 
-    pub fn as_position_source(&self) -> impl DataSource<Position> {
+    pub fn position(&self) -> impl DataSource<Position> {
         SingularDataSource::new(&self.position)
     }
 
@@ -49,7 +49,7 @@ impl UBXDecoder {
             self.position.write(Position {
                 latitude: payload.latitude.into(),
                 longitude: payload.longitude.into(),
-                altitude: Distance(payload.height_above_msl as isize / 10),
+                altitude: Distance(payload.height_above_msl as i32 / 10),
             });
         }
 

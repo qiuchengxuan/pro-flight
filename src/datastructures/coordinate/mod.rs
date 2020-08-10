@@ -14,25 +14,25 @@ use super::measurement::DEGREE_PER_DAG;
 
 #[derive(Copy, Clone, Default, Value, PartialEq, Debug)]
 pub struct SphericalCoordinate {
-    pub rho: Distance<isize>, // radius
-    pub theta: i16,           // azimuth angle, [-180, 180]
-    pub phi: i8,              // polar angle, [-90, 90]
+    pub rho: Distance<i32>, // radius
+    pub theta: i16,         // azimuth angle, [-180, 180]
+    pub phi: i8,            // polar angle, [-90, 90]
 }
 
 // assuming unit of centimeter
 #[derive(Default, Copy, Clone, PartialEq, Debug, Value)]
 pub struct Displacement {
-    pub x: Distance<isize>,
-    pub y: Distance<isize>,
-    pub z: Distance<isize>,
+    pub x: Distance<i32>,
+    pub y: Distance<i32>,
+    pub z: Distance<i32>,
 }
 
 impl From<(f32, f32, f32)> for Displacement {
     fn from(tuple: (f32, f32, f32)) -> Self {
-        let unit = DistanceUnit::Meter as isize as f32;
-        let x = Distance((tuple.0 * unit) as isize);
-        let y = Distance((tuple.1 * unit) as isize);
-        let z = Distance((tuple.2 * unit) as isize);
+        let unit = DistanceUnit::Meter as i32 as f32;
+        let x = Distance((tuple.0 * unit) as i32);
+        let y = Distance((tuple.1 * unit) as i32);
+        let z = Distance((tuple.2 * unit) as i32);
         Self { x, y, z }
     }
 }
@@ -65,7 +65,7 @@ impl Into<SphericalCoordinate> for Displacement {
         } else {
             ((-z / rho).acos() * DEGREE_PER_DAG) as i8 - 90
         };
-        SphericalCoordinate { rho: Distance(rho as isize), theta, phi }
+        SphericalCoordinate { rho: Distance(rho as i32), theta, phi }
     }
 }
 

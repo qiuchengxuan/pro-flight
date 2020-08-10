@@ -36,19 +36,19 @@ impl Longitude {
     }
 }
 
-impl core::ops::Add<Distance<isize>> for Longitude {
+impl core::ops::Add<Distance<i32>> for Longitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<isize>) -> Self {
+    fn add(self, distance: Distance<i32>) -> Self {
         Self(self.0 + distance.0 as i32 * SUB_SECOND * SCALE * 1000 / 30_715)
     }
 }
 
 impl core::ops::Sub for Longitude {
-    type Output = Distance<isize>;
+    type Output = Distance<i32>;
 
-    fn sub(self, other: Self) -> Distance<isize> {
-        Distance(((self.0 - other.0) * 30_715 / 1000 / SCALE / SUB_SECOND) as isize)
+    fn sub(self, other: Self) -> Distance<i32> {
+        Distance(((self.0 - other.0) * 30_715 / 1000 / SCALE / SUB_SECOND) as i32)
     }
 }
 

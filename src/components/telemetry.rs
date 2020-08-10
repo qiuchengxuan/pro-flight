@@ -101,7 +101,7 @@ pub struct TelemetryData {
     pub control_input: ControlInput,
     pub heading: u16,
     pub height: Altitude,
-    pub velocity: Velocity,
+    pub velocity: Velocity<i16>,
     pub g_force: u8,
     pub battery: Battery,
     pub position: Position,
@@ -132,7 +132,7 @@ pub struct TelemetryUnit<A, B, C, IMU, NAV> {
 
 impl<A, B, C, IMU, NAV> Schedulable for TelemetryUnit<A, B, C, IMU, NAV>
 where
-    A: DataSource<(Altitude, Velocity)>,
+    A: DataSource<(Altitude, Velocity<i16>)>,
     B: DataSource<Battery>,
     C: DataSource<Acceleration>,
     IMU: DataSource<UnitQuaternion<f32>>,
@@ -153,10 +153,11 @@ where
         let acceleration = self.accelerometer.read_last_unchecked();
         let input_option = self.control_input.as_ref().map(|i| i.read_last_unchecked());
         let unit_quaternion = self.imu.read_last_unchecked();
+        let heading = (-euler.psi) as isize;
         let data = TelemetryData {
             attitude: euler.into(),
             altitude,
-            heading: ((-euler.psi as isize + 360) % 360) as u16,
+            heading: if heading > 0 { heading } else { 360 + heading } as u16,
             height: altitude - self.initial_altitude,
             velocity,
             g_force: acceleration.g_force(),

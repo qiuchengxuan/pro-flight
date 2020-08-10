@@ -17,9 +17,9 @@ impl GNSS {
         }
     }
 
-    pub fn as_position_source(&mut self) -> impl DataSource<Position> {
+    pub fn position(&self) -> impl DataSource<Position> {
         match self {
-            Self::UBX(ubx) => ubx.as_position_source(),
+            Self::UBX(ubx) => ubx.position(),
         }
     }
 

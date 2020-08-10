@@ -11,7 +11,7 @@ const MAX_RECORDS: usize = 25;
 
 pub struct Altimeter<D> {
     data_source: D,
-    data: Rc<SingularData<(Altitude, Velocity)>>,
+    data: Rc<SingularData<(Altitude, Velocity<i16>)>>,
 
     records: Vec<i16>,
     rate: u16, // hz
@@ -32,7 +32,7 @@ impl<D: DataSource<Pressure>> Altimeter<D> {
         Self { data_source, data, records, rate, counter: 0 }
     }
 
-    pub fn as_data_source(&self) -> impl DataSource<(Altitude, Velocity)> {
+    pub fn as_data_source(&self) -> impl DataSource<(Altitude, Velocity<i16>)> {
         SingularDataSource::new(&self.data)
     }
 }
@@ -45,7 +45,7 @@ impl<D: DataSource<Pressure>> Schedulable for Altimeter<D> {
             self.records[self.counter as usize] = meters;
             self.counter = (self.counter + 1) % self.rate as u8;
             let delta = meters - self.records[self.counter as usize];
-            self.data.write((altitude, delta * SECONDS_PER_MINUTE))
+            self.data.write((altitude, Velocity(delta * SECONDS_PER_MINUTE)))
         }
         true
     }

@@ -4,7 +4,7 @@ use ahrs::{Ahrs, Mahony};
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
 use crate::components::schedule::{Hertz, Schedulable};
-use crate::config::Accelerometer as Config;
+use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
@@ -31,9 +31,10 @@ where
     A: DataSource<Acceleration>,
     G: DataSource<Gyro>,
 {
-    pub fn new(accelerometer: A, gyroscope: G, sample_rate: u16, config: &Config) -> Self {
+    pub fn new(accelerometer: A, gyroscope: G, sample_rate: u16) -> Self {
         let size = accelerometer.capacity();
         let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(0.0, 0.0, 0.0, 0.0));
+        let config = &config::get().accelerometer;
         Self {
             accelerometer,
             gyroscope,

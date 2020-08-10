@@ -3,6 +3,7 @@ use alloc::rc::Rc;
 
 use nalgebra::UnitQuaternion;
 
+use crate::algorithm::runge_kutta4;
 use crate::alloc;
 use crate::components::schedule::{Hertz, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
@@ -10,7 +11,6 @@ use crate::datastructures::data_source::singular::{SingularData, SingularDataSou
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
-use crate::math::runge_kutta4;
 
 const CURRENT: usize = 0;
 const HOME: usize = 0;
@@ -21,7 +21,7 @@ pub struct Navigation<IMU, A> {
     imu: IMU,
     accelerometer: A,
     gnss: Option<Box<dyn DataSource<Position>>>,
-    altimeter: Option<Box<dyn DataSource<(Altitude, Velocity)>>>,
+    altimeter: Option<Box<dyn DataSource<(Altitude, Velocity<i16>)>>>,
     waypoints: [Waypoint; MAX_WAYPOINT],
     offset: (f32, f32, f32),
     displacements: [Displacement; MAX_WAYPOINT],
@@ -62,7 +62,7 @@ where
         self.gnss = Some(gnss)
     }
 
-    pub fn set_altimeter(&mut self, altimeter: Box<dyn DataSource<(Altitude, Velocity)>>) {
+    pub fn set_altimeter(&mut self, altimeter: Box<dyn DataSource<(Altitude, Velocity<i16>)>>) {
         self.altimeter = Some(altimeter)
     }
 

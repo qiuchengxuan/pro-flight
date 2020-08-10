@@ -44,7 +44,7 @@ impl<T: DataSource<TelemetryData>> TelemetrySource for HUDTelemetrySource<T> {
             heading: data.heading,
             g_force: data.g_force,
             height: data.height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
-            velocity: data.velocity / 100 * 100,
+            velocity: data.velocity.0 / 100 * 100,
             steerpoint: steerpoint,
             ..Default::default()
         }

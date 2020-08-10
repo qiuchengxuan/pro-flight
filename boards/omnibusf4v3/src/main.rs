@@ -186,11 +186,8 @@ fn main() -> ! {
         }
     };
 
-    let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
-    let rate = GYRO_SAMPLE_RATE as u16;
-    let imu = IMU::new(accelerometer, gyroscope, rate, &config.accelerometer);
-
     info!("Initialize MPU6000");
+    let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
     let mut int = gpio_c.pc4.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
@@ -260,11 +257,14 @@ fn main() -> ! {
         Configuration::Airplane => Airplane::new(mixer, pwms),
     };
 
+    let rate = GYRO_SAMPLE_RATE as u16;
+    let imu = IMU::new(accelerometer, gyroscope, rate);
+
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
     navigation.set_altimeter(Box::new(altimeter.as_data_source()));
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
-        navigation.set_gnss(Box::new(gnss.as_position_source()));
+        navigation.set_gnss(Box::new(gnss.position()));
     }
 
     let mut telemetry = TelemetryUnit::new(

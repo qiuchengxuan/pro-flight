@@ -1,87 +1,22 @@
-use core::ops::{Add, Sub};
-
 use integer_sqrt::IntegerSquareRoot;
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 use nalgebra::Vector3;
 
 pub mod battery;
+pub mod distance;
 pub mod euler;
+pub mod velocity;
 
+pub use distance::{Distance, DistanceUnit};
 pub use euler::DEGREE_PER_DAG;
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum DistanceUnit {
-    CentiMeter = 1,
-    Feet = 330,
-    Meter = 100,
-    KiloMeter = 100_000,
-    NauticalMile = 1852 * 100,
-}
-
-impl PartialOrd for DistanceUnit {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        (*self as usize).partial_cmp(&(*other as usize))
-    }
-}
-
-#[derive(Default, Copy, Clone, PartialEq, Debug)]
-pub struct Distance<T: Default + Copy + Clone + PartialEq>(pub T);
-
-impl<T: PartialEq + Copy + Default> PartialEq<T> for Distance<T> {
-    fn eq(&self, rhs: &T) -> bool {
-        self.0 == *rhs
-    }
-}
-
-impl<T: Add<Output = T> + Copy + Default + PartialEq> Add for Distance<T> {
-    type Output = Distance<T::Output>;
-    fn add(self, other: Self) -> Self::Output {
-        Self(self.0 + other.0)
-    }
-}
-
-impl<T: Sub<Output = T> + Copy + Default + PartialEq> Sub for Distance<T> {
-    type Output = Distance<T::Output>;
-    fn sub(self, other: Self) -> Self::Output {
-        Self(self.0 - other.0)
-    }
-}
-
-impl<T: Into<isize> + Copy + Default + PartialEq> sval::value::Value for Distance<T> {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.i64(self.0.into() as i64)
-    }
-}
-
-impl<T: Into<isize> + Copy + Default + PartialEq> Distance<T> {
-    #[inline]
-    pub fn convert(self, from: DistanceUnit, to: DistanceUnit, scale: isize) -> isize {
-        let raw: isize = self.0.into();
-        match (from, to) {
-            (DistanceUnit::CentiMeter, _) => raw * scale / to as isize,
-            (_, DistanceUnit::CentiMeter) => raw * scale * from as isize,
-            _ => {
-                if from >= to {
-                    raw * scale * from as isize / to as isize
-                } else {
-                    raw * scale * to as isize / from as isize
-                }
-            }
-        }
-    }
-}
-
-impl<T: Into<isize> + Copy + Default + PartialEq> Into<f32> for Distance<T> {
-    fn into(self) -> f32 {
-        let value: isize = self.0.into();
-        value as f32 / (DistanceUnit::Meter as isize as f32)
-    }
-}
+pub use velocity::Velocity;
 
 pub type Temperature = i16;
-pub type Altitude = Distance<isize>;
-pub type Velocity = i16;
+pub type Altitude = Distance<i32>;
+
+pub type Heading = u16;
+pub type Course = u16;
 
 #[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
 pub struct Axes {
@@ -209,6 +144,6 @@ pub struct Pressure(pub u32); // unit of Pa
 
 impl Into<Altitude> for Pressure {
     fn into(self) -> Altitude {
-        Distance(((1013_25 - self.0 as isize) * 82 / 10) as isize)
+        Distance(((1013_25 - self.0 as isize) * 82 / 10) as i32)
     }
 }

@@ -1,10 +1,8 @@
-use core::mem::MaybeUninit;
-
 use rs_flight::config::SerialConfig;
 use rs_flight::drivers::sbus::SbusReceiver;
 use rs_flight::drivers::uart::Device;
 use stm32f4xx_hal::gpio::gpioc;
-use stm32f4xx_hal::gpio::{Alternate, Floating, Input, AF8};
+use stm32f4xx_hal::gpio::{Floating, Input};
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::serial::config::{Config, StopBits};
@@ -13,14 +11,12 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 type PC6 = gpioc::PC6<Input<Floating>>;
 type PC7 = gpioc::PC7<Input<Floating>>;
-type PINS = (gpioc::PC6<Alternate<AF8>>, gpioc::PC7<Alternate<AF8>>);
 
 const HTIF_OFFSET: usize = 4;
 const STREAM1_OFFSET: usize = 6;
 
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
 static mut DEVICE: Option<Device> = None;
-static mut USART6: MaybeUninit<Serial<stm32::USART6, PINS>> = MaybeUninit::uninit();
 
 #[interrupt]
 unsafe fn DMA2_STREAM1() {
@@ -56,11 +52,10 @@ pub fn init(
 
     let (pc6, pc7) = pins;
     let pins = (pc6.into_alternate_af8(), pc7.into_alternate_af8());
-    let usart = Serial::usart6(usart6, pins, cfg, clocks).unwrap();
+    Serial::usart6(usart6, pins, cfg, clocks).unwrap();
 
     // dma2 stream1 channel 5 rx
     unsafe {
-        USART6 = MaybeUninit::new(usart);
         (&*stm32::USART6::ptr()).cr3.modify(|_, w| w.dmar().enabled());
 
         let dma2 = &*(stm32::DMA2::ptr());

@@ -1,10 +1,8 @@
-use core::mem::MaybeUninit;
-
 use rs_flight::config::SerialConfig;
 use rs_flight::drivers::gnss::GNSS;
 use rs_flight::drivers::uart::Device;
 use stm32f4xx_hal::gpio::gpioa;
-use stm32f4xx_hal::gpio::{Alternate, Floating, Input, AF7};
+use stm32f4xx_hal::gpio::{Floating, Input};
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::serial::config::Config;
@@ -13,14 +11,12 @@ use stm32f4xx_hal::{prelude::*, stm32};
 
 type PA9 = gpioa::PA9<Input<Floating>>;
 type PA10 = gpioa::PA10<Input<Floating>>;
-type PINS = (gpioa::PA9<Alternate<AF7>>, gpioa::PA10<Alternate<AF7>>);
 
 const HTIF_OFFSET: usize = 4;
 const STREAM5_OFFSET: usize = 6;
 
 static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
 static mut DEVICE: Option<Device> = None;
-static mut USART1: MaybeUninit<Serial<stm32::USART1, PINS>> = MaybeUninit::uninit();
 
 #[interrupt]
 unsafe fn DMA2_STREAM5() {
@@ -53,10 +49,9 @@ pub fn init(
 
     let (pa9, pa10) = pins;
     let pins = (pa9.into_alternate_af7(), pa10.into_alternate_af7());
-    let usart = Serial::usart1(usart1, pins, cfg, clocks).unwrap();
+    Serial::usart1(usart1, pins, cfg, clocks).unwrap();
 
     unsafe {
-        USART1 = MaybeUninit::new(usart);
         (&*stm32::USART1::ptr()).cr3.modify(|_, w| w.dmar().enabled());
 
         let dma2 = &*(stm32::DMA2::ptr());

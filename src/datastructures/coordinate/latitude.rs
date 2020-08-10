@@ -36,25 +36,25 @@ impl Latitude {
     }
 }
 
-impl PartialEq<isize> for Latitude {
-    fn eq(&self, rhs: &isize) -> bool {
-        self.0 as isize == *rhs
+impl PartialEq<i32> for Latitude {
+    fn eq(&self, rhs: &i32) -> bool {
+        self.0 as i32 == *rhs
     }
 }
 
-impl core::ops::Add<Distance<isize>> for Latitude {
+impl core::ops::Add<Distance<i32>> for Latitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<isize>) -> Self {
+    fn add(self, distance: Distance<i32>) -> Self {
         Self(self.0 + distance.0 as i32 * SUB_SECOND * 100 * SCALE / 30_92)
     }
 }
 
 impl core::ops::Sub for Latitude {
-    type Output = Distance<isize>;
+    type Output = Distance<i32>;
 
-    fn sub(self, other: Self) -> Distance<isize> {
-        Distance(((self.0 - other.0) * 30_92 / SCALE / 100 / SUB_SECOND) as isize)
+    fn sub(self, other: Self) -> Distance<i32> {
+        Distance(((self.0 - other.0) * 30_92 / SCALE / 100 / SUB_SECOND) as i32)
     }
 }
 
