@@ -32,7 +32,6 @@ mod usart6;
 
 use alloc::boxed::Box;
 use core::alloc::Layout;
-use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 use core::time::Duration;
 
@@ -98,9 +97,6 @@ macro_rules! panic_logger {
     };
 }
 
-#[link_section = ".uninit.STACKS"]
-static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
-
 fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     let rcc = rcc.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
@@ -134,9 +130,8 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
 
 #[entry]
 fn main() -> ! {
-    let dfu = unsafe { &mut *DFU.as_mut_ptr() };
-    dfu.check();
-    dfu.arm();
+    let mut dfu = Dfu::new();
+    dfu.arm_or_enter();
 
     unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
 

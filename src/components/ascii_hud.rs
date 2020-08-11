@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
-use ascii_osd_hud::telemetry::{Steerpoint, Telemetry, TelemetrySource};
+use ascii_osd_hud::telemetry::{Steerpoint, Telemetry, TelemetrySource, Unit};
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
 use crate::components::telemetry::TelemetryData;
@@ -35,7 +35,6 @@ impl<T: DataSource<TelemetryData>> TelemetrySource for HUDTelemetrySource<T> {
             name: data.steerpoint.waypoint.name,
             heading: delta.azimuth(),
             coordinate: coordinate.into(),
-            unit: "NM",
         };
         Telemetry {
             altitude: round_up(altitude as i16),
@@ -44,6 +43,7 @@ impl<T: DataSource<TelemetryData>> TelemetrySource for HUDTelemetrySource<T> {
             heading: data.heading,
             g_force: data.g_force,
             height: data.height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
+            unit: Unit::Aviation,
             velocity: data.velocity.0 / 100 * 100,
             steerpoint: steerpoint,
             ..Default::default()

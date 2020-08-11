@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use core::ptr::{read_volatile, write_volatile};
 
 const DFU_SAFE: usize = 0xCAFEFEED;
@@ -7,7 +8,7 @@ pub struct Dfu(usize);
 
 impl Dfu {
     pub fn new() -> Self {
-        Self(DFU_SAFE)
+        unsafe { MaybeUninit::uninit().assume_init() }
     }
 
     #[inline(never)]
@@ -28,10 +29,12 @@ impl Dfu {
         loop {}
     }
 
-    pub fn check(&mut self) {
+    pub fn arm_or_enter(&mut self) {
         if unsafe { read_volatile(&self.0) } == DFU_MAGIC {
-            unsafe { write_volatile(&mut self.0, DFU_SAFE) };
+            self.disarm();
             self.enter();
+        } else {
+            self.arm()
         }
     }
 
