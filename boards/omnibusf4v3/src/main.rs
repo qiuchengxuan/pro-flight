@@ -273,6 +273,9 @@ fn main() -> ! {
         telemetry.set_receiver(Box::new(sbus.as_receiver()));
         telemetry.set_control_input(Box::new(sbus.as_control_input()));
     }
+    if let Some(Device::GNSS(ref mut gnss)) = gnss {
+        telemetry.set_gnss(Box::new(gnss.fix_type()));
+    }
 
     info!("Initialize OSD & Barometer");
     let result = spi3_osd_baro::init(

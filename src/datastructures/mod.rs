@@ -1,5 +1,6 @@
 pub mod coordinate;
 pub mod data_source;
+pub mod gnss;
 pub mod input;
 pub mod measurement;
 pub mod waypoint;

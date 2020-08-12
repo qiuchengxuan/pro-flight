@@ -1,7 +1,7 @@
 pub const UBX_HEADER0: u8 = 0xB5;
 pub const UBX_HEADER1: u8 = 0x62;
 pub const CHECKSUM_SIZE: usize = 2;
-pub const PAYLOAD_OFFSET: usize = 8;
+pub const PAYLOAD_OFFSET: usize = 4;
 
 pub enum PayloadType {
     NavPosPvt,
@@ -18,8 +18,6 @@ impl PayloadType {
 
 #[repr(C)]
 pub struct Message<T> {
-    _padding: u16,
-    pub header: u16,
     pub class: u8,
     pub id: u8,
     pub length: u16,

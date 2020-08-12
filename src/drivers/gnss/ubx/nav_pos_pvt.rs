@@ -32,19 +32,6 @@ pub enum FixType {
     TimeOnlyFix,
 }
 
-impl Into<&str> for FixType {
-    fn into(self) -> &'static str {
-        match self {
-            Self::NoFix => "no-fix",
-            Self::DeadReckoningOnly => "dead-reckoning-only",
-            Self::TwoDemension => "2D",
-            Self::ThreeDemension => "3D",
-            Self::GNSSPlusDeadReckoningCombined => "gnss+dead-reckoning",
-            Self::TimeOnlyFix => "time-only",
-        }
-    }
-}
-
 impl Default for FixType {
     fn default() -> Self {
         Self::NoFix

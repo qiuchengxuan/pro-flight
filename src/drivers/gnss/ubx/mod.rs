@@ -7,10 +7,11 @@ use core::mem::transmute;
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::{Course, Distance, Heading, Velocity};
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
-use nav_pos_pvt::{FixType, NavPositionVelocityTime};
+use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
 
 const MAX_MESSAGE_SIZE: usize = core::mem::size_of::<Message<NavPositionVelocityTime>>();
 
@@ -29,11 +30,11 @@ pub enum State {
 pub struct UBXDecoder {
     buffer: [u8; MAX_MESSAGE_SIZE],
     state: State,
+    fix_type: Rc<SingularData<FixType>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<[Velocity<i32>; 3]>>,
     heading: Rc<SingularData<Heading>>,
     course: Rc<SingularData<Course>>,
-    fix_type: FixType,
     normal: bool,
 }
 
@@ -42,13 +43,17 @@ impl UBXDecoder {
         Self {
             buffer: [0u8; MAX_MESSAGE_SIZE],
             state: State::WaitHeader0,
+            fix_type: Rc::new(SingularData::default()),
             position: Rc::new(SingularData::default()),
             velocity: Rc::new(SingularData::<[Velocity<i32>; 3]>::default()),
             course: Rc::new(SingularData::default()),
             heading: Rc::new(SingularData::default()),
-            fix_type: FixType::NoFix,
             normal: true,
         }
+    }
+
+    pub fn fix_type(&self) -> impl DataSource<FixType> {
+        SingularDataSource::new(&self.fix_type)
     }
 
     pub fn position(&self) -> impl DataSource<Position> {
@@ -76,7 +81,15 @@ impl UBXDecoder {
         self.normal = true;
 
         let payload = &pvt_message.payload;
-        if payload.fix_type == FixType::ThreeDemension {
+
+        let fix_type = match payload.fix_type {
+            UBXFixType::TwoDemension => FixType::TwoDemension,
+            UBXFixType::ThreeDemension => FixType::ThreeDemension,
+            _ => FixType::NoFix,
+        };
+        self.fix_type.write(fix_type);
+
+        if payload.fix_type == UBXFixType::ThreeDemension {
             self.position.write(Position {
                 latitude: payload.latitude.into(),
                 longitude: payload.longitude.into(),
@@ -94,12 +107,6 @@ impl UBXDecoder {
             if payload.flags1.heading_of_vehicle_valid() {
                 self.heading.write(heading);
             }
-        }
-
-        if payload.fix_type != self.fix_type {
-            let fix_type: &str = payload.fix_type.into();
-            info!("GNSS fix-type changed to {}", fix_type);
-            self.fix_type = payload.fix_type;
         }
     }
 
@@ -131,10 +138,10 @@ impl UBXDecoder {
                 }
                 (State::WaitLength1, value) => {
                     message.length = u16::from_le_bytes([message.length as u8, value]);
-                    let length = message.length as usize;
+                    let length = message.length as usize + CHECKSUM_SIZE;
                     match message.payload_type() {
-                        Some(_) => self.state = State::Remain(length + CHECKSUM_SIZE),
-                        None => self.state = State::Skip(length + CHECKSUM_SIZE),
+                        Some(_) => self.state = State::Remain(length),
+                        None => self.state = State::Skip(length),
                     }
                 }
                 (State::Skip(size), _) => {
@@ -146,19 +153,17 @@ impl UBXDecoder {
                     }
                 }
                 (State::Remain(remain), _) => {
-                    let offset =
-                        PAYLOAD_OFFSET + (message.length as usize + CHECKSUM_SIZE) - remain;
+                    let offset = (message.length as usize + CHECKSUM_SIZE) - remain;
+                    let payload = &mut self.buffer[PAYLOAD_OFFSET + offset..];
                     let size = ring.len() - index;
-                    if size >= remain {
-                        self.state = State::WaitHeader0;
-                        self.buffer[offset..offset + remain]
-                            .copy_from_slice(&ring[index..index + remain]);
-                        self.handle_pvt_message();
-                    } else {
-                        self.buffer[offset..offset + size].copy_from_slice(&ring[index..]);
+                    if size < remain {
+                        payload[..size].copy_from_slice(&ring[index..]);
                         self.state = State::Remain(remain - (ring.len() - index));
                         return;
                     }
+                    payload[..remain].copy_from_slice(&ring[index..index + remain]);
+                    self.handle_pvt_message();
+                    self.state = State::WaitHeader0;
                 }
                 _ => {
                     self.state = State::WaitHeader0;
@@ -178,7 +183,7 @@ mod test {
         use super::NavPositionVelocityTime;
         use super::UBXDecoder;
 
-        assert_eq!(core::mem::size_of::<Message<NavPositionVelocityTime>>(), 104);
+        assert_eq!(core::mem::size_of::<Message<NavPositionVelocityTime>>(), 100);
 
         let message = hex!(
             "00 00

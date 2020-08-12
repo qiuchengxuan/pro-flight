@@ -33,7 +33,7 @@ where
 {
     pub fn new(accelerometer: A, gyroscope: G, sample_rate: u16) -> Self {
         let size = accelerometer.capacity();
-        let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(0.0, 0.0, 0.0, 0.0));
+        let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(1.0, 0.0, 0.0, 0.0));
         let config = &config::get().accelerometer;
         Self {
             accelerometer,
