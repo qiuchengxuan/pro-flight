@@ -1,32 +1,31 @@
-use embedded_hal::serial;
-
-use crate::components::console::Console;
 use crate::config;
 use crate::config::setter::Setter;
 use crate::config::yaml::ToYAML;
 use crate::sys::fs::OpenOptions;
 
-pub fn show<WE, S: serial::Write<u8, Error = WE>>(serial: &mut S) {
-    config::get().write_to(0, &mut Console(serial)).ok();
+pub fn show(writer: &mut impl core::fmt::Write) -> core::fmt::Result {
+    config::get().write_to(0, writer)
 }
 
-pub fn set<WE, S: serial::Write<u8, Error = WE>>(serial: &mut S, line: &str) {
+pub fn set(writer: &mut impl core::fmt::Write, line: &str) -> core::fmt::Result {
     let mut split = line.split(' ');
     split.next();
     if let Some(path) = split.next() {
         let mut config = config::get().clone();
         match config.set(&mut path.split('.'), split.next()) {
             Ok(()) => (),
-            Err(e) => console!(serial, "{}\n", e),
+            Err(e) => writeln!(writer, "{}", e)?,
         }
         config::replace(config);
     }
+    Ok(())
 }
 
-pub fn save() {
+pub fn save() -> core::fmt::Result {
     let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
     if let Some(mut file) = option.open("sdcard://config.yml").ok() {
-        config::get().write_to(0, &mut file).ok();
+        config::get().write_to(0, &mut file)?;
         file.close();
     }
+    Ok(())
 }

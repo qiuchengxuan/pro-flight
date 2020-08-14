@@ -56,9 +56,7 @@ pub unsafe fn log_panic(args: Arguments, panic_logger: &mut PanicLogger) {
     let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
     if let Some(mut file) = option.open("sdcard://panic.log").ok() {
         writeln!(file, "{}", args).ok();
-        for s in logger::reader() {
-            file.write_str(s).ok();
-        }
+        logger::get().write(&mut file).ok();
         file.close();
     }
 }

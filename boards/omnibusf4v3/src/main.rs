@@ -32,6 +32,7 @@ mod usart6;
 
 use alloc::boxed::Box;
 use core::alloc::Layout;
+use core::fmt::Write as _;
 use core::panic::PanicInfo;
 use core::time::Duration;
 
@@ -55,7 +56,7 @@ use rs_flight::{
         navigation::Navigation,
         panic::{log_panic, PanicLogger},
         schedule::Scheduler,
-        usb_serial, TelemetryUnit,
+        TelemetryUnit,
     },
     config::{self, aircraft::Configuration, Config, SerialConfig},
     datastructures::{
@@ -66,6 +67,7 @@ use rs_flight::{
         bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE},
         mpu6000::init_data_source as init_mpu6000_data_source,
         uart::Device,
+        usb_serial,
     },
     sys::{
         fs::File,
@@ -307,7 +309,7 @@ fn main() -> ! {
             led.toggle().ok();
         }
 
-        if !device.poll(&mut [&mut serial]) {
+        if !device.poll(&mut [&mut serial.0]) {
             continue;
         }
         cli.interact(&mut serial, |line, serial| -> bool {
@@ -320,15 +322,16 @@ fn main() -> ! {
                     cortex_m::peripheral::SCB::sys_reset()
                 }
                 Some("free") => {
-                    console!(serial, "Used: {}, free: {}\n", ALLOCATOR.used(), ALLOCATOR.free());
+                    writeln!(serial, "Used: {}, free: {}", ALLOCATOR.used(), ALLOCATOR.free()).ok();
                 }
                 Some("telemetry") => {
-                    console!(serial, "{}\n", telemetry_source.read_last_unchecked())
+                    writeln!(serial, "{}", telemetry_source.read_last_unchecked()).ok();
                 }
                 _ => return false,
             }
             true
-        });
+        })
+        .ok();
     }
 }
 

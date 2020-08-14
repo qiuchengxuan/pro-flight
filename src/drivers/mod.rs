@@ -5,5 +5,7 @@ pub mod mpu6000;
 pub mod pwm;
 pub mod sbus;
 pub mod sdcard;
+pub mod serial;
 pub mod shared_spi;
 pub mod uart;
+pub mod usb_serial;
