@@ -2,12 +2,13 @@ use alloc::boxed::Box;
 
 use ascii_osd_hud::hud::HUD;
 use ascii_osd_hud::symbol::{Symbol, SymbolTable};
-use ascii_osd_hud::telemetry::{Steerpoint, Telemetry, TelemetrySource, Unit};
+use ascii_osd_hud::telemetry::{Notes, Steerpoint, Telemetry, Unit};
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
 use crate::components::telemetry::TelemetryData;
 use crate::datastructures::coordinate::{Displacement, SphericalCoordinate};
 use crate::datastructures::data_source::DataSource;
+use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::DistanceUnit;
 use crate::datastructures::Ratio;
 
@@ -15,44 +16,11 @@ type Screen = [[u8; 29]; 15];
 
 pub type ScreenConsumer = fn(&Screen);
 
-fn round_up(value: i16) -> i16 {
-    (value + 5) / 10 * 10
-}
-
-pub struct HUDTelemetrySource<T>(T);
-
-impl<T: DataSource<TelemetryData>> TelemetrySource for HUDTelemetrySource<T> {
-    fn get_telemetry(&self) -> Telemetry {
-        let data = self.0.read_last_unchecked();
-
-        let altitude = data.altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1);
-        let delta = data.steerpoint.waypoint.position - data.position;
-        let vector = data.raw.quaternion.inverse_transform_vector(&delta.into_f32_vector());
-        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
-        let coordinate: SphericalCoordinate = transformed.into();
-        let steerpoint = Steerpoint {
-            number: data.steerpoint.index,
-            name: data.steerpoint.waypoint.name,
-            heading: delta.azimuth(),
-            coordinate: coordinate.into(),
-        };
-        Telemetry {
-            altitude: round_up(altitude as i16),
-            attitude: data.attitude.into(),
-            battery: data.battery.percentage(),
-            heading: data.heading,
-            g_force: data.g_force,
-            height: data.height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
-            unit: Unit::Aviation,
-            velocity: data.velocity.0 / 100 * 100,
-            steerpoint: steerpoint,
-            ..Default::default()
-        }
-    }
-}
+const NO_GPS: &str = "NO GPS";
 
 pub struct AsciiHud<T> {
-    hud: HUD<HUDTelemetrySource<T>>,
+    hud: HUD,
+    telemetry: T,
     screen: Box<[[u8; 29]; 15]>,
 }
 
@@ -66,6 +34,10 @@ impl From<Ratio> for PixelRatio {
     fn from(ratio: Ratio) -> PixelRatio {
         PixelRatio(ratio.0, ratio.1)
     }
+}
+
+fn round_up(value: i16) -> i16 {
+    (value + 5) / 10 * 10
 }
 
 impl<T: DataSource<TelemetryData>> AsciiHud<T> {
@@ -92,13 +64,48 @@ impl<T: DataSource<TelemetryData>> AsciiHud<T> {
             Symbol::LineRight => 227,
             Symbol::LineRight1 => 228,
         };
-        let hud =
-            HUD::new(HUDTelemetrySource(telemetry), &symbol_table, fov, pixel_ratio, aspect_ratio);
-        Self { hud, screen: Box::new([[0u8; 29]; 15]) }
+        let hud = HUD::new(&symbol_table, fov, pixel_ratio, aspect_ratio);
+        Self { hud, telemetry, screen: Box::new([[0u8; 29]; 15]) }
     }
 
     pub fn draw(&mut self) -> &Screen {
-        self.hud.draw(self.screen.as_mut());
+        let data = self.telemetry.read_last_unchecked();
+
+        let altitude = data.altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1);
+        let delta = data.steerpoint.waypoint.position - data.position;
+        let vector = data.raw.quaternion.inverse_transform_vector(&delta.into_f32_vector());
+        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
+        let coordinate: SphericalCoordinate = transformed.into();
+        let steerpoint = Steerpoint {
+            number: data.steerpoint.index,
+            name: data.steerpoint.waypoint.name,
+            heading: delta.azimuth(),
+            coordinate: coordinate.into(),
+        };
+
+        let mut note_buffer = [0u8; 30];
+        let mut index = 0;
+        if let Some(fix_type) = data.raw.fix_type {
+            if fix_type == FixType::NoFix {
+                note_buffer[index..index + NO_GPS.len()].copy_from_slice(NO_GPS.as_bytes());
+                index += NO_GPS.len();
+            }
+        }
+        let note_left = unsafe { core::str::from_utf8_unchecked(&note_buffer[..index]) };
+        let hud_telemetry = Telemetry {
+            altitude: round_up(altitude as i16),
+            attitude: data.attitude.into(),
+            battery: data.battery.percentage(),
+            heading: data.heading,
+            g_force: data.g_force,
+            height: data.height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
+            unit: Unit::Aviation,
+            velocity: data.velocity.0 / 100 * 100,
+            steerpoint: steerpoint,
+            notes: Notes { left: note_left, center: "", right: "" },
+            ..Default::default()
+        };
+        self.hud.draw(&hud_telemetry, self.screen.as_mut());
         &self.screen
     }
 }

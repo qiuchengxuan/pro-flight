@@ -147,6 +147,7 @@ impl fmt::Write for OverwritingData<u8> {
         let partial_size = size - write;
         buffer[write..size].copy_from_slice(&bytes[..partial_size]);
         buffer[..bytes.len() - partial_size].copy_from_slice(&bytes[partial_size..]);
+        self.written.store(next_write, Ordering::Relaxed);
         Ok(())
     }
 }
@@ -155,14 +156,11 @@ impl fmt::Display for OverwritingDataSource<u8> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let buffer = unsafe { &*self.ring.buffer.get() };
         let written = self.ring.written.load(Ordering::Relaxed);
-        let mut size = written.wrapping_sub(self.read);
-        if written.wrapping_sub(self.read) > buffer.len() {
-            size = buffer.len();
+        if written <= buffer.len() {
+            return write!(f, "{}", unsafe { from_utf8_unchecked(&buffer[..written]) });
         }
+        let size = core::cmp::min(written.wrapping_sub(self.read), buffer.len());
         let index = written % buffer.len();
-        if size + index <= buffer.len() {
-            return write!(f, "{}", unsafe { from_utf8_unchecked(&buffer[index..size]) });
-        }
         write!(f, "{}", unsafe { from_utf8_unchecked(&buffer[index..]) })?;
         write!(f, "{}", unsafe { from_utf8_unchecked(&buffer[..size - (buffer.len() - index)]) })
     }
