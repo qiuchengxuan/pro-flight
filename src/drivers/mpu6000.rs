@@ -9,7 +9,7 @@ use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
 
 use crate::alloc;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, Measurement, Temperature};
 use crate::sys::timer::SysTimer;
 
@@ -42,8 +42,11 @@ impl Into<Measurement> for mpu6000::measurement::Measurement<GyroSensitive> {
     }
 }
 
-pub fn init_data_source(
-) -> (impl DataSource<Acceleration>, impl DataSource<Gyro>, impl DataSource<Temperature>) {
+pub fn init_data_source() -> (
+    OverwritingDataSource<Acceleration>,
+    OverwritingDataSource<Gyro>,
+    OverwritingDataSource<Temperature>,
+) {
     let mpu6000_data = MPU6000Data {
         accelerometer: Rc::new(OverwritingData::sized(40)),
         gyroscope: Rc::new(OverwritingData::sized(40)),

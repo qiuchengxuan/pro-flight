@@ -1,12 +1,12 @@
 accelerometer:
   bias:
-    x: 83
-    y: -1
-    z: 99
+    x: -236
+    y: 22
+    z: -713
   gain:
-    x: 4079
-    y: 4079
-    z: 4017
+    x: 8222
+    y: 8142
+    z: 8188
 aircraft:
   configuration: airplane
 battery:

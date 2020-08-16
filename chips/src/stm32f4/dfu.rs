@@ -15,13 +15,7 @@ impl Dfu {
     fn enter(&self) -> ! {
         cortex_m::interrupt::disable();
         unsafe {
-            llvm_asm!("ldr r0, =0x40023844
-                       ldr r1, =0x00004000
-                       str r1, [r0, #0]
-                       ldr r0, =0x40013800
-                       ldr r1, =0x00000001
-                       str r1, [r0, #0]
-                       ldr r0, =0x1fff0000
+            llvm_asm!("ldr r0, =0x1fff0000
                        ldr sp, [r0, #0]
                        ldr r0, [r0, #4]
                        bx r0" :::: "volatile");

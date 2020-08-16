@@ -255,7 +255,7 @@ fn main() -> ! {
     };
 
     let rate = GYRO_SAMPLE_RATE as u16;
-    let imu = IMU::new(accelerometer, gyroscope, rate);
+    let imu = IMU::new(accelerometer, gyroscope.clone(), rate);
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
@@ -268,6 +268,7 @@ fn main() -> ! {
         altimeter.as_data_source(),
         battery,
         imu.as_accelerometer(),
+        gyroscope,
         imu.as_imu(),
         navigation.as_data_source(),
     );
@@ -297,8 +298,8 @@ fn main() -> ! {
 
     let telemetry_source = telemetry.as_data_source();
     let schedule_trigger = SchedulableEvent::new(trigger, 50);
-    let group =
-        Scheduler::new((schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd), 100);
+    let tasks = (schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd);
+    let group = Scheduler::new(tasks, 100);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
 
     let mut cli = CLI::new();

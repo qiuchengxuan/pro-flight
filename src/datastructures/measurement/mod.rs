@@ -67,12 +67,6 @@ impl PartialOrd for Axes {
     }
 }
 
-impl Axes {
-    pub fn gain(self, gain: &Axes) -> Self {
-        self * gain / 4096
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Value)]
 pub struct Measurement {
     pub axes: Axes,
@@ -118,7 +112,7 @@ impl sval::value::Value for Acceleration {
 
 impl Acceleration {
     pub fn calibrated(self, zero: &Axes, gain: &Axes) -> Self {
-        let axes = (self.0.axes - zero).gain(gain);
+        let axes = (self.0.axes - zero) * gain / self.0.sensitive;
         return Self(Measurement { axes, sensitive: self.0.sensitive });
     }
 }

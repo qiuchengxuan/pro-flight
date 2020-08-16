@@ -43,7 +43,7 @@ where
             accelerometer_bias: config.bias.into(),
             accelerometer_gain: config.gain.into(),
             gyro_bias: Default::default(),
-            calibration_loop: 200,
+            calibration_loop: 50,
             counter: 0,
             calibrated: false,
             acceleration: Rc::new(OverwritingData::sized(size)),
@@ -89,15 +89,18 @@ impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G>
     }
 
     fn schedule(&mut self) -> bool {
+        if !self.calibrated {
+            while let Some(gyro) = self.gyroscope.read() {
+                self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
+            }
+            self.accelerometer.read_last_unchecked();
+            self.calibrated = self.counter >= self.calibration_loop as usize;
+            self.counter += 1;
+            return true;
+        }
         while let Some(gyro) = self.gyroscope.read() {
             if let Some(acceleration) = self.accelerometer.read() {
-                if !self.calibrated {
-                    self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
-                    self.calibrated = self.counter >= self.calibration_loop as usize;
-                    self.counter += 1;
-                } else {
-                    self.update_imu((acceleration, gyro))
-                }
+                self.update_imu((acceleration, gyro));
             }
         }
         true

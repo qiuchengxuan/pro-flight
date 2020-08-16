@@ -14,7 +14,7 @@ use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::{
-    Acceleration, Altitude, Distance, DistanceUnit, Velocity,
+    Acceleration, Altitude, Distance, DistanceUnit, Gyro, Velocity,
 };
 use crate::datastructures::waypoint::Steerpoint;
 
@@ -53,6 +53,7 @@ impl Into<hud::SphericalCoordinate> for SphericalCoordinate {
 #[derive(Copy, Clone, Debug)]
 pub struct RawData {
     pub acceleration: Acceleration,
+    pub gyro: Gyro,
     pub quaternion: UnitQuaternion<f32>,
     pub fix_type: Option<FixType>,
 }
@@ -80,6 +81,7 @@ impl Default for RawData {
         Self {
             quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             acceleration: Acceleration::default(),
+            gyro: Gyro::default(),
             fix_type: None,
         }
     }
@@ -87,9 +89,11 @@ impl Default for RawData {
 
 impl sval::value::Value for RawData {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(2 + self.fix_type.is_some() as usize))?;
+        stream.map_begin(Some(3 + self.fix_type.is_some() as usize))?;
         stream.map_key("acceleration")?;
         stream.map_value(&self.acceleration)?;
+        stream.map_key("gyro")?;
+        stream.map_value(&self.gyro)?;
         stream.map_key("quaternion")?;
         let quat: Quat = self.quaternion.into();
         stream.map_value(quat)?;
@@ -128,10 +132,11 @@ impl core::fmt::Display for TelemetryData {
     }
 }
 
-pub struct TelemetryUnit<A, B, C, IMU, NAV> {
+pub struct TelemetryUnit<A, B, C, G, IMU, NAV> {
     altimeter: A,
     battery: B,
     accelerometer: C,
+    gyroscope: G,
     imu: IMU,
     navigation: NAV,
 
@@ -144,11 +149,12 @@ pub struct TelemetryUnit<A, B, C, IMU, NAV> {
     telemetry: Rc<SingularData<TelemetryData>>,
 }
 
-impl<A, B, C, IMU, NAV> Schedulable for TelemetryUnit<A, B, C, IMU, NAV>
+impl<A, B, C, G, IMU, NAV> Schedulable for TelemetryUnit<A, B, C, G, IMU, NAV>
 where
     A: DataSource<(Altitude, Velocity<i16>)>,
     B: DataSource<Battery>,
     C: DataSource<Acceleration>,
+    G: DataSource<Gyro>,
     IMU: DataSource<UnitQuaternion<f32>>,
     NAV: DataSource<(Position, Steerpoint)>,
 {
@@ -170,6 +176,7 @@ where
         let heading = (-euler.psi) as isize;
 
         let acceleration = self.accelerometer.read_last_unchecked();
+        let gyro = self.gyroscope.read_last_unchecked();
         let fix_type = self.gnss.as_mut().map(|g| g.read_last_unchecked());
 
         let data = TelemetryData {
@@ -184,7 +191,7 @@ where
             steerpoint,
             receiver: self.receiver.as_ref().map(|r| r.read_last_unchecked()).unwrap_or_default(),
             input: input_option.unwrap_or_default(),
-            raw: RawData { acceleration, quaternion, fix_type },
+            raw: RawData { acceleration, gyro, quaternion, fix_type },
         };
         self.telemetry.write(data);
         true
@@ -195,13 +202,21 @@ where
     }
 }
 
-impl<A, B, C, IMU, NAV> TelemetryUnit<A, B, C, IMU, NAV> {
-    pub fn new(altimeter: A, battery: B, accelerometer: C, imu: IMU, navigation: NAV) -> Self {
+impl<A, B, C, G, IMU, NAV> TelemetryUnit<A, B, C, G, IMU, NAV> {
+    pub fn new(
+        altimeter: A,
+        battery: B,
+        accelerometer: C,
+        gyroscope: G,
+        imu: IMU,
+        navigation: NAV,
+    ) -> Self {
         let config = config::get();
         Self {
             altimeter,
             battery,
             accelerometer,
+            gyroscope,
             imu,
             navigation,
 
