@@ -141,6 +141,7 @@ impl fmt::Write for OverwritingData<u8> {
 
         if size - write > bytes.len() {
             buffer[write..write + bytes.len()].copy_from_slice(bytes);
+            self.written.store(next_write, Ordering::Relaxed);
             return Ok(());
         }
 

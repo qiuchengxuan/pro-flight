@@ -4,7 +4,7 @@ use crate::config::serial::GNSSProtocol;
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::DataSource;
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::{Course, Heading, Velocity};
+use crate::datastructures::measurement::{Course, HeadingOrCourse, Velocity};
 
 use ubx::UBXDecoder;
 
@@ -37,7 +37,7 @@ impl GNSS {
         }
     }
 
-    pub fn heading(&self) -> impl DataSource<Heading> {
+    pub fn heading(&self) -> impl DataSource<HeadingOrCourse> {
         match self {
             Self::UBX(ubx) => ubx.heading(),
         }

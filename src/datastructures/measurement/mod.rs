@@ -18,6 +18,27 @@ pub type Altitude = Distance<i32>;
 pub type Heading = u16;
 pub type Course = u16;
 
+#[derive(Copy, Clone)]
+pub enum HeadingOrCourse {
+    Heading(Heading),
+    Course(Course),
+}
+
+impl Default for HeadingOrCourse {
+    fn default() -> Self {
+        Self::Course(0)
+    }
+}
+
+impl Into<Heading> for HeadingOrCourse {
+    fn into(self) -> Heading {
+        match self {
+            Self::Heading(h) => h,
+            Self::Course(c) => c,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
 pub struct Axes {
     pub x: i32,

@@ -33,6 +33,7 @@ mod usart6;
 use alloc::boxed::Box;
 use core::alloc::Layout;
 use core::fmt::Write as _;
+use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 use core::time::Duration;
 
@@ -132,8 +133,9 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
 
 #[entry]
 fn main() -> ! {
-    let mut dfu = Dfu::new();
-    dfu.arm_or_enter();
+    static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
+    let dfu = unsafe { &mut *DFU.as_mut_ptr() };
+    dfu.check();
 
     unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
 
@@ -255,7 +257,10 @@ fn main() -> ! {
     };
 
     let rate = GYRO_SAMPLE_RATE as u16;
-    let imu = IMU::new(accelerometer, gyroscope.clone(), rate);
+    let mut imu = IMU::new(accelerometer, gyroscope.clone(), rate);
+    if let Some(Device::GNSS(ref mut gnss)) = gnss {
+        imu.set_heading(Box::new(gnss.heading()));
+    }
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);

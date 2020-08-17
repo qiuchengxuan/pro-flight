@@ -1,14 +1,12 @@
-use core::mem::MaybeUninit;
 use core::ptr::{read_volatile, write_volatile};
 
-const DFU_SAFE: usize = 0xCAFEFEED;
-const DFU_MAGIC: usize = 0xDEADBEEF;
+const DFU_ARM: usize = 0x4446550A;
 
 pub struct Dfu(usize);
 
 impl Dfu {
     pub fn new() -> Self {
-        unsafe { MaybeUninit::uninit().assume_init() }
+        Self(0)
     }
 
     #[inline(never)]
@@ -23,8 +21,8 @@ impl Dfu {
         loop {}
     }
 
-    pub fn arm_or_enter(&mut self) {
-        if unsafe { read_volatile(&self.0) } == DFU_MAGIC {
+    pub fn check(&mut self) {
+        if unsafe { read_volatile(&self.0) } == DFU_ARM {
             self.disarm();
             self.enter();
         } else {
@@ -33,10 +31,10 @@ impl Dfu {
     }
 
     pub fn arm(&mut self) {
-        unsafe { write_volatile(&mut self.0, DFU_MAGIC) };
+        unsafe { write_volatile(&mut self.0, DFU_ARM) };
     }
 
     pub fn disarm(&mut self) {
-        unsafe { write_volatile(&mut self.0, DFU_SAFE) };
+        unsafe { write_volatile(&mut self.0, 0) };
     }
 }

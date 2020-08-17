@@ -8,7 +8,7 @@ use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::{Course, Distance, Heading, Velocity};
+use crate::datastructures::measurement::{Course, Distance, HeadingOrCourse, Velocity};
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
@@ -33,7 +33,7 @@ pub struct UBXDecoder {
     fix_type: Rc<SingularData<FixType>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<[Velocity<i32>; 3]>>,
-    heading: Rc<SingularData<Heading>>,
+    heading: Rc<SingularData<HeadingOrCourse>>,
     course: Rc<SingularData<Course>>,
     normal: bool,
 }
@@ -68,7 +68,7 @@ impl UBXDecoder {
         SingularDataSource::new(&self.course)
     }
 
-    pub fn heading(&self) -> impl DataSource<Heading> {
+    pub fn heading(&self) -> impl DataSource<HeadingOrCourse> {
         SingularDataSource::new(&self.heading)
     }
 
@@ -104,9 +104,12 @@ impl UBXDecoder {
             self.course.write(if course > 0 { course } else { 360 + course } as u16);
             let hov = payload.heading_of_vehicle / 10;
             let heading = if hov > 0 { hov } else { 360 + hov } as u16;
-            if payload.flags1.heading_of_vehicle_valid() {
-                self.heading.write(heading);
-            }
+            let heading_or_course = if payload.flags1.heading_of_vehicle_valid() {
+                HeadingOrCourse::Heading(heading)
+            } else {
+                HeadingOrCourse::Course(heading)
+            };
+            self.heading.write(heading_or_course);
         }
     }
 
