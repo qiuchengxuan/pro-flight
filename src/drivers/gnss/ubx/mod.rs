@@ -8,7 +8,8 @@ use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::{Course, Distance, HeadingOrCourse, Velocity};
+use crate::datastructures::measurement::distance::{CentiMeter, Distance};
+use crate::datastructures::measurement::{Course, HeadingOrCourse, Velocity};
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
@@ -93,7 +94,7 @@ impl UBXDecoder {
             self.position.write(Position {
                 latitude: payload.latitude.into(),
                 longitude: payload.longitude.into(),
-                altitude: Distance(payload.height_above_msl / 10),
+                altitude: Distance::new(payload.height_above_msl / 10, CentiMeter),
             });
             self.velocity.write([
                 Velocity(payload.velocity_north),

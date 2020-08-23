@@ -12,10 +12,9 @@ use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
+use crate::datastructures::measurement::distance::{Distance, NauticalMile};
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
-use crate::datastructures::measurement::{
-    Acceleration, Altitude, Distance, DistanceUnit, Gyro, Velocity,
-};
+use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, Velocity};
 use crate::datastructures::waypoint::Steerpoint;
 
 #[derive(Debug, Default, Copy, Clone, Value)]
@@ -45,8 +44,8 @@ impl Into<hud::Attitude> for Attitude {
 
 impl Into<hud::SphericalCoordinate> for SphericalCoordinate {
     fn into(self) -> hud::SphericalCoordinate {
-        let rho = self.rho.convert(DistanceUnit::CentiMeter, DistanceUnit::NauticalMile, 10) as u16;
-        hud::SphericalCoordinate { rho, theta: self.theta, phi: self.phi }
+        let rho = (self.rho * 10).to_unit(NauticalMile);
+        hud::SphericalCoordinate { rho: rho.value() as u16, theta: self.theta, phi: self.phi }
     }
 }
 
@@ -160,7 +159,7 @@ where
 {
     fn schedule(&mut self) -> bool {
         let (altitude, velocity) = self.altimeter.read_last_unchecked();
-        if self.initial_altitude == Distance(0) {
+        if self.initial_altitude == Distance::default() {
             self.initial_altitude = altitude;
         }
         let battery = self.battery.read_last_unchecked();

@@ -1,4 +1,4 @@
-use crate::datastructures::measurement::Distance;
+use crate::datastructures::measurement::distance::{CentiMeter, Distance};
 
 const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;
@@ -36,19 +36,20 @@ impl Longitude {
     }
 }
 
-impl core::ops::Add<Distance<i32>> for Longitude {
+impl core::ops::Add<Distance<i32, CentiMeter>> for Longitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<i32>) -> Self {
-        Self(self.0 + distance.0 as i32 * SUB_SECOND * SCALE * 1000 / 30_715)
+    fn add(self, distance: Distance<i32, CentiMeter>) -> Self {
+        Self(self.0 + distance.value() * SUB_SECOND * SCALE * 1000 / 30_715)
     }
 }
 
 impl core::ops::Sub for Longitude {
-    type Output = Distance<i32>;
+    type Output = Distance<i32, CentiMeter>;
 
-    fn sub(self, other: Self) -> Distance<i32> {
-        Distance(((self.0 - other.0) * 30_715 / 1000 / SCALE / SUB_SECOND) as i32)
+    fn sub(self, other: Self) -> Distance<i32, CentiMeter> {
+        let value = ((self.0 - other.0) * 30_715 / 1000 / SCALE / SUB_SECOND) as i32;
+        Distance::new(value, CentiMeter::default())
     }
 }
 

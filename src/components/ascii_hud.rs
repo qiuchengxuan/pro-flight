@@ -9,7 +9,7 @@ use crate::components::telemetry::TelemetryData;
 use crate::datastructures::coordinate::{Displacement, SphericalCoordinate};
 use crate::datastructures::data_source::DataSource;
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::DistanceUnit;
+use crate::datastructures::measurement::distance::Feet;
 use crate::datastructures::Ratio;
 
 type Screen = [[u8; 29]; 15];
@@ -71,7 +71,8 @@ impl<T: DataSource<TelemetryData>> AsciiHud<T> {
     pub fn draw(&mut self) -> &Screen {
         let data = self.telemetry.read_last_unchecked();
 
-        let altitude = data.altitude.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1);
+        let altitude = data.altitude.to_unit(Feet);
+        let height = data.height.to_unit(Feet);
         let delta = data.steerpoint.waypoint.position - data.position;
         let vector = data.raw.quaternion.inverse_transform_vector(&delta.into_f32_vector());
         let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
@@ -93,12 +94,12 @@ impl<T: DataSource<TelemetryData>> AsciiHud<T> {
         }
         let note_left = unsafe { core::str::from_utf8_unchecked(&note_buffer[..index]) };
         let hud_telemetry = Telemetry {
-            altitude: round_up(altitude as i16),
+            altitude: round_up(altitude.value() as i16),
             attitude: data.attitude.into(),
             battery: data.battery.percentage(),
             heading: data.heading,
             g_force: data.g_force,
-            height: data.height.convert(DistanceUnit::CentiMeter, DistanceUnit::Feet, 1) as i16,
+            height: height.value() as i16,
             unit: Unit::Aviation,
             velocity: data.velocity.0 / 100 * 100,
             steerpoint: steerpoint,

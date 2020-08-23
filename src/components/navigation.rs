@@ -9,6 +9,7 @@ use crate::components::schedule::{Hertz, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::measurement::distance::Meter;
 use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
 
@@ -109,11 +110,11 @@ where
                 offset.1 = runge_kutta4(|_, dt| ay * dt, offset.1, t, dt);
                 let altimeter = self.altimeter.as_mut().map(|a| a.read_last()).flatten();
                 if let Some((altitude, _)) = altimeter {
-                    if self.waypoints[HOME].position.altitude == 0 {
+                    if self.waypoints[HOME].position.altitude.is_zero() {
                         self.waypoints[HOME].position.altitude = altitude;
                     }
                     let height = altitude - self.waypoints[HOME].position.altitude;
-                    self.offset.2 = height.into();
+                    self.offset.2 = height.to_unit(Meter).value() as f32;
                 } else {
                     offset.2 = runge_kutta4(|_, dt| az * dt, offset.2, t, dt);
                 }

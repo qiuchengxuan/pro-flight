@@ -8,12 +8,12 @@ pub mod distance;
 pub mod euler;
 pub mod velocity;
 
-pub use distance::{Distance, DistanceUnit};
+pub use distance::{CentiMeter, Distance};
 pub use euler::DEGREE_PER_DAG;
 pub use velocity::Velocity;
 
 pub type Temperature = i16;
-pub type Altitude = Distance<i32>;
+pub type Altitude = Distance<i32, CentiMeter>;
 
 pub type Heading = u16;
 pub type Course = u16;
@@ -159,6 +159,6 @@ pub struct Pressure(pub u32); // unit of Pa
 
 impl Into<Altitude> for Pressure {
     fn into(self) -> Altitude {
-        Distance(((1013_25 - self.0 as isize) * 82 / 10) as i32)
+        Distance::new(((1013_25 - self.0 as isize) * 82 / 10) as i32, CentiMeter::default())
     }
 }
