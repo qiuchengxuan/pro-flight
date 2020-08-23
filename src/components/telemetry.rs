@@ -12,8 +12,9 @@ use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
-use crate::datastructures::measurement::distance::{Distance, NauticalMile};
+use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
+use crate::datastructures::measurement::unit::{Meter, NauticalMile};
 use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, Velocity};
 use crate::datastructures::waypoint::Steerpoint;
 
@@ -111,7 +112,7 @@ pub struct TelemetryData {
     pub heading: u16,
     pub height: Altitude,
     pub g_force: u8,
-    pub velocity: Velocity<i16>,
+    pub velocity: Velocity<i16, Meter>,
 
     pub receiver: Receiver,
     pub input: ControlInput,
@@ -150,7 +151,7 @@ pub struct TelemetryUnit<A, B, C, G, IMU, NAV> {
 
 impl<A, B, C, G, IMU, NAV> Schedulable for TelemetryUnit<A, B, C, G, IMU, NAV>
 where
-    A: DataSource<(Altitude, Velocity<i16>)>,
+    A: DataSource<(Altitude, Velocity<i16, Meter>)>,
     B: DataSource<Battery>,
     C: DataSource<Acceleration>,
     G: DataSource<Gyro>,

@@ -6,11 +6,13 @@ use nalgebra::Vector3;
 pub mod battery;
 pub mod distance;
 pub mod euler;
-pub mod velocity;
+pub mod unit;
 
-pub use distance::{CentiMeter, Distance};
+pub use distance::Distance;
 pub use euler::DEGREE_PER_DAG;
-pub use velocity::Velocity;
+pub use unit::CentiMeter;
+
+pub type Velocity<T, U> = Distance<T, U>;
 
 pub type Temperature = i16;
 pub type Altitude = Distance<i32, CentiMeter>;

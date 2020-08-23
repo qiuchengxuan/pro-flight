@@ -8,7 +8,8 @@ use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::distance::{CentiMeter, Distance};
+use crate::datastructures::measurement::distance::Distance;
+use crate::datastructures::measurement::unit::{CentiMeter, MilliMeter};
 use crate::datastructures::measurement::{Course, HeadingOrCourse, Velocity};
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
@@ -33,7 +34,7 @@ pub struct UBXDecoder {
     state: State,
     fix_type: Rc<SingularData<FixType>>,
     position: Rc<SingularData<Position>>,
-    velocity: Rc<SingularData<[Velocity<i32>; 3]>>,
+    velocity: Rc<SingularData<[Velocity<i32, MilliMeter>; 3]>>,
     heading: Rc<SingularData<HeadingOrCourse>>,
     course: Rc<SingularData<Course>>,
     normal: bool,
@@ -46,7 +47,7 @@ impl UBXDecoder {
             state: State::WaitHeader0,
             fix_type: Rc::new(SingularData::default()),
             position: Rc::new(SingularData::default()),
-            velocity: Rc::new(SingularData::<[Velocity<i32>; 3]>::default()),
+            velocity: Rc::new(SingularData::<[Velocity<i32, MilliMeter>; 3]>::default()),
             course: Rc::new(SingularData::default()),
             heading: Rc::new(SingularData::default()),
             normal: true,
@@ -61,7 +62,7 @@ impl UBXDecoder {
         SingularDataSource::new(&self.position)
     }
 
-    pub fn velocity(&self) -> impl DataSource<[Velocity<i32>; 3]> {
+    pub fn velocity(&self) -> impl DataSource<[Velocity<i32, MilliMeter>; 3]> {
         SingularDataSource::new(&self.velocity)
     }
 
@@ -97,9 +98,9 @@ impl UBXDecoder {
                 altitude: Distance::new(payload.height_above_msl / 10, CentiMeter),
             });
             self.velocity.write([
-                Velocity(payload.velocity_north),
-                Velocity(payload.velocity_east),
-                Velocity(payload.velocity_down),
+                Velocity::new(payload.velocity_north, MilliMeter),
+                Velocity::new(payload.velocity_east, MilliMeter),
+                Velocity::new(payload.velocity_down, MilliMeter),
             ]);
             let course = payload.heading_of_motion / 10;
             self.course.write(if course > 0 { course } else { 360 + course } as u16);

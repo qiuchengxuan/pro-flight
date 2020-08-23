@@ -9,7 +9,7 @@ use crate::components::telemetry::TelemetryData;
 use crate::datastructures::coordinate::{Displacement, SphericalCoordinate};
 use crate::datastructures::data_source::DataSource;
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::distance::Feet;
+use crate::datastructures::measurement::unit::Feet;
 use crate::datastructures::Ratio;
 
 type Screen = [[u8; 29]; 15];
@@ -101,7 +101,7 @@ impl<T: DataSource<TelemetryData>> AsciiHud<T> {
             g_force: data.g_force,
             height: height.value() as i16,
             unit: Unit::Aviation,
-            velocity: data.velocity.0 / 100 * 100,
+            velocity: data.velocity.value() / 100 * 100,
             steerpoint: steerpoint,
             notes: Notes { left: note_left, center: "", right: "" },
             ..Default::default()

@@ -4,7 +4,8 @@ use alloc::vec::Vec;
 use crate::components::schedule::{Hertz, Schedulable};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
-use crate::datastructures::measurement::distance::{Distance, Meter};
+use crate::datastructures::measurement::distance::Distance;
+use crate::datastructures::measurement::unit::Meter;
 use crate::datastructures::measurement::{Altitude, Pressure, Velocity};
 
 const SECONDS_PER_MINUTE: i16 = 60;
@@ -12,7 +13,7 @@ const MAX_RECORDS: usize = 25;
 
 pub struct Altimeter<D> {
     data_source: D,
-    data: Rc<SingularData<(Altitude, Velocity<i16>)>>,
+    data: Rc<SingularData<(Altitude, Velocity<i16, Meter>)>>,
 
     records: Vec<Distance<i16, Meter>>,
     rate: u16, // hz
@@ -33,7 +34,7 @@ impl<D: DataSource<Pressure>> Altimeter<D> {
         Self { data_source, data, records, rate, counter: 0 }
     }
 
-    pub fn as_data_source(&self) -> impl DataSource<(Altitude, Velocity<i16>)> {
+    pub fn as_data_source(&self) -> impl DataSource<(Altitude, Velocity<i16, Meter>)> {
         SingularDataSource::new(&self.data)
     }
 }
@@ -46,7 +47,7 @@ impl<D: DataSource<Pressure>> Schedulable for Altimeter<D> {
             self.records[self.counter as usize] = meters;
             self.counter = (self.counter + 1) % self.rate as u8;
             let delta = meters - self.records[self.counter as usize];
-            self.data.write((altitude, Velocity(delta.value() * SECONDS_PER_MINUTE)))
+            self.data.write((altitude, Velocity::new(delta.value() * SECONDS_PER_MINUTE, Meter)))
         }
         true
     }

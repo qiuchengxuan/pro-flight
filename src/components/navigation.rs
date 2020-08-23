@@ -9,7 +9,7 @@ use crate::components::schedule::{Hertz, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
-use crate::datastructures::measurement::distance::Meter;
+use crate::datastructures::measurement::unit::Meter;
 use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
 
@@ -22,7 +22,7 @@ pub struct Navigation<IMU, A> {
     imu: IMU,
     accelerometer: A,
     gnss: Option<Box<dyn DataSource<Position>>>,
-    altimeter: Option<Box<dyn DataSource<(Altitude, Velocity<i16>)>>>,
+    altimeter: Option<Box<dyn DataSource<(Altitude, Velocity<i16, Meter>)>>>,
     waypoints: [Waypoint; MAX_WAYPOINT],
     offset: (f32, f32, f32),
     displacements: [Displacement; MAX_WAYPOINT],
@@ -63,7 +63,10 @@ where
         self.gnss = Some(gnss)
     }
 
-    pub fn set_altimeter(&mut self, altimeter: Box<dyn DataSource<(Altitude, Velocity<i16>)>>) {
+    pub fn set_altimeter(
+        &mut self,
+        altimeter: Box<dyn DataSource<(Altitude, Velocity<i16, Meter>)>>,
+    ) {
         self.altimeter = Some(altimeter)
     }
 

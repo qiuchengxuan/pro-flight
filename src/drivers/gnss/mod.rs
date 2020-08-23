@@ -4,6 +4,7 @@ use crate::config::serial::GNSSProtocol;
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::DataSource;
 use crate::datastructures::gnss::FixType;
+use crate::datastructures::measurement::unit::MilliMeter;
 use crate::datastructures::measurement::{Course, HeadingOrCourse, Velocity};
 
 use ubx::UBXDecoder;
@@ -31,7 +32,7 @@ impl GNSS {
         }
     }
 
-    pub fn velocity(&self) -> impl DataSource<[Velocity<i32>; 3]> {
+    pub fn velocity(&self) -> impl DataSource<[Velocity<i32, MilliMeter>; 3]> {
         match self {
             Self::UBX(ubx) => ubx.velocity(),
         }

@@ -1,4 +1,5 @@
-use crate::datastructures::measurement::distance::{CentiMeter, Distance};
+use crate::datastructures::measurement::distance::Distance;
+use crate::datastructures::measurement::unit::CentiMeter;
 
 const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;

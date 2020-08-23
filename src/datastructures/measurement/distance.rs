@@ -3,51 +3,6 @@ use core::marker::PhantomData;
 use core::ops::{Add, Mul, Sub};
 
 #[derive(Copy, Clone, Default, Debug)]
-pub struct CentiMeter;
-
-impl Into<i32> for CentiMeter {
-    fn into(self) -> i32 {
-        1
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct Feet;
-
-impl Into<i32> for Feet {
-    fn into(self) -> i32 {
-        330
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct Meter;
-
-impl Into<i32> for Meter {
-    fn into(self) -> i32 {
-        100
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct KiloMeter;
-
-impl Into<i32> for KiloMeter {
-    fn into(self) -> i32 {
-        100_000
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct NauticalMile;
-
-impl Into<i32> for NauticalMile {
-    fn into(self) -> i32 {
-        185_200
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
 pub struct Distance<T: Default + Copy + Clone, U> {
     value: T,
     unit: PhantomData<U>,

@@ -8,7 +8,8 @@ use nalgebra::Vector3;
 pub use latitude::Latitude;
 pub use longitude::Longitude;
 
-use crate::datastructures::measurement::distance::{CentiMeter, Distance, Meter};
+use crate::datastructures::measurement::distance::Distance;
+use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 use crate::datastructures::measurement::Altitude;
 
 use super::measurement::DEGREE_PER_DAG;
