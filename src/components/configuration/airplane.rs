@@ -2,7 +2,7 @@ use crate::components::event::OnEvent;
 use crate::components::mixer::ControlMixer;
 use crate::config;
 use crate::config::output::{Output, ServoType};
-use crate::datastructures::data_source::DataSource;
+use crate::datastructures::data_source::StaticData;
 use crate::datastructures::input::ControlInput;
 use crate::drivers::pwm::PwmByIdentifier;
 
@@ -19,7 +19,7 @@ impl<S, PWMS> Airplane<S, PWMS> {
     }
 }
 
-impl<PWMS: PwmByIdentifier, S: DataSource<ControlInput>> OnEvent for Airplane<S, PWMS> {
+impl<PWMS: PwmByIdentifier, S: StaticData<ControlInput>> OnEvent for Airplane<S, PWMS> {
     fn on_event(&mut self) {
         let input = self.mixer.mix();
         let outputs = &config::get().outputs.0;

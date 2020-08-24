@@ -8,7 +8,7 @@ use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
 use crate::datastructures::coordinate::{Position, SphericalCoordinate};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::{AgingStaticData, DataWriter, StaticData};
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
@@ -140,9 +140,9 @@ pub struct TelemetryUnit<A, B, C, G, IMU, NAV> {
     imu: IMU,
     navigation: NAV,
 
-    receiver: Option<Box<dyn DataSource<Receiver>>>,
-    control_input: Option<Box<dyn DataSource<ControlInput>>>,
-    gnss: Option<Box<dyn DataSource<FixType>>>,
+    receiver: Option<Box<dyn AgingStaticData<Receiver>>>,
+    control_input: Option<Box<dyn AgingStaticData<ControlInput>>>,
+    gnss: Option<Box<dyn AgingStaticData<FixType>>>,
 
     initial_altitude: Altitude,
     battery_cells: u8,
@@ -151,33 +151,35 @@ pub struct TelemetryUnit<A, B, C, G, IMU, NAV> {
 
 impl<A, B, C, G, IMU, NAV> Schedulable for TelemetryUnit<A, B, C, G, IMU, NAV>
 where
-    A: DataSource<(Altitude, Velocity<i16, Meter>)>,
-    B: DataSource<Battery>,
-    C: DataSource<Acceleration>,
-    G: DataSource<Gyro>,
-    IMU: DataSource<UnitQuaternion<f32>>,
-    NAV: DataSource<(Position, Steerpoint)>,
+    A: StaticData<(Altitude, Velocity<i16, Meter>)>,
+    B: StaticData<Battery>,
+    C: StaticData<Acceleration>,
+    G: StaticData<Gyro>,
+    IMU: StaticData<UnitQuaternion<f32>>,
+    NAV: StaticData<(Position, Steerpoint)>,
 {
     fn schedule(&mut self) -> bool {
-        let (altitude, velocity) = self.altimeter.read_last_unchecked();
+        let rate = self.rate();
+
+        let (altitude, velocity) = self.altimeter.read();
         if self.initial_altitude == Distance::default() {
             self.initial_altitude = altitude;
         }
-        let battery = self.battery.read_last_unchecked();
+        let battery = self.battery.read();
         if self.battery_cells == 0 {
             self.battery_cells = core::cmp::min(battery.0 / 4200 + 1, 8) as u8;
         }
 
-        let quaternion = self.imu.read_last_unchecked();
+        let quaternion = self.imu.read();
         let euler: Euler = quaternion.into();
         let euler = euler * DEGREE_PER_DAG;
-        let (position, steerpoint) = self.navigation.read_last_unchecked();
-        let input_option = self.control_input.as_ref().map(|i| i.read_last_unchecked());
+        let (position, steerpoint) = self.navigation.read();
+        let input_option = self.control_input.as_mut().map(|i| i.read(rate)).flatten();
         let heading = (-euler.psi) as isize;
 
-        let acceleration = self.accelerometer.read_last_unchecked();
-        let gyro = self.gyroscope.read_last_unchecked();
-        let fix_type = self.gnss.as_mut().map(|g| g.read_last_unchecked());
+        let acceleration = self.accelerometer.read();
+        let gyro = self.gyroscope.read();
+        let fix_type = self.gnss.as_mut().map(|g| g.read(rate)).flatten();
 
         let data = TelemetryData {
             attitude: euler.into(),
@@ -189,7 +191,7 @@ where
             battery: battery / self.battery_cells as u16,
             position,
             steerpoint,
-            receiver: self.receiver.as_ref().map(|r| r.read_last_unchecked()).unwrap_or_default(),
+            receiver: self.receiver.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
             raw: RawData { acceleration, gyro, quaternion, fix_type },
         };
@@ -230,19 +232,19 @@ impl<A, B, C, G, IMU, NAV> TelemetryUnit<A, B, C, G, IMU, NAV> {
         }
     }
 
-    pub fn set_receiver(&mut self, receiver: Box<dyn DataSource<Receiver>>) {
+    pub fn set_receiver(&mut self, receiver: Box<dyn AgingStaticData<Receiver>>) {
         self.receiver = Some(receiver)
     }
 
-    pub fn set_control_input(&mut self, input: Box<dyn DataSource<ControlInput>>) {
+    pub fn set_control_input(&mut self, input: Box<dyn AgingStaticData<ControlInput>>) {
         self.control_input = Some(input)
     }
 
-    pub fn set_gnss(&mut self, gnss: Box<dyn DataSource<FixType>>) {
+    pub fn set_gnss(&mut self, gnss: Box<dyn AgingStaticData<FixType>>) {
         self.gnss = Some(gnss)
     }
 
-    pub fn reader(&self) -> impl DataSource<TelemetryData> {
+    pub fn reader(&self) -> SingularDataSource<TelemetryData> {
         SingularDataSource::new(&self.telemetry)
     }
 }

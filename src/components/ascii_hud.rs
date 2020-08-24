@@ -7,7 +7,7 @@ use ascii_osd_hud::{AspectRatio, PixelRatio};
 
 use crate::components::telemetry::TelemetryData;
 use crate::datastructures::coordinate::{Displacement, SphericalCoordinate};
-use crate::datastructures::data_source::DataSource;
+use crate::datastructures::data_source::StaticData;
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::unit::Feet;
 use crate::datastructures::Ratio;
@@ -40,7 +40,7 @@ fn round_up(value: i16) -> i16 {
     (value + 5) / 10 * 10
 }
 
-impl<T: DataSource<TelemetryData>> AsciiHud<T> {
+impl<T: StaticData<TelemetryData>> AsciiHud<T> {
     pub fn new(telemetry: T, fov: u8, pixel_ratio: PixelRatio, aspect_ratio: AspectRatio) -> Self {
         let symbol_table: SymbolTable = enum_map! {
             Symbol::Antenna => 1,
@@ -69,7 +69,7 @@ impl<T: DataSource<TelemetryData>> AsciiHud<T> {
     }
 
     pub fn draw(&mut self) -> &Screen {
-        let data = self.telemetry.read_last_unchecked();
+        let data = self.telemetry.read();
 
         let altitude = data.altitude.to_unit(Feet);
         let height = data.height.to_unit(Feet);

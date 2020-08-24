@@ -6,7 +6,7 @@ use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, S
 use crate::components::event::Notify;
 use crate::config;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::input::ControlInput;
 use crate::datastructures::input::InputType;
 use crate::datastructures::input::Receiver;
@@ -40,11 +40,11 @@ impl SbusReceiver {
         }
     }
 
-    pub fn as_receiver(&self) -> impl DataSource<Receiver> {
+    pub fn as_receiver(&self) -> SingularDataSource<Receiver> {
         SingularDataSource::new(&self.receiver)
     }
 
-    pub fn as_control_input(&self) -> impl DataSource<ControlInput> {
+    pub fn as_control_input(&self) -> SingularDataSource<ControlInput> {
         SingularDataSource::new(&self.control_input)
     }
 

@@ -6,7 +6,7 @@ use core::mem::transmute;
 
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{CentiMeter, MilliMeter};
@@ -54,23 +54,23 @@ impl UBXDecoder {
         }
     }
 
-    pub fn fix_type(&self) -> impl DataSource<FixType> {
+    pub fn fix_type(&self) -> SingularDataSource<FixType> {
         SingularDataSource::new(&self.fix_type)
     }
 
-    pub fn position(&self) -> impl DataSource<Position> {
+    pub fn position(&self) -> SingularDataSource<Position> {
         SingularDataSource::new(&self.position)
     }
 
-    pub fn velocity(&self) -> impl DataSource<[Velocity<i32, MilliMeter>; 3]> {
+    pub fn velocity(&self) -> SingularDataSource<[Velocity<i32, MilliMeter>; 3]> {
         SingularDataSource::new(&self.velocity)
     }
 
-    pub fn course(&self) -> impl DataSource<Course> {
+    pub fn course(&self) -> SingularDataSource<Course> {
         SingularDataSource::new(&self.course)
     }
 
-    pub fn heading(&self) -> impl DataSource<HeadingOrCourse> {
+    pub fn heading(&self) -> SingularDataSource<HeadingOrCourse> {
         SingularDataSource::new(&self.heading)
     }
 
@@ -182,7 +182,7 @@ impl UBXDecoder {
 mod test {
     #[test]
     fn test_message() {
-        use crate::datastructures::data_source::DataSource;
+        use crate::datastructures::data_source::OptionData;
         use crate::drivers::gnss::ubx::message::Message;
 
         use super::NavPositionVelocityTime;
@@ -204,6 +204,6 @@ mod test {
         let mut position = decoder.position();
         decoder.handle(&message[0..64], false);
         decoder.handle(&message[64..message.len()], false);
-        assert_eq!(position.read_last().is_some(), true);
+        assert_eq!(position.read().is_some(), true);
     }
 }

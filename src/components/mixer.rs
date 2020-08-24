@@ -1,10 +1,11 @@
 use alloc::boxed::Box;
 
-use crate::datastructures::data_source::DataSource;
-use crate::datastructures::input::ControlInput;
+use crate::datastructures::data_source::{AgingStaticData, StaticData};
+use crate::datastructures::input::ControlInput as Input;
 
 pub struct ControlMixer<S> {
-    receiver: Box<dyn DataSource<ControlInput>>,
+    receiver: Box<dyn AgingStaticData<Input>>,
+    receiver_max_age: usize,
     stabilizer: S,
     stablizer_limit: u8,
     // TODO: autopilot
@@ -22,18 +23,18 @@ fn limit_i16(value: i16, limit: u8) -> i16 {
     }
 }
 
-impl<S: DataSource<ControlInput>> ControlMixer<S> {
-    pub fn new(receiver: Box<dyn DataSource<ControlInput>>, stabilizer: S) -> Self {
-        Self { receiver, stabilizer, stablizer_limit: 30 }
+impl<S: StaticData<Input>> ControlMixer<S> {
+    pub fn new(receiver: Box<dyn AgingStaticData<Input>>, age: usize, stabilizer: S) -> Self {
+        Self { receiver, receiver_max_age: age, stabilizer, stablizer_limit: 30 }
     }
 
     pub fn set_stabilizer_limit(&mut self, limit: u8) {
         self.stablizer_limit = limit;
     }
 
-    pub fn mix(&mut self) -> ControlInput {
-        let mut input = self.receiver.read_last_unchecked();
-        let stabilizer = self.stabilizer.read_last_unchecked();
+    pub fn mix(&mut self) -> Input {
+        let mut input = self.receiver.read(self.receiver_max_age).unwrap_or_default();
+        let stabilizer = self.stabilizer.read();
 
         if input.roll > 0 && stabilizer.roll < 0 || input.roll < 0 && stabilizer.roll > 0 {
             input.roll += limit_i16(stabilizer.roll, self.stablizer_limit);

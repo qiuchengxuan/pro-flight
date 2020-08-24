@@ -9,7 +9,7 @@ use rs_flight::components::ascii_hud::AsciiHud;
 use rs_flight::components::schedule::{Rate, Schedulable};
 use rs_flight::components::telemetry::TelemetryData;
 use rs_flight::config;
-use rs_flight::datastructures::data_source::DataSource;
+use rs_flight::datastructures::data_source::StaticData;
 use rs_flight::datastructures::Ratio;
 use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::init as max7456_init;
@@ -127,7 +127,7 @@ impl Schedulable for BaroScheduler {
 
 pub struct OSDScheduler<T>(AsciiHud<T>);
 
-impl<T: DataSource<TelemetryData>> Schedulable for OSDScheduler<T> {
+impl<T: StaticData<TelemetryData>> Schedulable for OSDScheduler<T> {
     fn rate(&self) -> Rate {
         50
     }
@@ -154,7 +154,7 @@ pub fn init<'a, CRC: Hasher32>(
     chip_selects: (PA15<Input<Floating>>, PB3<Input<Floating>>),
     crc: &mut CRC,
     clocks: Clocks,
-    telemetry: impl DataSource<TelemetryData>,
+    telemetry: impl StaticData<TelemetryData>,
 ) -> Result<(impl Schedulable, impl Schedulable), Error> {
     let cs_osd = chip_selects.0.into_push_pull_output();
     let cs_baro = chip_selects.1.into_push_pull_output();

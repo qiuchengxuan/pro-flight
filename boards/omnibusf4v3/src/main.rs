@@ -61,7 +61,7 @@ use rs_flight::{
     },
     config::{self, aircraft::Configuration, Config, SerialConfig},
     datastructures::{
-        data_source::{DataSource, NoDataSource},
+        data_source::{AgingStaticData, NoDataSource, StaticData},
         input::ControlInput,
     },
     drivers::{
@@ -86,6 +86,7 @@ use stm32f4xx_hal::{
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
 const LOG_BUFFER_SIZE: usize = 1024;
+const SERVO_SCHEDULE_RATE: usize = 50;
 
 #[link_section = ".uninit.STACKS"]
 #[link_section = ".ccmram"]
@@ -242,7 +243,7 @@ fn main() -> ! {
 
     let mut led = gpio_b.pb5.into_push_pull_output();
 
-    let mut control_input: Box<dyn DataSource<ControlInput>> = Box::new(NoDataSource::new());
+    let mut control_input: Box<dyn AgingStaticData<ControlInput>> = Box::new(NoDataSource::new());
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
         control_input = Box::new(sbus.as_control_input());
     }
@@ -251,7 +252,7 @@ fn main() -> ! {
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = pwm::init(tims, pins, clocks, &config.outputs);
-    let mixer = ControlMixer::new(control_input, NoDataSource::new());
+    let mixer = ControlMixer::new(control_input, SERVO_SCHEDULE_RATE, NoDataSource::new());
     let control_surface = match config.aircraft.configuration {
         Configuration::Airplane => Airplane::new(mixer, pwms),
     };
@@ -301,8 +302,8 @@ fn main() -> ! {
         sbus.set_notify(Box::new(trigger.clone()));
     }
 
-    let telemetry_source = telemetry.reader();
-    let schedule_trigger = SchedulableEvent::new(trigger, 50);
+    let mut telemetry_source = telemetry.reader();
+    let schedule_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
     let tasks = (schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd);
     let group = Scheduler::new(tasks, 100);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
@@ -331,7 +332,7 @@ fn main() -> ! {
                     writeln!(serial, "Used: {}, free: {}", ALLOCATOR.used(), ALLOCATOR.free()).ok();
                 }
                 Some("telemetry") => {
-                    writeln!(serial, "{}", telemetry_source.read_last_unchecked()).ok();
+                    writeln!(serial, "{}", StaticData::read(&mut telemetry_source)).ok();
                 }
                 _ => return false,
             }

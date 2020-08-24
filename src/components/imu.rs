@@ -10,7 +10,7 @@ use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData, WithCapacity};
 use crate::datastructures::measurement::{
     Acceleration, Axes, Gyro, Heading, HeadingOrCourse, DEGREE_PER_DAG,
 };
@@ -19,7 +19,7 @@ pub struct IMU<A, G> {
     accelerometer: A,
     gyroscope: G,
 
-    heading: Option<Box<dyn DataSource<HeadingOrCourse>>>,
+    heading: Option<Box<dyn AgingStaticData<HeadingOrCourse>>>,
 
     ahrs: Mahony<f32>,
     accelerometer_bias: Axes,
@@ -33,11 +33,7 @@ pub struct IMU<A, G> {
     gyro: Rc<SingularData<Gyro>>,
 }
 
-impl<A, G> IMU<A, G>
-where
-    A: DataSource<Acceleration>,
-    G: DataSource<Gyro>,
-{
+impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> {
     pub fn new(accelerometer: A, gyroscope: G, sample_rate: u16) -> Self {
         let size = accelerometer.capacity();
         let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(1.0, 0.0, 0.0, 0.0));
@@ -61,7 +57,7 @@ where
         }
     }
 
-    pub fn set_heading(&mut self, heading: Box<dyn DataSource<HeadingOrCourse>>) {
+    pub fn set_heading(&mut self, heading: Box<dyn AgingStaticData<HeadingOrCourse>>) {
         self.heading = Some(heading);
     }
 
@@ -69,15 +65,15 @@ where
         self.calibration_loop = value;
     }
 
-    pub fn as_accelerometer(&self) -> impl DataSource<Acceleration> {
+    pub fn as_accelerometer(&self) -> OverwritingDataSource<Acceleration> {
         OverwritingDataSource::new(&self.acceleration)
     }
 
-    pub fn as_imu(&self) -> impl DataSource<UnitQuaternion<f32>> {
+    pub fn as_imu(&self) -> OverwritingDataSource<UnitQuaternion<f32>> {
         OverwritingDataSource::new(&self.quaternion)
     }
 
-    pub fn as_gyroscope(&self) -> impl DataSource<Gyro> {
+    pub fn as_gyroscope(&self) -> SingularDataSource<Gyro> {
         SingularDataSource::new(&self.gyro)
     }
 
@@ -118,7 +114,7 @@ where
     }
 }
 
-impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G> {
+impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulable for IMU<A, G> {
     fn rate(&self) -> Rate {
         50
     }
@@ -128,15 +124,16 @@ impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G>
             while let Some(gyro) = self.gyroscope.read() {
                 self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
             }
-            self.accelerometer.read_last_unchecked();
+            self.accelerometer.read();
             self.calibrated = self.counter >= self.calibration_loop as usize;
             self.counter += 1;
             return true;
         }
+        let rate = self.rate();
         while let Some(gyro) = self.gyroscope.read() {
             let acceleration = self.accelerometer.read().unwrap();
             #[rustfmt::skip]
-            let option = self.heading.as_mut().map(|h| h.read()).flatten()
+            let option = self.heading.as_mut().map(|h| h.read(rate)).flatten()
                 .map(|h| self.heading_as_magnitism(h.into())).flatten();
             self.update_imu(&acceleration, &gyro, option);
         }

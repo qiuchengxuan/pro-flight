@@ -6,7 +6,7 @@ use core::num::Wrapping;
 use core::str::from_utf8_unchecked;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{DataSource, DataWriter};
+use super::{DataWriter, OptionData, StaticData, WithCapacity};
 use crate::hal::io;
 
 pub struct OverwritingData<T> {
@@ -56,7 +56,14 @@ impl<T> OverwritingDataSource<T> {
     }
 }
 
-impl<T: Copy + Clone> DataSource<T> for OverwritingDataSource<T> {
+impl<T> WithCapacity for OverwritingDataSource<T> {
+    fn capacity(&self) -> usize {
+        let buffer = unsafe { &*self.ring.buffer.get() };
+        buffer.len()
+    }
+}
+
+impl<T: Copy + Clone> OptionData<T> for OverwritingDataSource<T> {
     fn read(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
         let mut written = self.ring.written.load(Ordering::Relaxed);
@@ -79,26 +86,13 @@ impl<T: Copy + Clone> DataSource<T> for OverwritingDataSource<T> {
             self.read = self.read.wrapping_add(1);
         }
     }
+}
 
-    fn read_last(&mut self) -> Option<T> {
-        let written = self.ring.written.load(Ordering::Relaxed);
-        if written.wrapping_sub(self.read) == 0 {
-            return None;
-        }
-        self.read = written;
-        let buffer = unsafe { &*self.ring.buffer.get() };
-        Some(buffer[written.wrapping_sub(1) % buffer.len()])
-    }
-
-    fn read_last_unchecked(&self) -> T {
+impl<T: Copy> StaticData<T> for OverwritingDataSource<T> {
+    fn read(&mut self) -> T {
         let buffer = unsafe { &*self.ring.buffer.get() };
         let written = self.ring.written.load(Ordering::Relaxed);
         buffer[written.wrapping_sub(1) % buffer.len()]
-    }
-
-    fn capacity(&self) -> usize {
-        let buffer = unsafe { &*self.ring.buffer.get() };
-        buffer.len()
     }
 }
 
@@ -188,9 +182,8 @@ mod test {
     #[test]
     fn test_ring_buffer() {
         use alloc::rc::Rc;
-        use core::sync::atomic::Ordering;
 
-        use super::{DataSource, DataWriter, OverwritingData, OverwritingDataSource};
+        use super::{DataWriter, OptionData, OverwritingData, OverwritingDataSource};
 
         let ring: Rc<OverwritingData<usize>> = Rc::new(OverwritingData::sized(32));
         let mut reader = OverwritingDataSource::new(&ring);
@@ -209,10 +202,21 @@ mod test {
 
         assert_eq!(reader.read(), Some(1));
         assert_eq!(reader.read(), Some(2));
+    }
+
+    #[test]
+    fn test_ring_buffer_as_static() {
+        use alloc::rc::Rc;
+        use core::sync::atomic::Ordering;
+
+        use super::{DataWriter, OverwritingData, OverwritingDataSource, StaticData};
+
+        let ring: Rc<OverwritingData<usize>> = Rc::new(OverwritingData::sized(32));
+        let mut reader = OverwritingDataSource::new(&ring);
 
         ring.write.store(usize::MAX, Ordering::Relaxed);
         ring.write(10010);
         ring.write(10086);
-        assert_eq!(reader.read_last(), Some(10086));
+        assert_eq!(reader.read(), 10086);
     }
 }

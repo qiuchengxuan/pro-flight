@@ -2,7 +2,7 @@ pub mod ubx;
 
 use crate::config::serial::GNSSProtocol;
 use crate::datastructures::coordinate::Position;
-use crate::datastructures::data_source::DataSource;
+use crate::datastructures::data_source::singular::SingularDataSource;
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::unit::MilliMeter;
 use crate::datastructures::measurement::{Course, HeadingOrCourse, Velocity};
@@ -20,31 +20,31 @@ impl GNSS {
         }
     }
 
-    pub fn fix_type(&self) -> impl DataSource<FixType> {
+    pub fn fix_type(&self) -> SingularDataSource<FixType> {
         match self {
             Self::UBX(ubx) => ubx.fix_type(),
         }
     }
 
-    pub fn position(&self) -> impl DataSource<Position> {
+    pub fn position(&self) -> SingularDataSource<Position> {
         match self {
             Self::UBX(ubx) => ubx.position(),
         }
     }
 
-    pub fn velocity(&self) -> impl DataSource<[Velocity<i32, MilliMeter>; 3]> {
+    pub fn velocity(&self) -> SingularDataSource<[Velocity<i32, MilliMeter>; 3]> {
         match self {
             Self::UBX(ubx) => ubx.velocity(),
         }
     }
 
-    pub fn heading(&self) -> impl DataSource<HeadingOrCourse> {
+    pub fn heading(&self) -> SingularDataSource<HeadingOrCourse> {
         match self {
             Self::UBX(ubx) => ubx.heading(),
         }
     }
 
-    pub fn course(&self) -> impl DataSource<Course> {
+    pub fn course(&self) -> SingularDataSource<Course> {
         match self {
             Self::UBX(ubx) => ubx.course(),
         }

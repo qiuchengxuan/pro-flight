@@ -2,7 +2,7 @@ use alloc::rc::Rc;
 use core::marker::PhantomData;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use super::{DataSource, DataWriter};
+use super::{DataWriter, OptionData, StaticData};
 
 pub struct U16Data<T> {
     value: AtomicU32,
@@ -33,27 +33,20 @@ impl<T> U16DataSource<T> {
     }
 }
 
-impl<T: From<u16>> DataSource<T> for U16DataSource<T> {
-    fn capacity(&self) -> usize {
-        1
+impl<T: From<u16>> StaticData<T> for U16DataSource<T> {
+    fn read(&mut self) -> T {
+        (self.data.value.load(Ordering::Relaxed) as u16).into()
     }
+}
 
+impl<T: From<u16>> OptionData<T> for U16DataSource<T> {
     fn read(&mut self) -> Option<T> {
         let value = self.data.value.load(Ordering::Relaxed);
-        if (value >> 16) as u16 == self.counter {
-            None
-        } else {
-            self.counter += 1;
-            Some((value as u16).into())
+        let written = (value >> 16) as u16;
+        if self.counter == written {
+            return None;
         }
-    }
-
-    fn read_last(&mut self) -> Option<T> {
-        self.read()
-    }
-
-    fn read_last_unchecked(&self) -> T {
-        let value = self.data.value.load(Ordering::Relaxed);
-        (value as u16).into()
+        self.counter = written;
+        Some((value as u16).into())
     }
 }

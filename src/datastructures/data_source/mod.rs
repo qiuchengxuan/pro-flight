@@ -4,11 +4,20 @@ pub trait DataWriter<T> {
     fn write(&self, t: T);
 }
 
-pub trait DataSource<T> {
+pub trait WithCapacity {
     fn capacity(&self) -> usize;
+}
+
+pub trait OptionData<T> {
     fn read(&mut self) -> Option<T>;
-    fn read_last(&mut self) -> Option<T>;
-    fn read_last_unchecked(&self) -> T;
+}
+
+pub trait StaticData<T> {
+    fn read(&mut self) -> T;
+}
+
+pub trait AgingStaticData<T> {
+    fn read(&mut self, max_age: usize) -> Option<T>;
 }
 
 pub struct NoDataSource<T> {
@@ -21,21 +30,27 @@ impl<T> NoDataSource<T> {
     }
 }
 
-impl<T: Default> DataSource<T> for NoDataSource<T> {
+impl<T> WithCapacity for NoDataSource<T> {
     fn capacity(&self) -> usize {
         0
     }
+}
 
+impl<T> OptionData<T> for NoDataSource<T> {
     fn read(&mut self) -> Option<T> {
         None
     }
+}
 
-    fn read_last(&mut self) -> Option<T> {
-        None
-    }
-
-    fn read_last_unchecked(&self) -> T {
+impl<T: Default> StaticData<T> for NoDataSource<T> {
+    fn read(&mut self) -> T {
         T::default()
+    }
+}
+
+impl<T: Default> AgingStaticData<T> for NoDataSource<T> {
+    fn read(&mut self, _: usize) -> Option<T> {
+        None
     }
 }
 

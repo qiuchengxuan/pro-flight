@@ -7,7 +7,7 @@ use bmp280::registers::{PressureOversampling, StandbyTime, TemperatureOversampli
 use bmp280::{Mode, BMP280};
 
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::measurement::Pressure;
 use crate::sys::timer::SysTimer;
 
@@ -26,7 +26,7 @@ pub unsafe fn on_dma_receive(dma_buffer: &[u8; 8]) {
     }
 }
 
-pub fn init_data_source() -> impl DataSource<Pressure> {
+pub fn init_data_source() -> OverwritingDataSource<Pressure> {
     unsafe { BUFFER = Some(OverwritingData::sized(8)) };
     let buffer = unsafe { &Rc::from_raw(BUFFER.as_ref().unwrap()) };
     core::mem::forget(buffer);

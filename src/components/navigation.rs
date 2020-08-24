@@ -8,7 +8,7 @@ use crate::alloc;
 use crate::components::schedule::{Rate, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
-use crate::datastructures::data_source::{DataSource, DataWriter};
+use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData, StaticData};
 use crate::datastructures::measurement::unit::Meter;
 use crate::datastructures::measurement::{Acceleration, Altitude, Velocity};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
@@ -21,8 +21,8 @@ const GRAVITY: f32 = 9.80665;
 pub struct Navigation<IMU, A> {
     imu: IMU,
     accelerometer: A,
-    gnss: Option<Box<dyn DataSource<Position>>>,
-    altimeter: Option<Box<dyn DataSource<(Altitude, Velocity<i16, Meter>)>>>,
+    gnss: Option<Box<dyn AgingStaticData<Position>>>,
+    altimeter: Option<Box<dyn StaticData<(Altitude, Velocity<i16, Meter>)>>>,
     waypoints: [Waypoint; MAX_WAYPOINT],
     offset: (f32, f32, f32),
     displacements: [Displacement; MAX_WAYPOINT],
@@ -33,11 +33,7 @@ pub struct Navigation<IMU, A> {
     time: f32,
 }
 
-impl<IMU, A> Navigation<IMU, A>
-where
-    IMU: DataSource<UnitQuaternion<f32>>,
-    A: DataSource<Acceleration>,
-{
+impl<IMU: OptionData<UnitQuaternion<f32>>, A: OptionData<Acceleration>> Navigation<IMU, A> {
     pub fn new(imu: IMU, accelerometer: A, interval: f32) -> Self {
         Self {
             imu,
@@ -55,17 +51,17 @@ where
         }
     }
 
-    pub fn reader(&self) -> impl DataSource<(Position, Steerpoint)> {
+    pub fn reader(&self) -> SingularDataSource<(Position, Steerpoint)> {
         SingularDataSource::new(&self.output)
     }
 
-    pub fn set_gnss(&mut self, gnss: Box<dyn DataSource<Position>>) {
+    pub fn set_gnss(&mut self, gnss: Box<dyn AgingStaticData<Position>>) {
         self.gnss = Some(gnss)
     }
 
     pub fn set_altimeter(
         &mut self,
-        altimeter: Box<dyn DataSource<(Altitude, Velocity<i16, Meter>)>>,
+        altimeter: Box<dyn StaticData<(Altitude, Velocity<i16, Meter>)>>,
     ) {
         self.altimeter = Some(altimeter)
     }
@@ -88,15 +84,17 @@ where
 
 impl<IMU, A> Schedulable for Navigation<IMU, A>
 where
-    IMU: DataSource<UnitQuaternion<f32>>,
-    A: DataSource<Acceleration>,
+    IMU: OptionData<UnitQuaternion<f32>>,
+    A: OptionData<Acceleration>,
 {
     fn rate(&self) -> Rate {
         50
     }
 
     fn schedule(&mut self) -> bool {
-        if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read_last()).flatten() {
+        let rate = self.rate();
+        let gnss = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten();
+        if let Some(position) = gnss {
             if self.waypoints[HOME].position.latitude == 0 {
                 self.waypoints[HOME].position = position;
             }
@@ -114,7 +112,7 @@ where
             // TODO: add speed data source or runge-kutta won't properly work
             offset.0 = runge_kutta4(|_, dt| ax * dt, offset.0, t, dt);
             offset.1 = runge_kutta4(|_, dt| ay * dt, offset.1, t, dt);
-            let altimeter = self.altimeter.as_mut().map(|a| a.read_last()).flatten();
+            let altimeter = self.altimeter.as_mut().map(|a| a.read());
             if let Some((altitude, _)) = altimeter {
                 if self.waypoints[HOME].position.altitude.is_zero() {
                     self.waypoints[HOME].position.altitude = altitude;
