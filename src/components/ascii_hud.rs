@@ -6,10 +6,12 @@ use ascii_osd_hud::telemetry::{Notes, Steerpoint, Telemetry, Unit};
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
 use crate::components::telemetry::TelemetryData;
-use crate::datastructures::coordinate::{Displacement, SphericalCoordinate};
+use crate::datastructures::coordinate::SphericalCoordinate;
 use crate::datastructures::data_source::StaticData;
 use crate::datastructures::gnss::FixType;
-use crate::datastructures::measurement::unit::Feet;
+use crate::datastructures::measurement::displacement::DistanceVector;
+use crate::datastructures::measurement::unit::{Feet, Knot, Meter};
+use crate::datastructures::measurement::VelocityVector;
 use crate::datastructures::Ratio;
 
 type Screen = [[u8; 29]; 15];
@@ -73,16 +75,27 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
 
         let altitude = data.altitude.to_unit(Feet);
         let height = data.height.to_unit(Feet);
-        let delta = data.steerpoint.waypoint.position - data.position;
-        let vector = data.raw.quaternion.inverse_transform_vector(&delta.into_f32_vector());
-        let transformed: Displacement = (vector[0], vector[1], vector[2]).into();
-        let coordinate: SphericalCoordinate = transformed.into();
+        let delta = (data.steerpoint.waypoint.position - data.position).convert(|v| v as f32);
+        let vector = data.raw.quaternion.inverse_transform_vector(&delta.to_unit(Meter).into());
+        let transformed: DistanceVector<f32, Meter> = vector.into();
+        let coordinate: SphericalCoordinate<Meter> = (transformed * 10.0).into();
         let steerpoint = Steerpoint {
             number: data.steerpoint.index,
             name: data.steerpoint.waypoint.name,
             heading: delta.azimuth(),
             coordinate: coordinate.into(),
         };
+
+        let vector = data.raw.quaternion.inverse_transform_vector(&data.raw.speed_vector.into());
+        let vector: VelocityVector<f32, Meter> = vector.into();
+        let speed_vector: SphericalCoordinate<Knot> = vector.to_unit(Knot).into();
+
+        let mut aoa = data.attitude.pitch.wrapping_sub((speed_vector.phi as i16) * 10);
+        if aoa > i8::MAX as i16 {
+            aoa = i8::MAX as i16;
+        } else if aoa < i8::MIN as i16 {
+            aoa = i8::MIN as i16;
+        }
 
         let mut note_buffer = [0u8; 30];
         let mut index = 0;
@@ -95,18 +108,36 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
         let note_left = unsafe { core::str::from_utf8_unchecked(&note_buffer[..index]) };
         let hud_telemetry = Telemetry {
             altitude: round_up(altitude.value() as i16),
+            aoa: aoa as i8,
             attitude: data.attitude.into(),
             battery: data.battery.percentage(),
             heading: data.heading,
             g_force: data.g_force,
             height: height.value() as i16,
-            unit: Unit::Aviation,
-            vario: data.velocity.value() / 100 * 100,
-            steerpoint: steerpoint,
             notes: Notes { left: note_left, center: "", right: "" },
-            ..Default::default()
+            rssi: data.receiver.rssi,
+            unit: Unit::Aviation,
+            speed_vector: speed_vector.into(),
+            vario: data.vario as i16 / 100 * 100,
+            steerpoint: steerpoint,
         };
         self.hud.draw(&hud_telemetry, self.screen.as_mut());
         &self.screen
+    }
+}
+
+mod test {
+    #[test]
+    fn test_speed_vector() {
+        use ascii_osd_hud::telemetry as hud;
+
+        use crate::datastructures::coordinate::SphericalCoordinate;
+        use crate::datastructures::measurement::unit::{Knot, Meter};
+        use crate::datastructures::measurement::VelocityVector;
+
+        let vector: VelocityVector<f32, Meter> = VelocityVector::new(10.0, 10.0, 10.0, Meter);
+        let speed_vector: SphericalCoordinate<Knot> = vector.to_unit(Knot).into();
+        let vector: hud::SphericalCoordinate = speed_vector.into();
+        assert_eq!(vector, hud::SphericalCoordinate { rho: 33, theta: 45, phi: 36 });
     }
 }

@@ -1,4 +1,3 @@
-use core::mem::MaybeUninit;
 use core::ptr::{read_volatile, write_volatile};
 
 const DFU_ARM: usize = 0x4446550A;
@@ -7,7 +6,7 @@ pub struct Dfu(usize);
 
 impl Dfu {
     pub fn new() -> Self {
-        unsafe { MaybeUninit::uninit().assume_init() }
+        Self(0)
     }
 
     #[inline(never)]

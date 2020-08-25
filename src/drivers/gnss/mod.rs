@@ -5,7 +5,7 @@ use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::SingularDataSource;
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::unit::MilliMeter;
-use crate::datastructures::measurement::{Course, HeadingOrCourse, Velocity};
+use crate::datastructures::measurement::{Course, HeadingOrCourse, VelocityVector};
 
 use ubx::UBXDecoder;
 
@@ -32,7 +32,7 @@ impl GNSS {
         }
     }
 
-    pub fn velocity(&self) -> SingularDataSource<[Velocity<i32, MilliMeter>; 3]> {
+    pub fn velocity(&self) -> SingularDataSource<VelocityVector<i32, MilliMeter>> {
         match self {
             Self::UBX(ubx) => ubx.velocity(),
         }

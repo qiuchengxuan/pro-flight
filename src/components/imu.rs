@@ -11,9 +11,8 @@ use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData, WithCapacity};
-use crate::datastructures::measurement::{
-    Acceleration, Axes, Gyro, Heading, HeadingOrCourse, DEGREE_PER_DAG,
-};
+use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
+use crate::datastructures::measurement::{Acceleration, Axes, Gyro, Heading, HeadingOrCourse};
 
 pub struct IMU<A, G> {
     accelerometer: A,
@@ -28,7 +27,7 @@ pub struct IMU<A, G> {
     calibration_loop: u16,
     counter: usize,
     calibrated: bool,
-    acceleration: Rc<OverwritingData<Acceleration>>,
+    acceleration: Rc<OverwritingData<Vector3<f32>>>,
     quaternion: Rc<OverwritingData<UnitQuaternion<f32>>>,
     gyro: Rc<SingularData<Gyro>>,
 }
@@ -36,6 +35,7 @@ pub struct IMU<A, G> {
 impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> {
     pub fn new(accelerometer: A, gyroscope: G, sample_rate: u16) -> Self {
         let size = accelerometer.capacity();
+        let acceleration = Vector3::<f32>::new(0.0, 0.0, 0.0);
         let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(1.0, 0.0, 0.0, 0.0));
         let config = &config::get().accelerometer;
         Self {
@@ -51,7 +51,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
             calibration_loop: 50,
             counter: 0,
             calibrated: false,
-            acceleration: Rc::new(OverwritingData::sized(size)),
+            acceleration: Rc::new(OverwritingData::new(vec![acceleration; size])),
             quaternion: Rc::new(OverwritingData::new(vec![unit; size])),
             gyro: Rc::new(SingularData::default()),
         }
@@ -65,7 +65,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         self.calibration_loop = value;
     }
 
-    pub fn as_accelerometer(&self) -> OverwritingDataSource<Acceleration> {
+    pub fn as_accelerometer(&self) -> OverwritingDataSource<Vector3<f32>> {
         OverwritingDataSource::new(&self.acceleration)
     }
 
@@ -94,11 +94,9 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
 
     pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro, mag: Option<Vector3<f32>>) {
         let acceleration = accel.calibrated(&self.accelerometer_bias, &self.accelerometer_gain);
-        let gyro = gyro.calibrated(&self.gyro_bias);
-        self.acceleration.write(acceleration);
-        self.gyro.write(gyro);
+        let raw_gyro = gyro.calibrated(&self.gyro_bias);
 
-        let mut gyro: Vector3<f32> = gyro.into();
+        let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
 
         let result = if let Some(magnetism) = mag {
@@ -108,7 +106,14 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         };
 
         match result {
-            Ok(&quaternion) => self.quaternion.write(UnitQuaternion::new_normalize(quaternion)),
+            Ok(&quaternion) => {
+                let unit_quaternion = UnitQuaternion::new_normalize(quaternion);
+                let mut acceleration = unit_quaternion.transform_vector(&acceleration.0.into());
+                acceleration[2] = -acceleration[2];
+                self.acceleration.write(acceleration);
+                self.gyro.write(raw_gyro);
+                self.quaternion.write(unit_quaternion);
+            }
             Err(_) => (),
         }
     }
@@ -130,12 +135,16 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
             return true;
         }
         let rate = self.rate();
-        while let Some(gyro) = self.gyroscope.read() {
-            let acceleration = self.accelerometer.read().unwrap();
-            #[rustfmt::skip]
-            let option = self.heading.as_mut().map(|h| h.read(rate)).flatten()
-                .map(|h| self.heading_as_magnitism(h.into())).flatten();
-            self.update_imu(&acceleration, &gyro, option);
+        if let Some(heading) = self.heading.as_mut().map(|h| h.read(rate)).flatten() {
+            while let Some(gyro) = self.gyroscope.read() {
+                let acceleration = self.accelerometer.read().unwrap();
+                self.update_imu(&acceleration, &gyro, self.heading_as_magnitism(heading.into()));
+            }
+        } else {
+            while let Some(gyro) = self.gyroscope.read() {
+                let acceleration = self.accelerometer.read().unwrap();
+                self.update_imu(&acceleration, &gyro, None);
+            }
         }
         true
     }

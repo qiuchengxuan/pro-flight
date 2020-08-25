@@ -1,18 +1,16 @@
-use integer_sqrt::IntegerSquareRoot;
-#[allow(unused_imports)] // false warning
-use micromath::F32Ext;
 use nalgebra::Vector3;
 
 pub mod battery;
+pub mod displacement;
 pub mod distance;
 pub mod euler;
 pub mod unit;
 
-pub use distance::Distance;
-pub use euler::DEGREE_PER_DAG;
-pub use unit::CentiMeter;
+use distance::Distance;
+use unit::CentiMeter;
 
-pub type Velocity<T, U> = Distance<T, U>;
+pub type Velocity<T, U> = distance::Distance<T, U>;
+pub type VelocityVector<T, U> = displacement::DistanceVector<T, U>;
 
 pub type Temperature = i16;
 pub type Altitude = Distance<i32, CentiMeter>;
@@ -124,10 +122,12 @@ impl Default for Measurement {
     }
 }
 
+pub const GRAVITY: f32 = 9.80665;
+
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Acceleration(pub Measurement);
 
-impl sval::value::Value for Acceleration {
+impl sval::Value for Acceleration {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
         self.0.stream(stream)
     }
@@ -140,20 +140,6 @@ impl Acceleration {
     }
 }
 
-impl Acceleration {
-    pub fn g_force(&self) -> u8 {
-        let axes = self.0.axes;
-        let (x, y, z) = (axes.x, axes.y, axes.z);
-        let square_sum = x * x + y * y + z * z;
-        if square_sum > 0 {
-            let g_force = square_sum.integer_sqrt();
-            (g_force * 10 / self.0.sensitive) as u8
-        } else {
-            0
-        }
-    }
-}
-
 pub type Gyro = Measurement;
 
 #[derive(Copy, Clone, Default)]
@@ -161,6 +147,6 @@ pub struct Pressure(pub u32); // unit of Pa
 
 impl Into<Altitude> for Pressure {
     fn into(self) -> Altitude {
-        Distance::new(((1013_25 - self.0 as isize) * 82 / 10) as i32, CentiMeter::default())
+        Distance::new(((1013_25 - self.0 as isize) * 82 / 10) as i32, CentiMeter)
     }
 }

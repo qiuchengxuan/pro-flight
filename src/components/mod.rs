@@ -11,6 +11,7 @@ pub mod monitor;
 pub mod navigation;
 pub mod panic;
 pub mod schedule;
+pub mod speedometer;
 pub mod telemetry;
 
 pub use imu::IMU;

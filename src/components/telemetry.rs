@@ -2,7 +2,9 @@ use alloc::boxed::Box;
 use alloc::rc::Rc;
 
 use ascii_osd_hud::telemetry as hud;
-use nalgebra::{Quaternion, UnitQuaternion};
+#[allow(unused_imports)] // false warning
+use micromath::F32Ext;
+use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
 use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
@@ -12,26 +14,25 @@ use crate::datastructures::data_source::{AgingStaticData, DataWriter, StaticData
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
-use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
-use crate::datastructures::measurement::unit::{Meter, NauticalMile};
-use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, Velocity};
+use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
+use crate::datastructures::measurement::{Altitude, Gyro, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
 
 #[derive(Debug, Default, Copy, Clone, Value)]
 pub struct Attitude {
-    roll: i16,
-    pitch: i8,
+    pub roll: i16,
+    pub pitch: i16,
 }
 
 impl From<Euler> for Attitude {
     fn from(euler: Euler) -> Self {
-        let roll = -euler.theta as i16;
-        let mut pitch = -euler.phi as i8;
-        if pitch > 90 {
-            pitch = 90
-        } else if pitch < -90 {
-            pitch = -90
+        let roll = (-euler.theta * 10.0) as i16;
+        let mut pitch = (-euler.phi * 10.0) as i16;
+        if pitch > 90_0 {
+            pitch = 90_0
+        } else if pitch < -90_0 {
+            pitch = -90_0
         };
         Self { roll, pitch }
     }
@@ -39,80 +40,69 @@ impl From<Euler> for Attitude {
 
 impl Into<hud::Attitude> for Attitude {
     fn into(self) -> hud::Attitude {
-        hud::Attitude { pitch: self.pitch, roll: self.roll }
+        hud::Attitude { roll: self.roll / 10, pitch: (self.pitch / 10) as i8 }
     }
 }
 
-impl Into<hud::SphericalCoordinate> for SphericalCoordinate {
+impl<U: Copy + Default + Into<u32>> Into<hud::SphericalCoordinate> for SphericalCoordinate<U> {
     fn into(self) -> hud::SphericalCoordinate {
-        let rho = (self.rho * 10).to_unit(NauticalMile);
-        hud::SphericalCoordinate { rho: rho.value() as u16, theta: self.theta, phi: self.phi }
+        hud::SphericalCoordinate { rho: self.rho.value() as u16, theta: self.theta, phi: self.phi }
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct RawData {
-    pub acceleration: Acceleration,
+    pub acceleration: Vector3<f32>,
     pub gyro: Gyro,
     pub quaternion: UnitQuaternion<f32>,
     pub fix_type: Option<FixType>,
-}
-
-pub struct Quat([f32; 4]);
-
-impl From<UnitQuaternion<f32>> for Quat {
-    fn from(quat: UnitQuaternion<f32>) -> Self {
-        Self([quat[0], quat[1], quat[2], quat[3]])
-    }
-}
-
-impl sval::value::Value for Quat {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.seq_begin(Some(4))?;
-        for q in self.0.iter() {
-            stream.seq_elem(q)?;
-        }
-        stream.seq_end()
-    }
+    pub speed_vector: VelocityVector<f32, Meter>,
 }
 
 impl Default for RawData {
     fn default() -> Self {
         Self {
             quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
-            acceleration: Acceleration::default(),
+            acceleration: Vector3::new(0.0, 0.0, 0.0),
             gyro: Gyro::default(),
             fix_type: None,
+            speed_vector: VelocityVector::default(),
         }
     }
 }
 
 impl sval::value::Value for RawData {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(3 + self.fix_type.is_some() as usize))?;
+        stream.map_begin(Some(4 + if self.fix_type.is_some() { 1 } else { 0 }))?;
         stream.map_key("acceleration")?;
-        stream.map_value(&self.acceleration)?;
+        let a = &self.acceleration;
+        let value: [f32; 3] = [a[0], a[1], a[2]];
+        stream.map_value(&value[..])?;
         stream.map_key("gyro")?;
         stream.map_value(&self.gyro)?;
         stream.map_key("quaternion")?;
-        let quat: Quat = self.quaternion.into();
-        stream.map_value(quat)?;
+        let q = &self.quaternion;
+        let value: [f32; 4] = [q[0], q[1], q[2], q[3]];
+        stream.map_value(&value[..])?;
         if let Some(fix_type) = self.fix_type {
             stream.map_key("gnss-fix-type")?;
             stream.map_value(fix_type)?;
         }
+        stream.map_key("speed-vector")?;
+        stream.map_value(&self.speed_vector)?;
         stream.map_end()
     }
 }
 
-#[derive(Copy, Clone, Default, Value, Debug)]
+#[derive(Copy, Clone, Default, Debug, Value)]
 pub struct TelemetryData {
     pub altitude: Altitude,
     pub attitude: Attitude,
     pub heading: u16,
     pub height: Altitude,
     pub g_force: u8,
-    pub velocity: Velocity<i16, Meter>,
+    pub airspeed: u16,
+    pub vario: i16,
 
     pub receiver: Receiver,
     pub input: ControlInput,
@@ -132,37 +122,44 @@ impl core::fmt::Display for TelemetryData {
     }
 }
 
-pub struct TelemetryUnit<A, B, C, G, IMU, NAV> {
+pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
     altimeter: A,
     battery: B,
     accelerometer: C,
     gyroscope: G,
     imu: IMU,
+    speedometer: S,
     navigation: NAV,
 
     receiver: Option<Box<dyn AgingStaticData<Receiver>>>,
     control_input: Option<Box<dyn AgingStaticData<ControlInput>>>,
-    gnss: Option<Box<dyn AgingStaticData<FixType>>>,
+    gnss: Option<Box<dyn StaticData<FixType>>>,
 
     initial_altitude: Altitude,
     battery_cells: u8,
     telemetry: Rc<SingularData<TelemetryData>>,
 }
 
-impl<A, B, C, G, IMU, NAV> Schedulable for TelemetryUnit<A, B, C, G, IMU, NAV>
+fn g_force(acceleration: &Vector3<f32>) -> u8 {
+    let (x, y, z) = (acceleration[0], acceleration[1], acceleration[2]);
+    ((x * x + y * y + z * z).sqrt() * 10.0) as u8
+}
+
+impl<A, B, ACCEL, G, IMU, S, NAV> Schedulable for TelemetryUnit<A, B, ACCEL, G, IMU, S, NAV>
 where
-    A: StaticData<(Altitude, Velocity<i16, Meter>)>,
+    A: StaticData<Altitude>,
     B: StaticData<Battery>,
-    C: StaticData<Acceleration>,
+    ACCEL: StaticData<Vector3<f32>>,
     G: StaticData<Gyro>,
     IMU: StaticData<UnitQuaternion<f32>>,
+    S: StaticData<VelocityVector<f32, Meter>>,
     NAV: StaticData<(Position, Steerpoint)>,
 {
     fn schedule(&mut self) -> bool {
         let rate = self.rate();
 
-        let (altitude, velocity) = self.altimeter.read();
-        if self.initial_altitude == Distance::default() {
+        let altitude = self.altimeter.read();
+        if self.initial_altitude.is_zero() {
             self.initial_altitude = altitude;
         }
         let battery = self.battery.read();
@@ -179,21 +176,25 @@ where
 
         let acceleration = self.accelerometer.read();
         let gyro = self.gyroscope.read();
-        let fix_type = self.gnss.as_mut().map(|g| g.read(rate)).flatten();
+        let fix_type = self.gnss.as_mut().map(|g| g.read());
+
+        let speed_vector = self.speedometer.read();
+        let vector = speed_vector.convert(|v| v as i32);
 
         let data = TelemetryData {
             attitude: euler.into(),
             altitude,
             heading: if heading > 0 { heading } else { 360 + heading } as u16,
             height: altitude - self.initial_altitude,
-            velocity,
-            g_force: acceleration.g_force(),
+            g_force: g_force(&acceleration),
+            airspeed: vector.to_unit(Knot).distance().value() as u16,
+            vario: vector.z.to_unit(FTpM).value() as i16,
             battery: battery / self.battery_cells as u16,
             position,
             steerpoint,
             receiver: self.receiver.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
-            raw: RawData { acceleration, gyro, quaternion, fix_type },
+            raw: RawData { acceleration, gyro, quaternion, fix_type, speed_vector },
         };
         self.telemetry.write(data);
         true
@@ -204,13 +205,14 @@ where
     }
 }
 
-impl<A, B, C, G, IMU, NAV> TelemetryUnit<A, B, C, G, IMU, NAV> {
+impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
     pub fn new(
         altimeter: A,
         battery: B,
         accelerometer: C,
         gyroscope: G,
         imu: IMU,
+        speedometer: S,
         navigation: NAV,
     ) -> Self {
         let config = config::get();
@@ -220,6 +222,7 @@ impl<A, B, C, G, IMU, NAV> TelemetryUnit<A, B, C, G, IMU, NAV> {
             accelerometer,
             gyroscope,
             imu,
+            speedometer,
             navigation,
 
             receiver: None,
@@ -240,7 +243,7 @@ impl<A, B, C, G, IMU, NAV> TelemetryUnit<A, B, C, G, IMU, NAV> {
         self.control_input = Some(input)
     }
 
-    pub fn set_gnss(&mut self, gnss: Box<dyn AgingStaticData<FixType>>) {
+    pub fn set_gnss(&mut self, gnss: Box<dyn StaticData<FixType>>) {
         self.gnss = Some(gnss)
     }
 

@@ -57,6 +57,7 @@ use rs_flight::{
         navigation::Navigation,
         panic::{log_panic, PanicLogger},
         schedule::Scheduler,
+        speedometer::Speedometer,
         TelemetryUnit,
     },
     config::{self, aircraft::Configuration, Config, SerialConfig},
@@ -134,11 +135,9 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
 
 #[entry]
 fn main() -> ! {
-    static mut DFU: MaybeUninit<Dfu> = MaybeUninit::uninit();
-    let dfu = unsafe { &mut *DFU.as_mut_ptr() };
-    dfu.check();
-
     unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
+    let mut dfu = unsafe { MaybeUninit::new(Box::new(Dfu::new())).assume_init() };
+    dfu.check();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
@@ -263,9 +262,14 @@ fn main() -> ! {
         imu.set_heading(Box::new(gnss.heading()));
     }
 
+    let mut speedometer =
+        Speedometer::new(altimeter.reader(), imu.as_accelerometer(), GYRO_SAMPLE_RATE);
+    if let Some(Device::GNSS(ref mut gnss)) = gnss {
+        speedometer.set_gnss(Box::new(gnss.velocity()));
+    }
+
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
-    let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
-    navigation.set_altimeter(Box::new(altimeter.reader()));
+    let mut navigation = Navigation::new(altimeter.reader(), imu.as_accelerometer(), interval);
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         navigation.set_gnss(Box::new(gnss.position()));
     }
@@ -276,6 +280,7 @@ fn main() -> ! {
         imu.as_accelerometer(),
         gyroscope,
         imu.as_imu(),
+        speedometer.reader(),
         navigation.reader(),
     );
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
@@ -304,7 +309,7 @@ fn main() -> ! {
 
     let mut telemetry_source = telemetry.reader();
     let schedule_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
-    let tasks = (schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd);
+    let tasks = (schedule_trigger, baro, altimeter, imu, speedometer, navigation, telemetry, osd);
     let group = Scheduler::new(tasks, 100);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
 
