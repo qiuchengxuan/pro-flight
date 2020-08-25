@@ -6,7 +6,7 @@ use ahrs::{Ahrs, Mahony};
 use micromath::F32Ext;
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
-use crate::components::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
@@ -119,7 +119,7 @@ where
 }
 
 impl<A: DataSource<Acceleration>, G: DataSource<Gyro>> Schedulable for IMU<A, G> {
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         50
     }
 

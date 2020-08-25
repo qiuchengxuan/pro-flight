@@ -101,7 +101,7 @@ impl<T: DataSource<TelemetryData>> AsciiHud<T> {
             g_force: data.g_force,
             height: height.value() as i16,
             unit: Unit::Aviation,
-            velocity: data.velocity.value() / 100 * 100,
+            vario: data.velocity.value() / 100 * 100,
             steerpoint: steerpoint,
             notes: Notes { left: note_left, center: "", right: "" },
             ..Default::default()

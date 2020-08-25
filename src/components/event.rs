@@ -1,4 +1,4 @@
-use super::schedule::{Hertz, Schedulable};
+use super::schedule::{Rate, Schedulable};
 
 pub trait Notify {
     fn notify(&mut self);
@@ -9,10 +9,10 @@ pub trait OnEvent {
 }
 
 #[derive(Copy, Clone)]
-pub struct SchedulableEvent<T>(T, Hertz);
+pub struct SchedulableEvent<T>(T, Rate);
 
 impl<T> SchedulableEvent<T> {
-    pub fn new(notify: T, rate: Hertz) -> Self {
+    pub fn new(notify: T, rate: Rate) -> Self {
         Self(notify, rate)
     }
 }
@@ -23,7 +23,7 @@ impl<T: Notify> Schedulable for SchedulableEvent<T> {
         true
     }
 
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         self.1
     }
 }

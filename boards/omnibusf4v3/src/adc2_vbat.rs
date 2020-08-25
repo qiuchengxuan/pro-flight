@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use core::mem::MaybeUninit;
 
 use stm32f4xx_hal::adc::config::{AdcConfig, Continuous, Dma, SampleTime, Sequence};
@@ -9,7 +10,7 @@ use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::stm32;
 
 use rs_flight::datastructures::data_source::u16_source::{U16Data, U16DataSource};
-use rs_flight::datastructures::data_source::{DataSource, DataWriter};
+use rs_flight::datastructures::data_source::DataWriter;
 use rs_flight::datastructures::measurement::battery::Battery;
 
 const VOLTAGE_SCALE_X100: usize = 1100;
@@ -18,23 +19,23 @@ const VREF: usize = 3300;
 
 pub struct Adc2VBat {
     adc: Adc<stm32::ADC2>,
-    vbat_data: U16Data,
+    vbat_data: Rc<U16Data<Battery>>,
     dma_buffer: [u16; SAMPLE_SIZE],
 }
 
 impl Adc2VBat {
     pub fn new(adc: Adc<stm32::ADC2>) -> Self {
-        Self { adc, vbat_data: U16Data::default(), dma_buffer: Default::default() }
+        Self { adc, vbat_data: Rc::new(U16Data::default()), dma_buffer: Default::default() }
     }
 
-    pub fn data_source(&'static self) -> impl DataSource<Battery> {
+    pub fn reader(&self) -> U16DataSource<Battery> {
         U16DataSource::new(&self.vbat_data)
     }
 
     fn dma_rx_done(&mut self) {
         let sum: usize = self.dma_buffer.iter().map(|&v| v as usize).sum();
         let milli_voltages = (sum / SAMPLE_SIZE) * VREF / 0xFFF * VOLTAGE_SCALE_X100 / 100;
-        self.vbat_data.write(milli_voltages as u16);
+        self.vbat_data.write(Battery(milli_voltages as u16));
     }
 }
 

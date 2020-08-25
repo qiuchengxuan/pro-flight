@@ -1,10 +1,10 @@
 use alloc::vec::Vec;
 
-pub type Hertz = usize;
+pub type Rate = usize;
 
 pub trait Schedulable {
     fn schedule(&mut self) -> bool;
-    fn rate(&self) -> Hertz;
+    fn rate(&self) -> Rate;
 }
 
 pub trait Schedulables {
@@ -31,11 +31,6 @@ macro_rules! schedulables {
     }
 }
 
-schedulables! {0, 1 -> S0, S1}
-schedulables! {0, 1, 2 -> S0, S1, S2}
-schedulables! {0, 1, 2, 3 -> S0, S1, S2, S3}
-schedulables! {0, 1, 2, 3, 4 -> S0, S1, S2, S3, S4}
-schedulables! {0, 1, 2, 3, 4, 5 -> S0, S1, S2, S3, S4, S5}
 schedulables! {0, 1, 2, 3, 4, 5, 6 -> S0, S1, S2, S3, S4, S5, S6}
 
 pub struct TaskInfo {
@@ -45,13 +40,13 @@ pub struct TaskInfo {
 
 pub struct Scheduler<S> {
     schedulables: S,
-    rate: Hertz,
+    rate: Rate,
     task_infos: Vec<TaskInfo>,
     running: bool,
 }
 
 impl<S: Schedulables> Scheduler<S> {
-    pub fn new(mut schedulables: S, rate: Hertz) -> Self {
+    pub fn new(mut schedulables: S, rate: Rate) -> Self {
         let mut task_infos: Vec<TaskInfo> = Vec::with_capacity(S::len());
         for i in 0..S::len() {
             let interval = rate / schedulables.get(i).unwrap().rate();
@@ -87,7 +82,7 @@ impl<S: Schedulables> Schedulable for Scheduler<S> {
         true
     }
 
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         self.rate
     }
 }

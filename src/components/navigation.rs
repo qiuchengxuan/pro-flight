@@ -5,7 +5,7 @@ use nalgebra::UnitQuaternion;
 
 use crate::algorithm::runge_kutta4;
 use crate::alloc;
-use crate::components::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Rate, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
@@ -55,7 +55,7 @@ where
         }
     }
 
-    pub fn as_data_source(&self) -> impl DataSource<(Position, Steerpoint)> {
+    pub fn reader(&self) -> impl DataSource<(Position, Steerpoint)> {
         SingularDataSource::new(&self.output)
     }
 
@@ -91,7 +91,7 @@ where
     IMU: DataSource<UnitQuaternion<f32>>,
     A: DataSource<Acceleration>,
 {
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         50
     }
 
@@ -102,33 +102,35 @@ where
             }
             self.offset = (self.waypoints[HOME].position - position).into_f32();
             self.time = 0.0;
-        } else if let Some(unit_quaternion) = self.imu.read() {
-            if let Some(acceleration) = self.accelerometer.read() {
-                let vector = unit_quaternion.transform_vector(&acceleration.0.into()) * GRAVITY;
-                let (ax, ay, az) = (vector[0], vector[1], vector[2] - GRAVITY); // z axis reverted
-                let (t, dt) = (self.time, self.interval);
-                let mut offset = self.offset;
-                // TODO: add speed data source or runge-kutta won't properly work
-                offset.0 = runge_kutta4(|_, dt| ax * dt, offset.0, t, dt);
-                offset.1 = runge_kutta4(|_, dt| ay * dt, offset.1, t, dt);
-                let altimeter = self.altimeter.as_mut().map(|a| a.read_last()).flatten();
-                if let Some((altitude, _)) = altimeter {
-                    if self.waypoints[HOME].position.altitude.is_zero() {
-                        self.waypoints[HOME].position.altitude = altitude;
-                    }
-                    let height = altitude - self.waypoints[HOME].position.altitude;
-                    self.offset.2 = height.to_unit(Meter).value() as f32;
-                } else {
-                    offset.2 = runge_kutta4(|_, dt| az * dt, offset.2, t, dt);
+            return true;
+        }
+
+        while let Some(unit_quaternion) = self.imu.read() {
+            let acceleration = self.accelerometer.read().unwrap();
+            let vector = unit_quaternion.transform_vector(&acceleration.0.into()) * GRAVITY;
+            let (ax, ay, az) = (vector[0], vector[1], vector[2] - GRAVITY); // z axis reverted
+            let (t, dt) = (self.time, self.interval);
+            let mut offset = self.offset;
+            // TODO: add speed data source or runge-kutta won't properly work
+            offset.0 = runge_kutta4(|_, dt| ax * dt, offset.0, t, dt);
+            offset.1 = runge_kutta4(|_, dt| ay * dt, offset.1, t, dt);
+            let altimeter = self.altimeter.as_mut().map(|a| a.read_last()).flatten();
+            if let Some((altitude, _)) = altimeter {
+                if self.waypoints[HOME].position.altitude.is_zero() {
+                    self.waypoints[HOME].position.altitude = altitude;
                 }
-                self.offset = offset;
-                self.displacements[CURRENT] = offset.into();
-                self.time += self.interval;
-                let waypoint = self.waypoints[self.next_waypoint as usize];
-                let steerpoint = Steerpoint { index: self.next_waypoint, waypoint };
-                let position = self.waypoints[HOME].position + self.displacements[CURRENT];
-                self.output.write((position, steerpoint));
+                let height = altitude - self.waypoints[HOME].position.altitude;
+                self.offset.2 = height.to_unit(Meter).value() as f32;
+            } else {
+                offset.2 = runge_kutta4(|_, dt| az * dt, offset.2, t, dt);
             }
+            self.offset = offset;
+            self.displacements[CURRENT] = offset.into();
+            self.time += self.interval;
+            let waypoint = self.waypoints[self.next_waypoint as usize];
+            let steerpoint = Steerpoint { index: self.next_waypoint, waypoint };
+            let position = self.waypoints[HOME].position + self.displacements[CURRENT];
+            self.output.write((position, steerpoint));
         }
         true
     }

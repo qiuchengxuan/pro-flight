@@ -81,13 +81,13 @@ impl<T: Copy + Clone> DataSource<T> for OverwritingDataSource<T> {
     }
 
     fn read_last(&mut self) -> Option<T> {
-        let buffer = unsafe { &*self.ring.buffer.get() };
         let written = self.ring.written.load(Ordering::Relaxed);
         if written.wrapping_sub(self.read) == 0 {
             return None;
         }
         self.read = written;
-        Some(buffer[self.read.wrapping_sub(1) % buffer.len()])
+        let buffer = unsafe { &*self.ring.buffer.get() };
+        Some(buffer[written.wrapping_sub(1) % buffer.len()])
     }
 
     fn read_last_unchecked(&self) -> T {
