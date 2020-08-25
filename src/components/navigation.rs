@@ -5,7 +5,7 @@ use nalgebra::UnitQuaternion;
 
 use crate::algorithm::runge_kutta4;
 use crate::alloc;
-use crate::components::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Rate, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
@@ -55,7 +55,7 @@ where
         }
     }
 
-    pub fn as_data_source(&self) -> impl DataSource<(Position, Steerpoint)> {
+    pub fn reader(&self) -> impl DataSource<(Position, Steerpoint)> {
         SingularDataSource::new(&self.output)
     }
 
@@ -91,7 +91,7 @@ where
     IMU: DataSource<UnitQuaternion<f32>>,
     A: DataSource<Acceleration>,
 {
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         50
     }
 

@@ -20,6 +20,12 @@ impl From<u16> for Battery {
     }
 }
 
+impl Into<u16> for Battery {
+    fn into(self) -> u16 {
+        self.0
+    }
+}
+
 impl Battery {
     pub fn percentage(&self) -> u8 {
         let result = match self.0 {

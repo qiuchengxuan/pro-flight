@@ -115,7 +115,8 @@ impl core::ops::Add<Displacement> for Position {
 mod test {
     #[test]
     fn test_spherical_coordinate() {
-        use crate::datastructures::measurement::distance::{CentiMeter, Distance};
+        use crate::datastructures::measurement::distance::Distance;
+        use crate::datastructures::measurement::unit::CentiMeter;
 
         use super::{Displacement, SphericalCoordinate};
 

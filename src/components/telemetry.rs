@@ -4,7 +4,7 @@ use alloc::rc::Rc;
 use ascii_osd_hud::telemetry as hud;
 use nalgebra::{Quaternion, UnitQuaternion};
 
-use crate::components::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
 use crate::datastructures::coordinate::{Position, SphericalCoordinate};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
@@ -197,7 +197,7 @@ where
         true
     }
 
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         50
     }
 }
@@ -242,7 +242,7 @@ impl<A, B, C, G, IMU, NAV> TelemetryUnit<A, B, C, G, IMU, NAV> {
         self.gnss = Some(gnss)
     }
 
-    pub fn as_data_source(&self) -> impl DataSource<TelemetryData> {
+    pub fn reader(&self) -> impl DataSource<TelemetryData> {
         SingularDataSource::new(&self.telemetry)
     }
 }

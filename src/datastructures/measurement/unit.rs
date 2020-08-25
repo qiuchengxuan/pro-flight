@@ -1,53 +1,41 @@
-#[derive(Copy, Clone, Default, Debug)]
-pub struct MilliMeter;
+macro_rules! units {
+    () => ();
+    (
+        $class:ident => $value:expr,
+        $(
+            $classes:ident => $values:expr,
+        )*
+    ) => {
+        #[derive(Copy, Clone, Default, Debug)]
+        pub struct $class;
 
-impl Into<i32> for MilliMeter {
-    fn into(self) -> i32 {
-        1
-    }
+        impl Into<u32> for $class {
+            fn into(self) -> u32 {
+                ($value) as u32
+            }
+        }
+
+        impl Into<i32> for $class {
+            fn into(self) -> i32 {
+                ($value) as i32
+            }
+        }
+
+        impl Into<f32> for $class {
+            fn into(self) -> f32 {
+                $value
+            }
+        }
+
+        units!{ $($classes => $values,)* }
+    };
 }
 
-#[derive(Copy, Clone, Default, Debug)]
-pub struct CentiMeter;
-
-impl Into<i32> for CentiMeter {
-    fn into(self) -> i32 {
-        10
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct Meter;
-
-impl Into<i32> for Meter {
-    fn into(self) -> i32 {
-        1000
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct Feet;
-
-impl Into<i32> for Feet {
-    fn into(self) -> i32 {
-        3300
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct KiloMeter;
-
-impl Into<i32> for KiloMeter {
-    fn into(self) -> i32 {
-        1000_000
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug)]
-pub struct NauticalMile;
-
-impl Into<i32> for NauticalMile {
-    fn into(self) -> i32 {
-        1852_000
-    }
+units! {
+    MilliMeter => 1.0,
+    CentiMeter => 10.0,
+    Meter => 1000.0,
+    Feet => 3300.0,
+    KiloMeter => 1000_000.0,
+    NauticalMile => 1852_000.0,
 }

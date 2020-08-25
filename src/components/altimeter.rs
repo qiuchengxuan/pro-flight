@@ -1,7 +1,7 @@
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 
-use crate::components::schedule::{Hertz, Schedulable};
+use crate::components::schedule::{Rate, Schedulable};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{DataSource, DataWriter};
 use crate::datastructures::measurement::distance::Distance;
@@ -16,12 +16,12 @@ pub struct Altimeter<D> {
     data: Rc<SingularData<(Altitude, Velocity<i16, Meter>)>>,
 
     records: Vec<Distance<i16, Meter>>,
-    rate: u16, // hz
+    rate: Rate,
     counter: u8,
 }
 
 impl<D: DataSource<Pressure>> Altimeter<D> {
-    pub fn new(data_source: D, rate: u16) -> Self {
+    pub fn new(data_source: D, rate: Rate) -> Self {
         let data = Rc::new(SingularData::default());
         let mut size = MAX_RECORDS;
         for i in 0..16 {
@@ -34,7 +34,7 @@ impl<D: DataSource<Pressure>> Altimeter<D> {
         Self { data_source, data, records, rate, counter: 0 }
     }
 
-    pub fn as_data_source(&self) -> impl DataSource<(Altitude, Velocity<i16, Meter>)> {
+    pub fn reader(&self) -> impl DataSource<(Altitude, Velocity<i16, Meter>)> {
         SingularDataSource::new(&self.data)
     }
 }
@@ -52,7 +52,7 @@ impl<D: DataSource<Pressure>> Schedulable for Altimeter<D> {
         true
     }
 
-    fn rate(&self) -> Hertz {
-        50
+    fn rate(&self) -> Rate {
+        self.rate
     }
 }

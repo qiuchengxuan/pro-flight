@@ -202,10 +202,10 @@ fn main() -> ! {
     .ok();
 
     info!("Initialize ADC VBAT");
-    let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2).data_source();
+    let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2).reader();
 
     let barometer = init_bmp280_data_source();
-    let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE as u16);
+    let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE);
 
     let mut gnss: Option<&'static mut Device> = None;
     let mut receiver: Option<&'static mut Device> = None;
@@ -264,18 +264,18 @@ fn main() -> ! {
 
     let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
     let mut navigation = Navigation::new(imu.as_imu(), imu.as_accelerometer(), interval);
-    navigation.set_altimeter(Box::new(altimeter.as_data_source()));
+    navigation.set_altimeter(Box::new(altimeter.reader()));
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         navigation.set_gnss(Box::new(gnss.position()));
     }
 
     let mut telemetry = TelemetryUnit::new(
-        altimeter.as_data_source(),
+        altimeter.reader(),
         battery,
         imu.as_accelerometer(),
         gyroscope,
         imu.as_imu(),
-        navigation.as_data_source(),
+        navigation.reader(),
     );
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
         telemetry.set_receiver(Box::new(sbus.as_receiver()));
@@ -292,7 +292,7 @@ fn main() -> ! {
         (gpio_a.pa15, gpio_b.pb3),
         &mut CRC(peripherals.CRC),
         clocks,
-        telemetry.as_data_source(),
+        telemetry.reader(),
     );
     let (baro, osd) = result.ok().unwrap();
 
@@ -301,7 +301,7 @@ fn main() -> ! {
         sbus.set_notify(Box::new(trigger.clone()));
     }
 
-    let telemetry_source = telemetry.as_data_source();
+    let telemetry_source = telemetry.reader();
     let schedule_trigger = SchedulableEvent::new(trigger, 50);
     let tasks = (schedule_trigger, baro, altimeter, imu, navigation, telemetry, osd);
     let group = Scheduler::new(tasks, 100);

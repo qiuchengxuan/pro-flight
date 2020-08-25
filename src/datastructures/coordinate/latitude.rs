@@ -56,7 +56,7 @@ impl core::ops::Sub for Latitude {
 
     fn sub(self, other: Self) -> Distance<i32, CentiMeter> {
         let value = (self.0 - other.0) * 30_92 / SCALE / 100 / SUB_SECOND;
-        Distance::new(value, CentiMeter::default())
+        Distance::new(value, CentiMeter)
     }
 }
 

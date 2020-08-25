@@ -6,7 +6,7 @@ use crc::Hasher32;
 use max7456::not_null_writer::NotNullWriter;
 use max7456::SPI_MODE;
 use rs_flight::components::ascii_hud::AsciiHud;
-use rs_flight::components::schedule::{Hertz, Schedulable};
+use rs_flight::components::schedule::{Rate, Schedulable};
 use rs_flight::components::telemetry::TelemetryData;
 use rs_flight::config;
 use rs_flight::datastructures::data_source::DataSource;
@@ -109,7 +109,7 @@ fn spi3_start_tx(dma_buffer: &[u8], size: usize) {
 }
 
 impl Schedulable for BaroScheduler {
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         16
     }
 
@@ -128,7 +128,7 @@ impl Schedulable for BaroScheduler {
 pub struct OSDScheduler<T>(AsciiHud<T>);
 
 impl<T: DataSource<TelemetryData>> Schedulable for OSDScheduler<T> {
-    fn rate(&self) -> Hertz {
+    fn rate(&self) -> Rate {
         50
     }
 
