@@ -12,7 +12,7 @@ pub use longitude::Longitude;
 use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
-use crate::datastructures::measurement::unit::CentiMeter;
+use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 use crate::datastructures::measurement::Altitude;
 
 #[derive(Copy, Clone, Default, Value, PartialEq, Debug)]
@@ -39,7 +39,13 @@ impl<U: Copy + Default> From<DistanceVector<f32, U>> for SphericalCoordinate<U> 
     }
 }
 
-pub type Displacement = DistanceVector<i32, CentiMeter>;
+impl<U: Copy + Default + Into<u32>> SphericalCoordinate<U> {
+    pub fn to_unit<V: Copy + Default + Into<u32>>(self, unit: V) -> SphericalCoordinate<V> {
+        SphericalCoordinate { rho: self.rho.to_unit(unit), theta: self.theta, phi: self.phi }
+    }
+}
+
+pub type Displacement<U> = DistanceVector<i32, U>;
 
 #[derive(Default, Copy, Clone, Value, PartialEq, Debug)]
 pub struct Position {
@@ -49,23 +55,23 @@ pub struct Position {
 }
 
 impl core::ops::Sub for Position {
-    type Output = Displacement;
+    type Output = Displacement<Meter>;
 
-    fn sub(self, other: Self) -> Displacement {
+    fn sub(self, other: Self) -> Self::Output {
         let x = self.longitude - other.longitude;
         let y = self.latitude - other.latitude;
         let height = self.altitude - other.altitude;
-        Displacement { x: x, y: y, z: height.into() }
+        Self::Output { x: x, y: y, z: height.to_unit(Meter).into() }
     }
 }
 
-impl core::ops::Add<Displacement> for Position {
+impl<U: Copy + Default + Into<i32>> core::ops::Add<Displacement<U>> for Position {
     type Output = Self;
 
-    fn add(self, displacement: Displacement) -> Self {
+    fn add(self, displacement: Displacement<U>) -> Self {
         let longitude = self.longitude + displacement.x;
         let latitude = self.latitude + displacement.y;
-        let altitude = self.altitude + displacement.z;
+        let altitude = self.altitude + displacement.z.to_unit(CentiMeter);
         Self { latitude, longitude, altitude }
     }
 }

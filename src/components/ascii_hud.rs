@@ -10,7 +10,7 @@ use crate::datastructures::coordinate::SphericalCoordinate;
 use crate::datastructures::data_source::StaticData;
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::displacement::DistanceVector;
-use crate::datastructures::measurement::unit::{Feet, Knot, Meter};
+use crate::datastructures::measurement::unit::{Feet, Knot, Meter, NauticalMile};
 use crate::datastructures::measurement::VelocityVector;
 use crate::datastructures::Ratio;
 
@@ -76,14 +76,14 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
         let altitude = data.altitude.to_unit(Feet);
         let height = data.height.to_unit(Feet);
         let delta = (data.steerpoint.waypoint.position - data.position).convert(|v| v as f32);
-        let vector = data.raw.quaternion.inverse_transform_vector(&delta.to_unit(Meter).into());
+        let vector = data.raw.quaternion.inverse_transform_vector(&delta.into());
         let transformed: DistanceVector<f32, Meter> = vector.into();
         let coordinate: SphericalCoordinate<Meter> = (transformed * 10.0).into();
         let steerpoint = Steerpoint {
             number: data.steerpoint.index,
             name: data.steerpoint.waypoint.name,
             heading: delta.azimuth(),
-            coordinate: coordinate.into(),
+            coordinate: coordinate.to_unit(NauticalMile).into(),
         };
 
         let vector = data.raw.quaternion.inverse_transform_vector(&data.raw.speed_vector.into());

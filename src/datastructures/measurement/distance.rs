@@ -1,4 +1,4 @@
-use core::fmt::Debug;
+use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
 use core::ops::{Add, Div, Mul, Sub};
 
@@ -6,6 +6,12 @@ use core::ops::{Add, Div, Mul, Sub};
 pub struct Distance<T, U> {
     pub value: T,
     unit: PhantomData<U>,
+}
+
+impl<T: Display, U: Display + Default> core::fmt::Display for Distance<T, U> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}{}", self.value, U::default())
+    }
 }
 
 impl<T: Copy + Default, U: Copy> Distance<T, U> {
@@ -53,6 +59,13 @@ impl<T: Mul<Output = T> + Copy + Default + PartialEq, U: Copy> Mul<T> for Distan
     type Output = Distance<T::Output, U>;
     fn mul(self, t: T) -> Self::Output {
         Self { value: self.value * t, unit: PhantomData }
+    }
+}
+
+impl<T: Div<Output = T> + Copy + Default + PartialEq, U: Copy> Div<T> for Distance<T, U> {
+    type Output = Distance<T::Output, U>;
+    fn div(self, t: T) -> Self::Output {
+        Self { value: self.value / t, unit: PhantomData }
     }
 }
 

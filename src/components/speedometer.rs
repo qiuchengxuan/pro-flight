@@ -13,11 +13,12 @@ use crate::datastructures::measurement::{Altitude, VelocityVector, GRAVITY};
 pub struct Speedometer<A, ACCEL> {
     altimeter: A,
     accelerometer: ACCEL,
-    sample_interval: f32,
+    interval: f32,
 
     gnss: Option<Box<dyn AgingStaticData<VelocityVector<i32, MilliMeter>>>>,
-    filters: [ComplementaryFilter<f32>; 3],
 
+    filters: [ComplementaryFilter<f32>; 3],
+    acceleration: Vector3<f32>,
     altitude: Altitude,
     vector: (f32, f32, f32),
     output: Rc<SingularData<VelocityVector<f32, Meter>>>,
@@ -28,9 +29,10 @@ impl<A, ACCEL> Speedometer<A, ACCEL> {
         Self {
             altimeter,
             accelerometer,
-            sample_interval: 1.0 / sample_rate as f32,
+            interval: 1.0 / sample_rate as f32,
             gnss: None,
-            filters: [ComplementaryFilter::new(0.05, 1.0 / sample_rate as f32); 3],
+            acceleration: Vector3::new(0.0, 0.0, 0.0),
+            filters: [ComplementaryFilter::new(0.5, 1.0 / sample_rate as f32); 3],
             altitude: Altitude::default(),
             vector: (0.0, 0.0, 0.0),
             output: Rc::new(SingularData::default()),
@@ -57,21 +59,20 @@ where
         let altitude = self.altimeter.read();
         let z = (altitude - self.altitude).convert(|v| v as f32).to_unit(Meter);
         self.altitude = altitude;
-        let gnss = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten().map(|v| {
-            let x = v.x.convert(|v| v as f32).to_unit(Meter);
-            let y = v.y.convert(|v| v as f32).to_unit(Meter);
-            VelocityVector::new(x.value(), y.value(), 0.0, Meter)
-        });
-        while let Some(mut acceleration) = self.accelerometer.read() {
-            acceleration *= GRAVITY;
+        #[rustfmt::skip]
+        let gnss = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten()
+                                     .map(|velocity| velocity.convert(|v| v as f32).to_unit(Meter));
+        while let Some(mut a) = self.accelerometer.read() {
+            a *= GRAVITY;
+            self.acceleration = a;
             if let Some(vector) = gnss {
-                self.vector.0 = self.filters[0].filter(vector.x.value(), acceleration[0]);
-                self.vector.1 = self.filters[1].filter(vector.y.value(), acceleration[1]);
+                self.vector.0 = self.filters[0].filter(vector.x.value(), a[0]);
+                self.vector.1 = self.filters[1].filter(vector.y.value(), a[1]);
             } else {
-                self.vector.0 += acceleration[0] * self.sample_interval;
-                self.vector.1 += acceleration[1] * self.sample_interval;
+                self.vector.0 += (a[0] + (a[0] - self.acceleration[0]) / 2.0) * self.interval;
+                self.vector.1 += (a[1] + (a[1] - self.acceleration[1]) / 2.0) * self.interval;
             }
-            self.vector.2 = self.filters[2].filter(z.value(), acceleration[2] + GRAVITY);
+            self.vector.2 = self.filters[2].filter(z.value(), a[2] + GRAVITY);
         }
         self.output.write(VelocityVector::new(self.vector.0, self.vector.1, self.vector.2, Meter));
         true

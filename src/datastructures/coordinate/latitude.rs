@@ -1,5 +1,5 @@
 use crate::datastructures::measurement::distance::Distance;
-use crate::datastructures::measurement::unit::CentiMeter;
+use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 
 const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;
@@ -43,20 +43,20 @@ impl PartialEq<i32> for Latitude {
     }
 }
 
-impl core::ops::Add<Distance<i32, CentiMeter>> for Latitude {
+impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Latitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<i32, CentiMeter>) -> Self {
-        Self(self.0 + distance.value() * SUB_SECOND * 100 * SCALE / 30_92)
+    fn add(self, distance: Distance<i32, U>) -> Self {
+        Self(self.0 + distance.to_unit(CentiMeter).value() * SUB_SECOND * 100 * SCALE / 30_92)
     }
 }
 
 impl core::ops::Sub for Latitude {
-    type Output = Distance<i32, CentiMeter>;
+    type Output = Distance<i32, Meter>;
 
-    fn sub(self, other: Self) -> Distance<i32, CentiMeter> {
-        let value = (self.0 - other.0) * 30_92 / SCALE / 100 / SUB_SECOND;
-        Distance::new(value, CentiMeter)
+    fn sub(self, other: Self) -> Distance<i32, Meter> {
+        let value = (self.0 - other.0) / 100 * 30_92 / SCALE / SUB_SECOND;
+        Distance::new(value, Meter)
     }
 }
 
@@ -83,5 +83,8 @@ mod test {
 
         let latitude = Latitude::from_str("N40°19.480").unwrap();
         assert_eq!("N40°19.480", format!("{}", latitude));
+
+        let distance = latitude - Latitude::from_str("N40°18.480").unwrap();
+        assert_eq!("1855m", format!("{}", distance));
     }
 }

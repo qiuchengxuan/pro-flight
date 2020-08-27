@@ -24,16 +24,16 @@ Progress
   - [x] timer based task scheduler
   - [x] software interrupt based event
   - [x] GNSS improved AHRS
+  - [x] Complementary filter
 * WIP
-  - [ ] Complementary filter
+  - [ ] Stabilizer
 * Future
-  - [ ] GNSS NMEA Protocol
   - [ ] Blackbox
   - [ ] DMA based SDCARD read & write
-  - [ ] Stabilizer
   - [ ] Navigation
   - [ ] EKF filter
   - [ ] Involve async syntax
+  - [ ] GNSS NMEA Protocol
 
 Memory allocator
 ================
@@ -70,7 +70,7 @@ data-flow
   +-----------+
   ```
   
-* GINS
+* SINS
 
   ```plantuml
   @startuml
@@ -83,7 +83,7 @@ data-flow
   +---------------+ Accel  +-------+            +------+
   | Accelerometer |------->|       |            |      |
   +---------------+        |       | Integral   |      |
-                           |  IMU  |-------+--->| GINS |
+                           |  IMU  |-------+--->| SINS |
   +-----------+     Gyro   |       |       |    |      |
   | Gyroscope |----------->|       |       |    |      |
   +-----------+            +-------+       |    +------+
@@ -111,7 +111,7 @@ data-flow
   +-----+                                  +-----------+       |
                                                                |
   +------+ Steerpoint   +-----------+                          |
-  | GINS |------------->| Autopilot |---------------+          |
+  | SINS |------------->| Autopilot |---------------+          |
   +------+              +-----------+               |          |      +-----------+    +----------+
                                                     |          +----->|           |    |          |
   +----------+ Remote controller +---------------+  +---------------->|   Mixer   |--->|   PWMs   |
@@ -138,7 +138,7 @@ data-flow
   +-----+    Attitude                         |             | 
                                               |             | 
   +------+   Postion & Steerpoint             |             |   +----------+
-  | GINS |------------------------------------+             +-->| HUD(OSD) |
+  | SINS |------------------------------------+             +-->| HUD(OSD) |
   +------+                                                      +----------+
   @enduml
   ```

@@ -1,5 +1,5 @@
 use crate::datastructures::measurement::distance::Distance;
-use crate::datastructures::measurement::unit::CentiMeter;
+use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 
 const SUB_SECOND: i32 = 10;
 const SCALE: i32 = 128;
@@ -37,20 +37,20 @@ impl Longitude {
     }
 }
 
-impl core::ops::Add<Distance<i32, CentiMeter>> for Longitude {
+impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Longitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<i32, CentiMeter>) -> Self {
-        Self(self.0 + distance.value() * SUB_SECOND * SCALE * 1000 / 30_715)
+    fn add(self, distance: Distance<i32, U>) -> Self {
+        Self(self.0 + distance.to_unit(CentiMeter).value() * SUB_SECOND * SCALE * 1000 / 30_715)
     }
 }
 
 impl core::ops::Sub for Longitude {
-    type Output = Distance<i32, CentiMeter>;
+    type Output = Distance<i32, Meter>;
 
-    fn sub(self, other: Self) -> Distance<i32, CentiMeter> {
-        let value = ((self.0 - other.0) * 30_715 / 1000 / SCALE / SUB_SECOND) as i32;
-        Distance::new(value, CentiMeter)
+    fn sub(self, other: Self) -> Distance<i32, Meter> {
+        let value = ((self.0 - other.0) / 1000 * 30_715 / SCALE / SUB_SECOND) as i32;
+        Distance::new(value, Meter)
     }
 }
 
@@ -77,5 +77,8 @@ mod test {
 
         let longitude = Longitude::from_str("E116°44.540").unwrap();
         assert_eq!("E116°44.540", format!("{}", longitude));
+
+        let distance = longitude - Longitude::from_str("E116°43.540").unwrap();
+        assert_eq!("1823m", format!("{}", distance));
     }
 }

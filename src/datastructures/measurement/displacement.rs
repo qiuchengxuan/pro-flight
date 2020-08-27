@@ -93,7 +93,7 @@ impl<U: Copy + Default> DistanceVector<i32, U> {
 impl<U: Copy + Default> DistanceVector<f32, U> {
     pub fn azimuth(&self) -> u16 {
         let theta = ((self.x.value()).atan2(self.y.value()) * DEGREE_PER_DAG) as i16;
-        (if theta > 0 { theta } else { 360 + theta }) as u16
+        (if theta >= 0 { theta % 360 } else { 360 + theta }) as u16
     }
 
     pub fn distance(&self) -> Distance<f32, U> {

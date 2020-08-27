@@ -268,8 +268,7 @@ fn main() -> ! {
         speedometer.set_gnss(Box::new(gnss.velocity()));
     }
 
-    let interval = 1.0 / GYRO_SAMPLE_RATE as f32;
-    let mut navigation = Navigation::new(altimeter.reader(), imu.as_accelerometer(), interval);
+    let mut navigation = Navigation::new(altimeter.reader(), speedometer.reader());
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         navigation.set_gnss(Box::new(gnss.position()));
     }

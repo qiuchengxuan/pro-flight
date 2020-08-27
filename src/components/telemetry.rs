@@ -19,7 +19,7 @@ use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
 use crate::datastructures::measurement::{Altitude, Gyro, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
 
-#[derive(Debug, Default, Copy, Clone, Value)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct Attitude {
     pub roll: i16,
     pub pitch: i16,
@@ -41,6 +41,17 @@ impl From<Euler> for Attitude {
 impl Into<hud::Attitude> for Attitude {
     fn into(self) -> hud::Attitude {
         hud::Attitude { roll: self.roll / 10, pitch: (self.pitch / 10) as i8 }
+    }
+}
+
+impl sval::value::Value for Attitude {
+    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
+        stream.map_begin(Some(2))?;
+        stream.map_key("roll")?;
+        stream.map_value(self.roll / 10)?;
+        stream.map_key("pitch")?;
+        stream.map_value(self.pitch / 10)?;
+        stream.map_end()
     }
 }
 

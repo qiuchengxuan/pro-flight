@@ -1,51 +1,51 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 
-use nalgebra::Vector3;
-
-use crate::algorithm::runge_kutta4;
+use crate::algorithm::ComplementaryFilter;
 use crate::alloc;
 use crate::components::schedule::{Rate, Schedulable};
 use crate::datastructures::coordinate::{Displacement, Position};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
-use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData};
+use crate::datastructures::data_source::{AgingStaticData, DataWriter, StaticData};
 use crate::datastructures::measurement::displacement::DistanceVector;
-use crate::datastructures::measurement::unit::CentiMeter;
-use crate::datastructures::measurement::{Altitude, GRAVITY};
+use crate::datastructures::measurement::unit::Meter;
+use crate::datastructures::measurement::{Altitude, VelocityVector};
 use crate::datastructures::waypoint::{Steerpoint, Waypoint};
 
 const CURRENT: usize = 0;
 const HOME: usize = 0;
 const MAX_WAYPOINT: usize = 32;
 
-pub struct Navigation<A, ACCEL> {
+pub struct Navigation<A, S> {
     altimeter: A,
-    accelerometer: ACCEL,
+    speedometer: S,
+
     gnss: Option<Box<dyn AgingStaticData<Position>>>,
+
+    velocity: VelocityVector<f32, Meter>,
+    filters: [ComplementaryFilter<f32>; 3],
+    displacement: (f32, f32, f32),
     waypoints: [Waypoint; MAX_WAYPOINT],
-    offset: DistanceVector<f32, CentiMeter>,
-    displacements: [Displacement; MAX_WAYPOINT],
+    displacements: [Displacement<Meter>; MAX_WAYPOINT],
     output: Rc<SingularData<(Position, Steerpoint)>>,
     next_waypoint: u8,
     max_waypoint: u8,
-    interval: f32,
-    time: f32,
 }
 
-impl<A, ACCEL> Navigation<A, ACCEL> {
-    pub fn new(altimeter: A, accelerometer: ACCEL, interval: f32) -> Self {
+impl<A, S> Navigation<A, S> {
+    pub fn new(altimeter: A, speedometer: S) -> Self {
         Self {
             altimeter,
-            accelerometer,
+            speedometer,
             gnss: None,
+            velocity: VelocityVector::default(),
+            filters: [ComplementaryFilter::new(0.5, 0.02); 3],
+            displacement: (0.0, 0.0, 0.0),
             waypoints: [Waypoint::default(); MAX_WAYPOINT],
-            offset: Default::default(),
             displacements: [Displacement::default(); MAX_WAYPOINT],
             output: Rc::new(SingularData::default()),
             next_waypoint: HOME as u8,
             max_waypoint: 1,
-            interval,
-            time: 0.0,
         }
     }
 
@@ -73,10 +73,10 @@ impl<A, ACCEL> Navigation<A, ACCEL> {
     }
 }
 
-impl<A, ACCEL> Schedulable for Navigation<A, ACCEL>
+impl<A, S> Schedulable for Navigation<A, S>
 where
-    A: OptionData<Altitude>,
-    ACCEL: OptionData<Vector3<f32>>,
+    A: StaticData<Altitude>,
+    S: StaticData<VelocityVector<f32, Meter>>,
 {
     fn rate(&self) -> Rate {
         50
@@ -84,43 +84,41 @@ where
 
     fn schedule(&mut self) -> bool {
         let rate = self.rate();
-        // TODO: complementary filter
-        if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten() {
-            if self.waypoints[HOME].position.latitude.0 == 0 {
+        let dt = 1.0 / rate as f32;
+
+        if self.waypoints[HOME].position.latitude.0 == 0 {
+            if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten() {
                 self.waypoints[HOME].position = position;
             }
-            self.offset = (self.waypoints[HOME].position - position).convert(|v| v as f32);
-            self.time = 0.0;
-            return true;
         }
 
-        let altimeter = self.altimeter.read();
-
-        while let Some(mut acceleration) = self.accelerometer.read() {
-            acceleration *= GRAVITY;
-            let (ax, ay, az) = (acceleration[0], acceleration[1], acceleration[2] + GRAVITY);
-            let (t, dt) = (self.time, self.interval);
-            let mut offset = self.offset;
-            // TODO: complementary filter
-            offset.x.value = runge_kutta4(|_, dt| ax * dt, offset.x.value(), t, dt);
-            offset.y.value = runge_kutta4(|_, dt| ay * dt, offset.y.value(), t, dt);
-            if let Some(altitude) = altimeter {
-                if self.waypoints[HOME].position.altitude.is_zero() {
-                    self.waypoints[HOME].position.altitude = altitude;
-                }
-                let height = altitude - self.waypoints[HOME].position.altitude;
-                self.offset.z = height.convert(|v| v as f32);
-            } else {
-                offset.z.value = runge_kutta4(|_, dt| az * dt, offset.z.value(), t, dt);
-            }
-            self.offset = offset;
-            self.displacements[CURRENT] = offset.convert(|v| v as i32);
-            self.time += self.interval;
-            let waypoint = self.waypoints[self.next_waypoint as usize];
-            let steerpoint = Steerpoint { index: self.next_waypoint, waypoint };
-            let position = self.waypoints[HOME].position + self.displacements[CURRENT];
-            self.output.write((position, steerpoint));
+        if self.waypoints[HOME].position.altitude.is_zero() {
+            self.waypoints[HOME].position.altitude = self.altimeter.read();
         }
+        let height = self.altimeter.read() - self.waypoints[HOME].position.altitude;
+        let height = height.convert(|v| v as f32).to_unit(Meter);
+
+        let gnss = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten().map(|position| {
+            (self.waypoints[HOME].position - position).convert(|v| v as f32).to_unit(Meter)
+        });
+
+        let v = self.speedometer.read();
+        if let Some(position) = gnss {
+            self.displacement.0 = self.filters[0].filter(position.x.value(), v.x.value());
+            self.displacement.1 = self.filters[1].filter(position.y.value(), v.y.value());
+        } else {
+            self.displacement.0 += (v.x + (v.x - self.velocity.x) / 2.0).value() * dt;
+            self.displacement.1 += (v.y + (v.y - self.velocity.y) / 2.0).value() * dt;
+        }
+        self.displacement.2 = self.filters[2].filter(height.value(), v.z.value());
+        self.velocity = v;
+
+        let s: DistanceVector<f32, Meter> = self.displacement.into();
+        self.displacements[CURRENT] = s.convert(|v| v as i32);
+        let waypoint = self.waypoints[self.next_waypoint as usize];
+        let steerpoint = Steerpoint { index: self.next_waypoint, waypoint };
+        let position = self.waypoints[HOME].position + self.displacements[CURRENT];
+        self.output.write((position, steerpoint));
         true
     }
 }
