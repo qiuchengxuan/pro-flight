@@ -1,3 +1,4 @@
+use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
 pub mod battery;
@@ -137,6 +138,20 @@ impl Acceleration {
     pub fn calibrated(self, zero: &Axes, gain: &Axes) -> Self {
         let axes = (self.0.axes - zero) * gain / self.0.sensitive;
         return Self(Measurement { axes, sensitive: self.0.sensitive });
+    }
+}
+
+impl Acceleration {
+    pub fn g_force(&self) -> u8 {
+        let axes = self.0.axes;
+        let (x, y, z) = (axes.x, axes.y, axes.z);
+        let square_sum = x * x + y * y + z * z;
+        if square_sum > 0 {
+            let g_force = square_sum.integer_sqrt();
+            (g_force * 10 / self.0.sensitive) as u8
+        } else {
+            0
+        }
     }
 }
 

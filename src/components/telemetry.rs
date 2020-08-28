@@ -4,7 +4,7 @@ use alloc::rc::Rc;
 use ascii_osd_hud::telemetry as hud;
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
-use nalgebra::{Quaternion, UnitQuaternion, Vector3};
+use nalgebra::{Quaternion, UnitQuaternion};
 
 use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
@@ -16,7 +16,7 @@ use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
-use crate::datastructures::measurement::{Altitude, Gyro, VelocityVector};
+use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -27,13 +27,8 @@ pub struct Attitude {
 
 impl From<Euler> for Attitude {
     fn from(euler: Euler) -> Self {
-        let roll = (-euler.theta * 10.0) as i16;
-        let mut pitch = (-euler.phi * 10.0) as i16;
-        if pitch > 90_0 {
-            pitch = 90_0
-        } else if pitch < -90_0 {
-            pitch = -90_0
-        };
+        let roll = (-euler.roll * 10.0) as i16;
+        let pitch = (-euler.pitch * 10.0) as i16;
         Self { roll, pitch }
     }
 }
@@ -63,7 +58,7 @@ impl<U: Copy + Default + Into<u32>> Into<hud::SphericalCoordinate> for Spherical
 
 #[derive(Copy, Clone, Debug)]
 pub struct RawData {
-    pub acceleration: Vector3<f32>,
+    pub acceleration: Acceleration,
     pub gyro: Gyro,
     pub quaternion: UnitQuaternion<f32>,
     pub fix_type: Option<FixType>,
@@ -74,7 +69,7 @@ impl Default for RawData {
     fn default() -> Self {
         Self {
             quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
-            acceleration: Vector3::new(0.0, 0.0, 0.0),
+            acceleration: Acceleration::default(),
             gyro: Gyro::default(),
             fix_type: None,
             speed_vector: VelocityVector::default(),
@@ -86,14 +81,12 @@ impl sval::value::Value for RawData {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
         stream.map_begin(Some(4 + if self.fix_type.is_some() { 1 } else { 0 }))?;
         stream.map_key("acceleration")?;
-        let a = &self.acceleration;
-        let value: [f32; 3] = [a[0], a[1], a[2]];
-        stream.map_value(&value[..])?;
+        stream.map_value(&self.acceleration)?;
         stream.map_key("gyro")?;
         stream.map_value(&self.gyro)?;
         stream.map_key("quaternion")?;
         let q = &self.quaternion;
-        let value: [f32; 4] = [q[0], q[1], q[2], q[3]];
+        let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         stream.map_value(&value[..])?;
         if let Some(fix_type) = self.fix_type {
             stream.map_key("gnss-fix-type")?;
@@ -151,16 +144,11 @@ pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
     telemetry: Rc<SingularData<TelemetryData>>,
 }
 
-fn g_force(acceleration: &Vector3<f32>) -> u8 {
-    let (x, y, z) = (acceleration[0], acceleration[1], acceleration[2]);
-    ((x * x + y * y + z * z).sqrt() * 10.0) as u8
-}
-
 impl<A, B, ACCEL, G, IMU, S, NAV> Schedulable for TelemetryUnit<A, B, ACCEL, G, IMU, S, NAV>
 where
     A: StaticData<Altitude>,
     B: StaticData<Battery>,
-    ACCEL: StaticData<Vector3<f32>>,
+    ACCEL: StaticData<Acceleration>,
     G: StaticData<Gyro>,
     IMU: StaticData<UnitQuaternion<f32>>,
     S: StaticData<VelocityVector<f32, Meter>>,
@@ -183,7 +171,7 @@ where
         let euler = euler * DEGREE_PER_DAG;
         let (position, steerpoint) = self.navigation.read();
         let input_option = self.control_input.as_mut().map(|i| i.read(rate)).flatten();
-        let heading = (-euler.psi) as isize;
+        let heading = -euler.yaw as isize;
 
         let acceleration = self.accelerometer.read();
         let gyro = self.gyroscope.read();
@@ -195,9 +183,9 @@ where
         let data = TelemetryData {
             attitude: euler.into(),
             altitude,
-            heading: if heading > 0 { heading } else { 360 + heading } as u16,
+            heading: if heading >= 0 { heading } else { 360 + heading } as u16,
             height: altitude - self.initial_altitude,
-            g_force: g_force(&acceleration),
+            g_force: acceleration.g_force(),
             airspeed: vector.to_unit(Knot).distance().value() as u16,
             vario: vector.z.to_unit(FTpM).value() as i16,
             battery: battery / self.battery_cells as u16,

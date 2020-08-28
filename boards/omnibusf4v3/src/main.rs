@@ -257,7 +257,7 @@ fn main() -> ! {
     };
 
     let rate = GYRO_SAMPLE_RATE as u16;
-    let mut imu = IMU::new(accelerometer, gyroscope.clone(), rate);
+    let mut imu = IMU::new(accelerometer.clone(), gyroscope.clone(), rate);
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         imu.set_heading(Box::new(gnss.heading()));
     }
@@ -276,7 +276,7 @@ fn main() -> ! {
     let mut telemetry = TelemetryUnit::new(
         altimeter.reader(),
         battery,
-        imu.as_accelerometer(),
+        accelerometer,
         gyroscope,
         imu.as_imu(),
         speedometer.reader(),

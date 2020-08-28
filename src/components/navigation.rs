@@ -102,16 +102,16 @@ where
             (self.waypoints[HOME].position - position).convert(|v| v as f32).to_unit(Meter)
         });
 
-        let v = self.speedometer.read();
+        let velocity = self.speedometer.read();
         if let Some(position) = gnss {
-            self.displacement.0 = self.filters[0].filter(position.x.value(), v.x.value());
-            self.displacement.1 = self.filters[1].filter(position.y.value(), v.y.value());
+            self.displacement.0 = self.filters[0].filter(position.x.value(), velocity.x.value());
+            self.displacement.1 = self.filters[1].filter(position.y.value(), velocity.y.value());
         } else {
-            self.displacement.0 += (v.x + (v.x - self.velocity.x) / 2.0).value() * dt;
-            self.displacement.1 += (v.y + (v.y - self.velocity.y) / 2.0).value() * dt;
+            self.displacement.0 += (velocity.x + (velocity.x - self.velocity.x) / 2.0).value() * dt;
+            self.displacement.1 += (velocity.y + (velocity.y - self.velocity.y) / 2.0).value() * dt;
         }
-        self.displacement.2 = self.filters[2].filter(height.value(), v.z.value());
-        self.velocity = v;
+        self.displacement.2 = self.filters[2].filter(height.value(), velocity.z.value());
+        self.velocity = velocity;
 
         let s: DistanceVector<f32, Meter> = self.displacement.into();
         self.displacements[CURRENT] = s.convert(|v| v as i32);

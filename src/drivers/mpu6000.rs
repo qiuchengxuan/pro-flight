@@ -27,7 +27,7 @@ static mut MPU6000_DATA: MaybeUninit<MPU6000Data> = MaybeUninit::uninit();
 
 impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
     fn into(self) -> Measurement {
-        let axes = Axes { x: self.x as i32, y: self.y as i32, z: self.z as i32 };
+        let axes = Axes { x: -self.x as i32, y: -self.y as i32, z: -self.z as i32 };
         let sensitive: f32 = ACCELEROMETER_SENSITIVE.into();
         Measurement { axes, sensitive: sensitive as i32 }
     }

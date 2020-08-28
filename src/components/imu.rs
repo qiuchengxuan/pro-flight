@@ -96,20 +96,20 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         let acceleration = accel.calibrated(&self.accelerometer_bias, &self.accelerometer_gain);
         let raw_gyro = gyro.calibrated(&self.gyro_bias);
 
+        let acceleration: Vector3<f32> = acceleration.0.into();
         let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
 
         let result = if let Some(magnetism) = mag {
-            self.ahrs.update(&gyro, &(acceleration.0.into()), &magnetism)
+            self.ahrs.update(&gyro, &-acceleration, &magnetism)
         } else {
-            self.ahrs.update_imu(&gyro, &(acceleration.0.into()))
+            self.ahrs.update_imu(&gyro, &-acceleration)
         };
 
         match result {
             Ok(&quaternion) => {
                 let unit_quaternion = UnitQuaternion::new_normalize(quaternion);
-                let mut acceleration = unit_quaternion.transform_vector(&acceleration.0.into());
-                acceleration[2] = -acceleration[2];
+                let acceleration = unit_quaternion.transform_vector(&acceleration);
                 self.acceleration.write(acceleration);
                 self.gyro.write(raw_gyro);
                 self.quaternion.write(unit_quaternion);
