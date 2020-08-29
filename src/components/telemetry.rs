@@ -14,6 +14,7 @@ use crate::datastructures::data_source::{AgingStaticData, DataWriter, StaticData
 use crate::datastructures::gnss::FixType;
 use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
+use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
 use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, VelocityVector};
@@ -63,6 +64,7 @@ pub struct RawData {
     pub quaternion: UnitQuaternion<f32>,
     pub fix_type: Option<FixType>,
     pub speed_vector: VelocityVector<f32, Meter>,
+    pub displacement: DistanceVector<i32, Meter>,
 }
 
 impl Default for RawData {
@@ -73,13 +75,14 @@ impl Default for RawData {
             gyro: Gyro::default(),
             fix_type: None,
             speed_vector: VelocityVector::default(),
+            displacement: DistanceVector::default(),
         }
     }
 }
 
 impl sval::value::Value for RawData {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(4 + if self.fix_type.is_some() { 1 } else { 0 }))?;
+        stream.map_begin(Some(5 + if self.fix_type.is_some() { 1 } else { 0 }))?;
         stream.map_key("acceleration")?;
         stream.map_value(&self.acceleration)?;
         stream.map_key("gyro")?;
@@ -94,6 +97,8 @@ impl sval::value::Value for RawData {
         }
         stream.map_key("speed-vector")?;
         stream.map_value(&self.speed_vector)?;
+        stream.map_key("displacement")?;
+        stream.map_value(&self.displacement)?;
         stream.map_end()
     }
 }
@@ -180,6 +185,8 @@ where
         let speed_vector = self.speedometer.read();
         let vector = speed_vector.convert(|v| v as i32);
 
+        let displacement = steerpoint.waypoint.position - position;
+
         let data = TelemetryData {
             attitude: euler.into(),
             altitude,
@@ -193,7 +200,7 @@ where
             steerpoint,
             receiver: self.receiver.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
-            raw: RawData { acceleration, gyro, quaternion, fix_type, speed_vector },
+            raw: RawData { acceleration, gyro, quaternion, fix_type, speed_vector, displacement },
         };
         self.telemetry.write(data);
         true

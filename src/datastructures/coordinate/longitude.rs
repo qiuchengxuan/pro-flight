@@ -40,8 +40,8 @@ impl Longitude {
 impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Longitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<i32, U>) -> Self {
-        Self(self.0 + distance.to_unit(CentiMeter).value() * SUB_SECOND * SCALE * 1000 / 30_715)
+    fn add(self, delta: Distance<i32, U>) -> Self {
+        Self(self.0 + delta.to_unit(CentiMeter).value() * SUB_SECOND * SCALE * 10 / 30_715)
     }
 }
 
@@ -49,7 +49,7 @@ impl core::ops::Sub for Longitude {
     type Output = Distance<i32, Meter>;
 
     fn sub(self, other: Self) -> Distance<i32, Meter> {
-        let value = ((self.0 - other.0) / 1000 * 30_715 / SCALE / SUB_SECOND) as i32;
+        let value = ((self.0 - other.0) as f32 / (SCALE * SUB_SECOND) as f32 * 30.715) as i32;
         Distance::new(value, Meter)
     }
 }
@@ -79,6 +79,6 @@ mod test {
         assert_eq!("E116°44.540", format!("{}", longitude));
 
         let distance = longitude - Longitude::from_str("E116°43.540").unwrap();
-        assert_eq!("1823m", format!("{}", distance));
+        assert_eq!("1842m", format!("{}", distance));
     }
 }

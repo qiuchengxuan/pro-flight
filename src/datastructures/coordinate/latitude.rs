@@ -47,7 +47,7 @@ impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Latitud
     type Output = Self;
 
     fn add(self, distance: Distance<i32, U>) -> Self {
-        Self(self.0 + distance.to_unit(CentiMeter).value() * SUB_SECOND * 100 * SCALE / 30_92)
+        Self(self.0 + distance.to_unit(CentiMeter).value() * SUB_SECOND * SCALE / 30_92)
     }
 }
 
@@ -55,7 +55,7 @@ impl core::ops::Sub for Latitude {
     type Output = Distance<i32, Meter>;
 
     fn sub(self, other: Self) -> Distance<i32, Meter> {
-        let value = (self.0 - other.0) / 100 * 30_92 / SCALE / SUB_SECOND;
+        let value = ((self.0 - other.0) as f32 / (SCALE * SUB_SECOND) as f32 * 30.92) as i32;
         Distance::new(value, Meter)
     }
 }

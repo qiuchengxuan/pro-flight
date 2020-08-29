@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::ptr::{read_volatile, write_volatile};
 
 pub type Rate = usize;
 
@@ -31,6 +32,7 @@ macro_rules! schedulables {
     }
 }
 
+schedulables! {0, 1 -> S0, S1}
 schedulables! {0, 1, 2, 3, 4, 5, 6, 7 -> S0, S1, S2, S3, S4, S5, S6, S7}
 
 pub struct TaskInfo {
@@ -63,12 +65,12 @@ impl<S: Schedulables> Schedulable for Scheduler<S> {
             task_info.counter += 1;
         }
 
-        if self.running {
+        if unsafe { read_volatile(&self.running) } {
             // in case of re-enter
             return true;
         }
 
-        self.running = true;
+        unsafe { write_volatile(&mut self.running, true) };
         for i in 0..S::len() {
             let task_info = &mut self.task_infos[i];
             if task_info.counter < task_info.interval {
@@ -78,7 +80,7 @@ impl<S: Schedulables> Schedulable for Scheduler<S> {
                 task_info.counter = 0;
             }
         }
-        self.running = false;
+        unsafe { write_volatile(&mut self.running, false) };
         true
     }
 

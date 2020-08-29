@@ -309,8 +309,8 @@ fn main() -> ! {
     let mut telemetry_source = telemetry.reader();
     let schedule_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
     let tasks = (schedule_trigger, baro, altimeter, imu, speedometer, navigation, telemetry, osd);
-    let group = Scheduler::new(tasks, 100);
-    tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 100);
+    let group = Scheduler::new(tasks, 200);
+    tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 200);
 
     let mut cli = CLI::new();
     let mut timer = SysTimer::new();
