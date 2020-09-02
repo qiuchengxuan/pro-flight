@@ -83,7 +83,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         let mut rotate_vector = unit.inverse_transform_vector(&forward);
         rotate_vector[2] = 0.0; // Rotate around z axis only
         if rotate_vector.norm_squared() > 0.01 {
-            let heading = heading as f32 / DEGREE_PER_DAG;
+            let heading = (heading as f32).to_degrees();
             let vector = Vector3::new(heading.cos(), heading.sin(), 0.0);
             let vector = rotate_vector.normalize().cross(&vector);
             Some(unit.transform_vector(&vector))
@@ -148,7 +148,8 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
         if let Some(heading) = self.heading.as_mut().map(|h| h.read(rate)).flatten() {
             while let Some(gyro) = self.gyroscope.read() {
                 let acceleration = self.accelerometer.read().unwrap();
-                self.update_imu(&acceleration, &gyro, self.heading_as_magnitism(heading.into()));
+                let magnitism = self.heading_as_magnitism(heading.or_course());
+                self.update_imu(&acceleration, &gyro, magnitism);
             }
         } else {
             while let Some(gyro) = self.gyroscope.read() {

@@ -25,6 +25,7 @@ Progress
   - [x] software interrupt based event
   - [x] GNSS improved AHRS
   - [x] Complementary filter
+  - [x] GNSS NMEA Protocol
 * WIP
   - [ ] Stabilizer
 * Future
@@ -33,7 +34,7 @@ Progress
   - [ ] Navigation
   - [ ] EKF filter
   - [ ] Involve async syntax
-  - [ ] GNSS NMEA Protocol
+  - [ ] Camera distortion adaption
 
 Memory allocator
 ================

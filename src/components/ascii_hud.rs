@@ -8,7 +8,6 @@ use ascii_osd_hud::{AspectRatio, PixelRatio};
 use crate::components::telemetry::TelemetryData;
 use crate::datastructures::coordinate::SphericalCoordinate;
 use crate::datastructures::data_source::StaticData;
-use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::unit::{Feet, Knot, Meter, NauticalMile};
 use crate::datastructures::measurement::VelocityVector;
@@ -99,8 +98,8 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
 
         let mut note_buffer = [0u8; 30];
         let mut index = 0;
-        if let Some(fix_type) = data.raw.fix_type {
-            if fix_type == FixType::NoFix {
+        if let Some(fixed) = data.raw.gnss_fixed {
+            if !fixed {
                 note_buffer[index..index + NO_GPS.len()].copy_from_slice(NO_GPS.as_bytes());
                 index += NO_GPS.len();
             }

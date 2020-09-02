@@ -11,7 +11,6 @@ use crate::config;
 use crate::datastructures::coordinate::{Position, SphericalCoordinate};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{AgingStaticData, DataWriter, StaticData};
-use crate::datastructures::gnss::FixType;
 use crate::datastructures::input::{ControlInput, Receiver};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::displacement::DistanceVector;
@@ -19,6 +18,7 @@ use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
 use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
+use crate::datastructures::GNSSFixed;
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Attitude {
@@ -62,7 +62,7 @@ pub struct RawData {
     pub acceleration: Acceleration,
     pub gyro: Gyro,
     pub quaternion: UnitQuaternion<f32>,
-    pub fix_type: Option<FixType>,
+    pub gnss_fixed: Option<bool>,
     pub speed_vector: VelocityVector<f32, Meter>,
     pub displacement: DistanceVector<i32, Meter>,
 }
@@ -73,7 +73,7 @@ impl Default for RawData {
             quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             acceleration: Acceleration::default(),
             gyro: Gyro::default(),
-            fix_type: None,
+            gnss_fixed: None,
             speed_vector: VelocityVector::default(),
             displacement: DistanceVector::default(),
         }
@@ -82,7 +82,7 @@ impl Default for RawData {
 
 impl sval::value::Value for RawData {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(5 + if self.fix_type.is_some() { 1 } else { 0 }))?;
+        stream.map_begin(Some(5 + if self.gnss_fixed.is_some() { 1 } else { 0 }))?;
         stream.map_key("acceleration")?;
         stream.map_value(&self.acceleration)?;
         stream.map_key("gyro")?;
@@ -91,9 +91,9 @@ impl sval::value::Value for RawData {
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         stream.map_value(&value[..])?;
-        if let Some(fix_type) = self.fix_type {
-            stream.map_key("gnss-fix-type")?;
-            stream.map_value(fix_type)?;
+        if let Some(fixed) = self.gnss_fixed {
+            stream.map_key("gnss-fix")?;
+            stream.map_value(fixed)?;
         }
         stream.map_key("speed-vector")?;
         stream.map_value(&self.speed_vector)?;
@@ -142,7 +142,7 @@ pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
     receiver: Option<Box<dyn AgingStaticData<Receiver>>>,
     control_input: Option<Box<dyn AgingStaticData<ControlInput>>>,
-    gnss: Option<Box<dyn StaticData<FixType>>>,
+    gnss_fix: Option<Box<dyn StaticData<GNSSFixed>>>,
 
     initial_altitude: Altitude,
     battery_cells: u8,
@@ -180,7 +180,7 @@ where
 
         let acceleration = self.accelerometer.read();
         let gyro = self.gyroscope.read();
-        let fix_type = self.gnss.as_mut().map(|g| g.read());
+        let gnss_fixed = self.gnss_fix.as_mut().map(|g| g.read().into());
 
         let speed_vector = self.speedometer.read();
         let vector = speed_vector.convert(|v| v as i32);
@@ -200,7 +200,7 @@ where
             steerpoint,
             receiver: self.receiver.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
-            raw: RawData { acceleration, gyro, quaternion, fix_type, speed_vector, displacement },
+            raw: RawData { acceleration, gyro, quaternion, gnss_fixed, speed_vector, displacement },
         };
         self.telemetry.write(data);
         true
@@ -233,7 +233,7 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
             receiver: None,
             control_input: None,
-            gnss: None,
+            gnss_fix: None,
 
             initial_altitude: Default::default(),
             battery_cells: config.battery.cells,
@@ -249,8 +249,8 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
         self.control_input = Some(input)
     }
 
-    pub fn set_gnss(&mut self, gnss: Box<dyn StaticData<FixType>>) {
-        self.gnss = Some(gnss)
+    pub fn set_gnss(&mut self, gnss: Box<dyn StaticData<GNSSFixed>>) {
+        self.gnss_fix = Some(gnss)
     }
 
     pub fn reader(&self) -> SingularDataSource<TelemetryData> {

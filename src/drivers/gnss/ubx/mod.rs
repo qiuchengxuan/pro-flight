@@ -6,12 +6,13 @@ use core::mem::transmute;
 
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
+use crate::datastructures::data_source::u16_source::{U16Data, U16DataSource};
 use crate::datastructures::data_source::DataWriter;
-use crate::datastructures::gnss::FixType;
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{CentiMeter, MilliMeter};
 use crate::datastructures::measurement::VelocityVector;
 use crate::datastructures::measurement::{Course, HeadingOrCourse};
+use crate::datastructures::GNSSFixed;
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
@@ -33,11 +34,11 @@ pub enum State {
 pub struct UBXDecoder {
     state: State,
     normal: bool,
-    fix_type: Rc<SingularData<FixType>>,
+    fixed: Rc<U16Data<GNSSFixed>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<VelocityVector<i32, MilliMeter>>>,
-    heading: Rc<SingularData<HeadingOrCourse>>,
-    course: Rc<SingularData<Course>>,
+    heading: Rc<U16Data<HeadingOrCourse>>,
+    course: Rc<U16Data<Course>>,
     buffer: [u8; MAX_MESSAGE_SIZE],
 }
 
@@ -46,17 +47,17 @@ impl UBXDecoder {
         Self {
             state: State::WaitHeader0,
             normal: true,
-            fix_type: Rc::new(SingularData::default()),
+            fixed: Rc::new(U16Data::default()),
             position: Rc::new(SingularData::default()),
             velocity: Rc::new(SingularData::default()),
-            course: Rc::new(SingularData::default()),
-            heading: Rc::new(SingularData::default()),
+            heading: Rc::new(U16Data::default()),
+            course: Rc::new(U16Data::default()),
             buffer: [0u8; MAX_MESSAGE_SIZE],
         }
     }
 
-    pub fn fix_type(&self) -> SingularDataSource<FixType> {
-        SingularDataSource::new(&self.fix_type)
+    pub fn fixed(&self) -> U16DataSource<GNSSFixed> {
+        U16DataSource::new(&self.fixed)
     }
 
     pub fn position(&self) -> SingularDataSource<Position> {
@@ -67,12 +68,12 @@ impl UBXDecoder {
         SingularDataSource::new(&self.velocity)
     }
 
-    pub fn course(&self) -> SingularDataSource<Course> {
-        SingularDataSource::new(&self.course)
+    pub fn course(&self) -> U16DataSource<Course> {
+        U16DataSource::new(&self.course)
     }
 
-    pub fn heading(&self) -> SingularDataSource<HeadingOrCourse> {
-        SingularDataSource::new(&self.heading)
+    pub fn heading(&self) -> U16DataSource<HeadingOrCourse> {
+        U16DataSource::new(&self.heading)
     }
 
     fn handle_pvt_message(&mut self) {
@@ -85,12 +86,10 @@ impl UBXDecoder {
 
         let payload = &pvt_message.payload;
 
-        let fix_type = match payload.fix_type {
-            UBXFixType::TwoDemension => FixType::TwoDemension,
-            UBXFixType::ThreeDemension => FixType::ThreeDemension,
-            _ => FixType::NoFix,
-        };
-        self.fix_type.write(fix_type);
+        self.fixed.write(match payload.fix_type {
+            UBXFixType::TwoDemension | UBXFixType::ThreeDemension => GNSSFixed(true),
+            _ => GNSSFixed(false),
+        });
 
         if payload.fix_type == UBXFixType::ThreeDemension {
             self.position.write(Position {
@@ -117,10 +116,7 @@ impl UBXDecoder {
         }
     }
 
-    pub fn handle(&mut self, ring: &[u8], half: bool) {
-        if half {
-            return;
-        }
+    pub fn handle(&mut self, ring: &[u8]) {
         let mut index = 0;
         let mut message: &mut Message<()> = unsafe { transmute(&mut self.buffer) };
         while index < ring.len() {

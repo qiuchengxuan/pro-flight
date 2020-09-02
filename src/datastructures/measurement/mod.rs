@@ -25,17 +25,36 @@ pub enum HeadingOrCourse {
     Course(Course),
 }
 
+impl HeadingOrCourse {
+    pub fn or_course(self) -> u16 {
+        match self {
+            Self::Heading(h) => h,
+            Self::Course(c) => c,
+        }
+    }
+}
+
 impl Default for HeadingOrCourse {
     fn default() -> Self {
         Self::Course(0)
     }
 }
 
-impl Into<Heading> for HeadingOrCourse {
-    fn into(self) -> Heading {
+impl Into<u16> for HeadingOrCourse {
+    fn into(self) -> u16 {
         match self {
             Self::Heading(h) => h,
-            Self::Course(c) => c,
+            Self::Course(c) => u16::MAX - c,
+        }
+    }
+}
+
+impl From<u16> for HeadingOrCourse {
+    fn from(value: u16) -> Self {
+        if value <= 360 {
+            Self::Heading(value)
+        } else {
+            Self::Course(u16::MAX - value)
         }
     }
 }

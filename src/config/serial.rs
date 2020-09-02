@@ -40,11 +40,15 @@ impl core::fmt::Display for Identifier {
 #[derive(PartialEq, Copy, Clone)]
 pub enum GNSSProtocol {
     UBX,
+    NMEA,
 }
 
 impl core::fmt::Display for GNSSProtocol {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "UBX")
+        match self {
+            Self::UBX => write!(f, "UBX"),
+            Self::NMEA => write!(f, "NMEA"),
+        }
     }
 }
 
@@ -85,6 +89,7 @@ impl FromYAML for Config {
         let mut fast = false;
         let mut rx_inverted = false;
         let mut half_duplex = false;
+        let mut protocol = GNSSProtocol::UBX;
         while let Some((key, value)) = parser.next_key_value() {
             match key {
                 "type" => type_string = value,
@@ -92,13 +97,17 @@ impl FromYAML for Config {
                 "fast" => fast = value == "true",
                 "rx-inverted" => rx_inverted = value == "true",
                 "half-duplex" => half_duplex = value == "true",
-                "protocol" => continue,
+                "protocol" => {
+                    if value != "UBX" {
+                        protocol = GNSSProtocol::NMEA
+                    }
+                }
                 _ => continue,
             }
         }
         match type_string {
             "SBUS" => Config::SBUS(SbusConfig { fast, rx_inverted, half_duplex }),
-            "GNSS" => Config::GNSS(GNSSConfig { baudrate, protocol: GNSSProtocol::UBX }),
+            "GNSS" => Config::GNSS(GNSSConfig { baudrate, protocol }),
             _ => Config::None,
         }
     }

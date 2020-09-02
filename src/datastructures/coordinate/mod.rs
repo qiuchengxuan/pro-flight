@@ -11,7 +11,6 @@ pub use longitude::Longitude;
 
 use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::distance::Distance;
-use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
 use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 use crate::datastructures::measurement::Altitude;
 
@@ -29,11 +28,11 @@ impl<U: Copy + Default> From<DistanceVector<f32, U>> for SphericalCoordinate<U> 
             return SphericalCoordinate { rho: rho.convert(|v| v as u32), theta: 0, phi: 0 };
         }
         let (x, y, z) = vector.into();
-        let theta = (x.atan2(y) * DEGREE_PER_DAG) as i16;
+        let theta = x.atan2(y).to_degrees() as i16;
         let phi = if z >= 0.0 {
-            90 - ((z / rho.value()).acos() * DEGREE_PER_DAG) as i8
+            90 - (z / rho.value()).acos().to_degrees() as i8
         } else {
-            ((-z / rho.value()).acos() * DEGREE_PER_DAG) as i8 - 90
+            (-z / rho.value()).acos().to_degrees() as i8 - 90
         };
         SphericalCoordinate { rho: rho.convert(|v| v as u32), theta, phi }
     }

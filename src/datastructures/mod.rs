@@ -1,12 +1,32 @@
 pub mod coordinate;
 pub mod data_source;
-pub mod gnss;
 pub mod input;
 pub mod measurement;
 pub mod waypoint;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Ratio(pub u8, pub u8);
+
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub struct GNSSFixed(pub bool);
+
+impl Into<u16> for GNSSFixed {
+    fn into(self) -> u16 {
+        self.0 as u16
+    }
+}
+
+impl From<u16> for GNSSFixed {
+    fn from(value: u16) -> Self {
+        Self(value > 0)
+    }
+}
+
+impl Into<bool> for GNSSFixed {
+    fn into(self) -> bool {
+        self.0
+    }
+}
 
 impl Ratio {
     pub fn from_str(string: &str) -> Option<Self> {
