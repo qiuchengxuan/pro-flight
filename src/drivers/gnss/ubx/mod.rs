@@ -31,27 +31,27 @@ pub enum State {
 }
 
 pub struct UBXDecoder {
-    buffer: [u8; MAX_MESSAGE_SIZE],
     state: State,
+    normal: bool,
     fix_type: Rc<SingularData<FixType>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<VelocityVector<i32, MilliMeter>>>,
     heading: Rc<SingularData<HeadingOrCourse>>,
     course: Rc<SingularData<Course>>,
-    normal: bool,
+    buffer: [u8; MAX_MESSAGE_SIZE],
 }
 
 impl UBXDecoder {
     pub fn new() -> Self {
         Self {
-            buffer: [0u8; MAX_MESSAGE_SIZE],
             state: State::WaitHeader0,
+            normal: true,
             fix_type: Rc::new(SingularData::default()),
             position: Rc::new(SingularData::default()),
             velocity: Rc::new(SingularData::default()),
             course: Rc::new(SingularData::default()),
             heading: Rc::new(SingularData::default()),
-            normal: true,
+            buffer: [0u8; MAX_MESSAGE_SIZE],
         }
     }
 

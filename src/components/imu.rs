@@ -21,8 +21,8 @@ pub struct IMU<A, G> {
     heading: Option<Box<dyn AgingStaticData<HeadingOrCourse>>>,
 
     ahrs: Mahony<f32>,
-    accelerometer_bias: Axes,
-    accelerometer_gain: Axes,
+    accel_bias: Axes,
+    accel_gain: Axes,
     gyro_bias: Axes,
     calibration_loop: u16,
     counter: usize,
@@ -45,8 +45,8 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
             heading: None,
 
             ahrs: Mahony::new(1.0 / sample_rate as f32, 0.5, 0.0),
-            accelerometer_bias: config.bias.into(),
-            accelerometer_gain: config.gain.into(),
+            accel_bias: config.bias.into(),
+            accel_gain: config.gain.into(),
             gyro_bias: Default::default(),
             calibration_loop: 50,
             counter: 0,
@@ -93,7 +93,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
     }
 
     pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro, mag: Option<Vector3<f32>>) {
-        let acceleration = accel.calibrated(&self.accelerometer_bias, &self.accelerometer_gain);
+        let acceleration = accel.calibrated(&self.accel_bias, &self.accel_gain);
         let raw_gyro = gyro.calibrated(&self.gyro_bias);
 
         let acceleration: Vector3<f32> = acceleration.0.into();
@@ -126,12 +126,22 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
 
     fn schedule(&mut self) -> bool {
         if !self.calibrated {
-            while let Some(gyro) = self.gyroscope.read() {
+            let mut valid_loop = true;
+            while let Some(acceleration) = self.accelerometer.read() {
+                let accel = acceleration.0;
+                let gyro = self.gyroscope.read().unwrap();
+                if accel.axes.x.abs() > accel.sensitive / 10
+                    || accel.axes.y.abs() > accel.sensitive / 10
+                {
+                    valid_loop = false;
+                    continue;
+                }
                 self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
             }
-            self.accelerometer.read();
             self.calibrated = self.counter >= self.calibration_loop as usize;
-            self.counter += 1;
+            if valid_loop {
+                self.counter += 1;
+            }
             return true;
         }
         let rate = self.rate();

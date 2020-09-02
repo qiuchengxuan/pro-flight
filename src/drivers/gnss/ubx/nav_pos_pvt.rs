@@ -1,4 +1,5 @@
 use crate::datastructures::coordinate;
+use crate::datastructures::coordinate::{latitude, longitude};
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Valid(u8);
@@ -82,7 +83,10 @@ pub struct Longitude(i32);
 
 impl Into<coordinate::Longitude> for Longitude {
     fn into(self) -> coordinate::Longitude {
-        coordinate::Longitude(((self.0 as i64 * 3600) * 128 / 1000_000) as i32)
+        let degree = self.0 / 10_000_000;
+        let sub_degree = self.0 % 10_000_000;
+        let degree_as_sec = degree * 3600 * longitude::SUB_SECOND * longitude::SCALE;
+        coordinate::Longitude(degree_as_sec + sub_degree * longitude::SCALE / 1000 * 36 / 10)
     }
 }
 
@@ -91,7 +95,10 @@ pub struct Latitude(i32);
 
 impl Into<coordinate::Latitude> for Latitude {
     fn into(self) -> coordinate::Latitude {
-        coordinate::Latitude(((self.0 as i64 * 3600) * 128 / 1000_000) as i32)
+        let degree = self.0 / 10_000_000;
+        let sub_degree = self.0 % 10_000_000;
+        let degree_as_sec = degree * 3600 * latitude::SUB_SECOND * latitude::SCALE;
+        coordinate::Latitude(degree_as_sec + sub_degree * latitude::SCALE / 1000 * 36 / 10)
     }
 }
 

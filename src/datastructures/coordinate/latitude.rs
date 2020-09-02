@@ -1,11 +1,11 @@
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 
-const SUB_SECOND: i32 = 10;
-const SCALE: i32 = 128;
+pub const SUB_SECOND: i32 = 10;
+pub const SCALE: i32 = 128;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
-pub struct Latitude(pub i32);
+pub struct Latitude(pub i32); // in seconds * SUB_SECOND * SCALE
 
 impl Latitude {
     pub fn from_str(string: &str) -> Option<Self> {
