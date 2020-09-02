@@ -1,8 +1,9 @@
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{CentiMeter, Meter};
 
-pub const SUB_SECOND: i32 = 10;
-pub const SCALE: i32 = 128;
+pub const SUB_SECOND: i32 = 1000;
+
+const MAX_SECONDS: i32 = 180 * 3600 * SUB_SECOND;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub struct Latitude(pub i32); // in seconds * SUB_SECOND * SCALE
@@ -32,7 +33,7 @@ impl Latitude {
             Some(s) => s,
             None => return None,
         };
-        let value = (degree * 3600 * SUB_SECOND + minute * 60 * SUB_SECOND + sub_second) * SCALE;
+        let value = (degree * 3600 + minute * 60) * SUB_SECOND + sub_second;
         Some(Self(if positive { value } else { -value }))
     }
 }
@@ -46,8 +47,13 @@ impl PartialEq<i32> for Latitude {
 impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Latitude {
     type Output = Self;
 
-    fn add(self, distance: Distance<i32, U>) -> Self {
-        Self(self.0 + distance.to_unit(CentiMeter).value() * SUB_SECOND * SCALE / 30_92)
+    fn add(self, delta: Distance<i32, U>) -> Self {
+        let cm = delta.to_unit(CentiMeter).value() as i64;
+        let seconds = self.0 + (cm * SUB_SECOND as i64 / 30_92) as i32;
+        if seconds.abs() > MAX_SECONDS {
+            return Self(-(seconds % MAX_SECONDS));
+        }
+        Self(seconds)
     }
 }
 
@@ -55,18 +61,18 @@ impl core::ops::Sub for Latitude {
     type Output = Distance<i32, Meter>;
 
     fn sub(self, other: Self) -> Distance<i32, Meter> {
-        let value = ((self.0 - other.0) as f32 / (SCALE * SUB_SECOND) as f32 * 30.92) as i32;
-        Distance::new(value, Meter)
+        let delta = (self.0 - other.0) as i64;
+        Distance::new((delta * 30_92 / 100 / SUB_SECOND as i64) as i32, Meter)
     }
 }
 
 impl core::fmt::Display for Latitude {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let direction = if self.0 >= 0 { "N" } else { "S" };
-        let sub_second = if self.0 >= 0 { self.0 } else { -self.0 } / SCALE;
+        let sub_second = self.0.abs();
         let degree = sub_second / SUB_SECOND / 3600;
         let minute = (sub_second / SUB_SECOND / 60) % 60;
-        write!(f, "{}{:02}°{:02}.{:03}", direction, degree, minute, sub_second % 600)
+        write!(f, "{}{:02}°{:02}.{:03}", direction, degree, minute, sub_second % SUB_SECOND)
     }
 }
 
@@ -80,9 +86,13 @@ mod test {
     #[test]
     fn test_latitude() {
         use super::Latitude;
+        use crate::datastructures::measurement::distance::Distance;
+        use crate::datastructures::measurement::unit::CentiMeter;
 
         let latitude = Latitude::from_str("N40°19.480").unwrap();
         assert_eq!("N40°19.480", format!("{}", latitude));
+
+        assert_eq!("N40°19.478", format!("{}", latitude + Distance::new(-7, CentiMeter)));
 
         let distance = latitude - Latitude::from_str("N40°18.480").unwrap();
         assert_eq!("1855m", format!("{}", distance));

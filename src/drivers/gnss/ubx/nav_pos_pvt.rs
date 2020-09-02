@@ -83,10 +83,8 @@ pub struct Longitude(i32);
 
 impl Into<coordinate::Longitude> for Longitude {
     fn into(self) -> coordinate::Longitude {
-        let degree = self.0 / 10_000_000;
-        let sub_degree = self.0 % 10_000_000;
-        let degree_as_sec = degree * 3600 * longitude::SUB_SECOND * longitude::SCALE;
-        coordinate::Longitude(degree_as_sec + sub_degree * longitude::SCALE / 1000 * 36 / 10)
+        let sub_seconds = longitude::SUB_SECOND as i64;
+        coordinate::Longitude((self.0 as i64 * 36 * sub_seconds / 10_000) as i32)
     }
 }
 
@@ -95,10 +93,8 @@ pub struct Latitude(i32);
 
 impl Into<coordinate::Latitude> for Latitude {
     fn into(self) -> coordinate::Latitude {
-        let degree = self.0 / 10_000_000;
-        let sub_degree = self.0 % 10_000_000;
-        let degree_as_sec = degree * 3600 * latitude::SUB_SECOND * latitude::SCALE;
-        coordinate::Latitude(degree_as_sec + sub_degree * latitude::SCALE / 1000 * 36 / 10)
+        let sub_seconds = latitude::SUB_SECOND as i64;
+        coordinate::Latitude((self.0 as i64 * 36 * sub_seconds / 10_000) as i32)
     }
 }
 
@@ -157,7 +153,7 @@ mod test {
 
         let message = hex!(
             "00 00 00 00 E0 07 0A 15 16 0D 0A 04 01 00 00 00
-             01 00 00 00 03 0C E0 0B 86 BE 2F FF AD 1F 21 20
+             01 00 00 00 03 0C E0 0B 86 BE 2F FF AD 1F 21 04
              E0 F2 09 00 A0 56 09 00 01 00 00 00 01 00 00 00
              00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
              00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
@@ -167,8 +163,8 @@ mod test {
             unsafe { core::mem::transmute(message.as_ptr()) };
         assert_eq!(nav_pos_pvt.year, 2016);
         let longitude: Longitude = nav_pos_pvt.longitude.into();
-        assert_eq!("W001°21.533", format!("{}", longitude));
+        assert_eq!("W013°38.700", format!("{}", longitude));
         let latitude: Latitude = nav_pos_pvt.latitude.into();
-        assert_eq!("N53°54.150", format!("{}", latitude));
+        assert_eq!("N69°16.779", format!("{}", latitude));
     }
 }
