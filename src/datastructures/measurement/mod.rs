@@ -66,6 +66,11 @@ pub struct Axes {
     pub z: i32,
 }
 
+impl Axes {
+    pub const MAX: Axes = Axes { x: i32::MAX, y: i32::MAX, z: i32::MAX };
+    pub const MIN: Axes = Axes { x: i32::MIN, y: i32::MIN, z: i32::MIN };
+}
+
 impl core::ops::Add for Axes {
     type Output = Axes;
 

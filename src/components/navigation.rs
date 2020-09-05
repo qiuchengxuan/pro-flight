@@ -39,7 +39,7 @@ impl<A, S> Navigation<A, S> {
             speedometer,
             gnss: None,
             velocity: VelocityVector::default(),
-            filters: [ComplementaryFilter::new(0.5, 0.02); 3],
+            filters: [ComplementaryFilter::new(0.1, 0.02); 3],
             displacement: (0.0, 0.0, 0.0),
             waypoints: [Waypoint::default(); MAX_WAYPOINT],
             displacements: [Displacement::default(); MAX_WAYPOINT],

@@ -77,19 +77,38 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         SingularDataSource::new(&self.gyro)
     }
 
-    fn heading_as_magnitism(&self, heading: Heading) -> Option<Vector3<f32>> {
-        let unit = UnitQuaternion::new_normalize(self.ahrs.quat);
-        let forward = Vector3::new(1.0, 0.0, 0.0);
-        let mut rotate_vector = unit.inverse_transform_vector(&forward);
-        rotate_vector[2] = 0.0; // Rotate around z axis only
-        if rotate_vector.norm_squared() > 0.01 {
-            let heading = (heading as f32).to_degrees();
-            let vector = Vector3::new(heading.cos(), heading.sin(), 0.0);
-            let vector = rotate_vector.normalize().cross(&vector);
-            Some(unit.transform_vector(&vector))
-        } else {
-            None
+    fn calibrate(&mut self) -> bool {
+        let mut min = Axes::MAX;
+        let mut max = Axes::MIN;
+        let mut bias = self.gyro_bias;
+        let mut sensitive = 0;
+        while let Some(gyro) = self.gyroscope.read() {
+            self.accelerometer.read();
+            min.x = core::cmp::min(min.x, gyro.axes.x);
+            min.y = core::cmp::min(min.y, gyro.axes.y);
+            min.z = core::cmp::min(min.z, gyro.axes.z);
+            max.x = core::cmp::max(max.x, gyro.axes.x);
+            max.y = core::cmp::max(max.y, gyro.axes.y);
+            max.z = core::cmp::max(max.z, gyro.axes.z);
+            bias = (bias + gyro.axes) / 2;
+            sensitive = gyro.sensitive;
         }
+        if max.x - min.x > sensitive || max.y - min.y > sensitive || max.z - min.z > sensitive {
+            return true;
+        }
+        self.gyro_bias = (self.gyro_bias + bias) / 2;
+        self.counter += 1;
+        self.calibrated = self.counter >= self.calibration_loop as usize;
+        true
+    }
+
+    fn heading_as_magnitism(&self, heading: Heading) -> Vector3<f32> {
+        let unit = UnitQuaternion::new_normalize(self.ahrs.quat);
+        let forward = Vector3::new(0.0, 1.0, 0.0);
+        let vector = unit.inverse_transform_vector(&forward);
+        let heading = (heading as f32).to_radians();
+        let vector = Vector3::new(heading.sin(), heading.cos(), vector[2]);
+        unit.transform_vector(&vector)
     }
 
     pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro, mag: Option<Vector3<f32>>) {
@@ -101,7 +120,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         gyro = gyro / DEGREE_PER_DAG;
 
         let result = if let Some(magnetism) = mag {
-            self.ahrs.update(&gyro, &-acceleration, &magnetism)
+            self.ahrs.update(&gyro, &-acceleration, &-magnetism)
         } else {
             self.ahrs.update_imu(&gyro, &-acceleration)
         };
@@ -126,30 +145,14 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
 
     fn schedule(&mut self) -> bool {
         if !self.calibrated {
-            let mut valid_loop = true;
-            while let Some(acceleration) = self.accelerometer.read() {
-                let accel = acceleration.0;
-                let gyro = self.gyroscope.read().unwrap();
-                if accel.axes.x.abs() > accel.sensitive / 10
-                    || accel.axes.y.abs() > accel.sensitive / 10
-                {
-                    valid_loop = false;
-                    continue;
-                }
-                self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
-            }
-            self.calibrated = self.counter >= self.calibration_loop as usize;
-            if valid_loop {
-                self.counter += 1;
-            }
-            return true;
+            return self.calibrate();
         }
         let rate = self.rate();
         if let Some(heading) = self.heading.as_mut().map(|h| h.read(rate)).flatten() {
             while let Some(gyro) = self.gyroscope.read() {
                 let acceleration = self.accelerometer.read().unwrap();
                 let magnitism = self.heading_as_magnitism(heading.or_course());
-                self.update_imu(&acceleration, &gyro, magnitism);
+                self.update_imu(&acceleration, &gyro, Some(magnitism));
             }
         } else {
             while let Some(gyro) = self.gyroscope.read() {
