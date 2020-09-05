@@ -200,8 +200,8 @@ mod test {
         );
         let mut decoder = UBXDecoder::new();
         let mut position = decoder.position();
-        decoder.handle(&message[0..64], false);
-        decoder.handle(&message[64..message.len()], false);
+        decoder.handle(&message[0..64]);
+        decoder.handle(&message[64..message.len()]);
         assert_eq!(position.read().is_some(), true);
     }
 }

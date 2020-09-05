@@ -20,7 +20,7 @@ micromath = "1.0"
 mpu6000 = "0.1"
 nalgebra = { version = "0.18", default-features = false }
 nb = "0.1"
-nmea0183 = "0.2"
+nmea0183-core = { version = "0.1.1" }
 sbus-parser = "0.0.2"
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }

@@ -171,7 +171,7 @@ impl OverwritingDataSource<u8> {
         let size = written.wrapping_sub(self.read);
         let index = written % buffer.len();
         if size + index <= buffer.len() {
-            return writer.write(&buffer[index..size]);
+            return writer.write(&buffer[index..index + size]);
         }
         writer.write(&buffer[index..])?;
         writer.write(&buffer[..size - (buffer.len() - index)])
