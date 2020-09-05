@@ -5,17 +5,20 @@ use alloc::vec::Vec;
 
 use crate::alloc;
 use crate::components::logger;
+use crate::components::telemetry::TelemetryData;
+use crate::datastructures::data_source::StaticData;
 use crate::drivers::serial::Readline;
 use crate::sys::timer::{get_jiffies, SysTimer};
 
-pub struct CLI {
+pub struct CLI<T> {
     vec: Vec<u8>,
     timer: SysTimer,
+    telemetry: T,
 }
 
-impl CLI {
-    pub fn new() -> Self {
-        CLI { vec: Vec::with_capacity(80), timer: SysTimer::new() }
+impl<T: StaticData<TelemetryData>> CLI<T> {
+    pub fn new(telemetry: T) -> Self {
+        CLI { vec: Vec::with_capacity(80), timer: SysTimer::new(), telemetry }
     }
 
     pub fn interact<S, E>(&mut self, serial: &mut S, mut extra: E) -> core::fmt::Result
@@ -37,6 +40,7 @@ impl CLI {
                 "set" => config::set(serial, line),
                 "show" => config::show(serial),
                 "save" => config::save(),
+                "telemetry" => writeln!(serial, "{}", self.telemetry.read()),
                 "" => Ok(()),
                 _ => {
                     if extra(line, serial) {

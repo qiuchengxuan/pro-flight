@@ -62,7 +62,7 @@ use rs_flight::{
     },
     config::{self, aircraft::Configuration, Config, SerialConfig},
     datastructures::{
-        data_source::{AgingStaticData, NoDataSource, StaticData},
+        data_source::{AgingStaticData, NoDataSource},
         input::ControlInput,
     },
     drivers::{
@@ -306,13 +306,13 @@ fn main() -> ! {
         sbus.set_notify(Box::new(trigger.clone()));
     }
 
-    let mut telemetry_source = telemetry.reader();
+    let telemetry_source = telemetry.reader();
     let schedule_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
     let tasks = (schedule_trigger, baro, altimeter, imu, speedometer, navigation, telemetry, osd);
     let group = Scheduler::new(tasks, 200);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 200);
 
-    let mut cli = CLI::new();
+    let mut cli = CLI::new(telemetry_source);
     let mut timer = SysTimer::new();
     loop {
         if timer.wait().is_ok() {
@@ -334,9 +334,6 @@ fn main() -> ! {
                 }
                 Some("free") => {
                     writeln!(serial, "Used: {}, free: {}", ALLOCATOR.used(), ALLOCATOR.free()).ok();
-                }
-                Some("telemetry") => {
-                    writeln!(serial, "{}", StaticData::read(&mut telemetry_source)).ok();
                 }
                 _ => return false,
             }

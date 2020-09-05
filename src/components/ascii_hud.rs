@@ -71,25 +71,26 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
 
     pub fn draw(&mut self) -> &Screen {
         let data = self.telemetry.read();
+        let (basic, misc, raw) = (&data.basic, &data.misc, &data.raw);
 
-        let altitude = data.altitude.to_unit(Feet);
-        let height = data.height.to_unit(Feet);
-        let delta = (data.steerpoint.waypoint.position - data.position).convert(|v| v as f32);
-        let vector = data.raw.quaternion.inverse_transform_vector(&delta.into());
+        let altitude = basic.altitude.to_unit(Feet);
+        let height = basic.height.to_unit(Feet);
+        let delta = (misc.steerpoint.waypoint.position - misc.position).convert(|v| v as f32);
+        let vector = raw.quaternion.inverse_transform_vector(&delta.into());
         let transformed: DistanceVector<f32, Meter> = vector.into();
         let coordinate: SphericalCoordinate<Meter> = (transformed * 10.0).into();
         let steerpoint = Steerpoint {
-            number: data.steerpoint.index,
-            name: data.steerpoint.waypoint.name,
+            number: misc.steerpoint.index,
+            name: misc.steerpoint.waypoint.name,
             heading: delta.azimuth(),
             coordinate: coordinate.to_unit(NauticalMile).into(),
         };
 
-        let vector = data.raw.quaternion.inverse_transform_vector(&data.raw.speed_vector.into());
+        let vector = raw.quaternion.inverse_transform_vector(&raw.speed_vector.into());
         let vector: VelocityVector<f32, Meter> = vector.into();
         let speed_vector: SphericalCoordinate<Knot> = vector.to_unit(Knot).into();
 
-        let mut aoa = data.attitude.pitch.wrapping_sub((speed_vector.phi as i16) * 10);
+        let mut aoa = basic.attitude.pitch.wrapping_sub((speed_vector.phi as i16) * 10);
         if aoa > i8::MAX as i16 {
             aoa = i8::MAX as i16;
         } else if aoa < i8::MIN as i16 {
@@ -98,7 +99,7 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
 
         let mut note_buffer = [0u8; 30];
         let mut index = 0;
-        if let Some(fixed) = data.raw.gnss_fixed {
+        if let Some(fixed) = raw.gnss_fixed {
             if !fixed {
                 note_buffer[index..index + NO_GPS.len()].copy_from_slice(NO_GPS.as_bytes());
                 index += NO_GPS.len();
@@ -108,16 +109,16 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
         let hud_telemetry = Telemetry {
             altitude: round_up(altitude.value() as i16),
             aoa: aoa as i8,
-            attitude: data.attitude.into(),
-            battery: data.battery.percentage(),
-            heading: data.heading,
-            g_force: data.g_force,
+            attitude: basic.attitude.into(),
+            battery: misc.battery.percentage(),
+            heading: basic.heading,
+            g_force: basic.g_force,
             height: height.value() as i16,
             notes: Notes { left: note_left, center: "", right: "" },
-            rssi: data.receiver.rssi,
+            rssi: misc.receiver.rssi,
             unit: Unit::Aviation,
             speed_vector: speed_vector.into(),
-            vario: data.vario as i16 / 100 * 100,
+            vario: basic.vario as i16 / 100 * 100,
             steerpoint: steerpoint,
         };
         self.hud.draw(&hud_telemetry, self.screen.as_mut());
