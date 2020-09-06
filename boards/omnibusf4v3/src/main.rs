@@ -244,7 +244,7 @@ fn main() -> ! {
 
     let mut control_input: Box<dyn AgingStaticData<ControlInput>> = Box::new(NoDataSource::new());
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
-        control_input = Box::new(sbus.as_control_input());
+        control_input = Box::new(sbus.input_reader());
     }
 
     info!("Initialize PWMs");
@@ -283,8 +283,8 @@ fn main() -> ! {
         navigation.reader(),
     );
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
-        telemetry.set_receiver(Box::new(sbus.as_receiver()));
-        telemetry.set_control_input(Box::new(sbus.as_control_input()));
+        telemetry.set_rssi(Box::new(sbus.rssi_reader()));
+        telemetry.set_control_input(Box::new(sbus.input_reader()));
     }
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         telemetry.set_gnss(Box::new(gnss.fixed()));

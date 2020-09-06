@@ -4,7 +4,7 @@ use micromath::F32Ext;
 use nalgebra::{Quaternion, UnitQuaternion};
 
 use crate::datastructures::coordinate::Position;
-use crate::datastructures::input::{ControlInput, Receiver};
+use crate::datastructures::input::{ControlInput, RSSI};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::euler::Euler;
@@ -56,7 +56,7 @@ pub struct Basic {
 
 #[derive(Copy, Clone, Default, Debug, Value)]
 pub struct Misc {
-    pub receiver: Receiver,
+    pub rssi: RSSI,
     pub input: ControlInput,
 
     pub position: Position,

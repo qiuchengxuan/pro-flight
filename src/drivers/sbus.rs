@@ -6,17 +6,15 @@ use sbus_parser::{is_sbus_packet_end, SbusData, SbusPacket, SBUS_PACKET_BEGIN, S
 use crate::components::event::Notify;
 use crate::config;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
+use crate::datastructures::data_source::u16_source::{U16Data, U16DataSource};
 use crate::datastructures::data_source::DataWriter;
-use crate::datastructures::input::ControlInput;
-use crate::datastructures::input::InputType;
-use crate::datastructures::input::Receiver;
+use crate::datastructures::input::{ControlInput, InputType, RSSI};
 
 pub struct SbusReceiver {
-    sequence: u8,
     counter: u8,
     loss: u8,
     loss_rate: u8,
-    receiver: Rc<SingularData<Receiver>>,
+    rssi: Rc<U16Data<RSSI>>,
     control_input: Rc<SingularData<ControlInput>>,
     notify: Option<Box<dyn Notify>>,
 }
@@ -30,21 +28,20 @@ fn to_axis(value: u16) -> i32 {
 impl SbusReceiver {
     pub fn new() -> Self {
         Self {
-            sequence: 0,
             counter: 0,
             loss: 0,
             loss_rate: 0,
-            receiver: Rc::new(SingularData::default()),
+            rssi: Rc::new(U16Data::default()),
             control_input: Rc::new(SingularData::default()),
             notify: None,
         }
     }
 
-    pub fn as_receiver(&self) -> SingularDataSource<Receiver> {
-        SingularDataSource::new(&self.receiver)
+    pub fn rssi_reader(&self) -> U16DataSource<RSSI> {
+        U16DataSource::new(&self.rssi)
     }
 
-    pub fn as_control_input(&self) -> SingularDataSource<ControlInput> {
+    pub fn input_reader(&self) -> SingularDataSource<ControlInput> {
         SingularDataSource::new(&self.control_input)
     }
 
@@ -53,14 +50,13 @@ impl SbusReceiver {
     }
 
     fn handle_sbus_data(&mut self, data: &SbusData) {
-        self.sequence = self.sequence.wrapping_add(1);
         self.loss += data.frame_lost as u8;
         self.counter += 1;
         if self.counter == 100 {
             self.loss_rate = self.loss;
             self.counter = 0;
         }
-        self.receiver.write(Receiver { rssi: 100 - self.loss_rate, sequence: self.sequence });
+        self.rssi.write((100 - self.loss_rate) as RSSI);
 
         let mut control_input = ControlInput::default();
         let channels = &config::get().receiver.channels;

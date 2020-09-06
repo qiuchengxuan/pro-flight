@@ -16,7 +16,7 @@ battery:
   warning-cell-voltage: 3500
 osd:
   aspect-ratio: '16:9'
-  font: sdcard://font.mcm
+  font: sdcard://font.bin
   fov: 145
   offset:
     horizental: 8

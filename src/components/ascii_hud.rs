@@ -115,7 +115,7 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
             g_force: basic.g_force,
             height: height.value() as i16,
             notes: Notes { left: note_left, center: "", right: "" },
-            rssi: misc.receiver.rssi,
+            rssi: misc.rssi as u8,
             unit: Unit::Aviation,
             speed_vector: speed_vector.into(),
             vario: basic.vario as i16 / 100 * 100,

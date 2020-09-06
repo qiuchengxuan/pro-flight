@@ -14,7 +14,7 @@ use crate::config;
 use crate::datastructures::coordinate::{Position, SphericalCoordinate};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{AgingStaticData, DataWriter, StaticData};
-use crate::datastructures::input::{ControlInput, Receiver};
+use crate::datastructures::input::{ControlInput, RSSI};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
@@ -37,7 +37,7 @@ pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
     speedometer: S,
     navigation: NAV,
 
-    receiver: Option<Box<dyn AgingStaticData<Receiver>>>,
+    rssi: Option<Box<dyn AgingStaticData<RSSI>>>,
     control_input: Option<Box<dyn AgingStaticData<ControlInput>>>,
     gnss_fix: Option<Box<dyn StaticData<GNSSFixed>>>,
 
@@ -98,7 +98,7 @@ where
             battery: battery / self.battery_cells as u16,
             position,
             steerpoint,
-            receiver: self.receiver.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
+            rssi: self.rssi.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
         };
 
@@ -134,7 +134,7 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
             speedometer,
             navigation,
 
-            receiver: None,
+            rssi: None,
             control_input: None,
             gnss_fix: None,
 
@@ -144,8 +144,8 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
         }
     }
 
-    pub fn set_receiver(&mut self, receiver: Box<dyn AgingStaticData<Receiver>>) {
-        self.receiver = Some(receiver)
+    pub fn set_rssi(&mut self, receiver: Box<dyn AgingStaticData<RSSI>>) {
+        self.rssi = Some(receiver)
     }
 
     pub fn set_control_input(&mut self, input: Box<dyn AgingStaticData<ControlInput>>) {
