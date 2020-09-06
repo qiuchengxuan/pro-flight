@@ -104,7 +104,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
 
     fn heading_as_magnitism(&self, heading: Heading) -> Vector3<f32> {
         let unit = UnitQuaternion::new_normalize(self.ahrs.quat);
-        let forward = Vector3::new(0.0, -1.0, 0.0); // reversed because of ahrs
+        let forward = Vector3::new(0.0, 1.0, 0.0);
         let vector = unit.inverse_transform_vector(&forward);
         let heading = (heading as f32).to_radians();
         let vector = Vector3::new(heading.sin(), heading.cos(), vector[2]);
@@ -120,7 +120,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         gyro = gyro / DEGREE_PER_DAG;
 
         let result = if let Some(magnetism) = mag {
-            self.ahrs.update(&gyro, &-acceleration, &magnetism)
+            self.ahrs.update(&gyro, &-acceleration, &-magnetism)
         } else {
             self.ahrs.update_imu(&gyro, &-acceleration)
         };
@@ -148,17 +148,11 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
             return self.calibrate();
         }
         let rate = self.rate();
-        if let Some(heading) = self.heading.as_mut().map(|h| h.read(rate)).flatten() {
-            while let Some(gyro) = self.gyroscope.read() {
-                let acceleration = self.accelerometer.read().unwrap();
-                let magnitism = self.heading_as_magnitism(heading.or_course());
-                self.update_imu(&acceleration, &gyro, Some(magnitism));
-            }
-        } else {
-            while let Some(gyro) = self.gyroscope.read() {
-                let acceleration = self.accelerometer.read().unwrap();
-                self.update_imu(&acceleration, &gyro, None);
-            }
+        let heading = self.heading.as_mut().map(|h| h.read(rate)).flatten();
+        let magnitism = heading.map(|h| self.heading_as_magnitism(h.or_course()));
+        while let Some(gyro) = self.gyroscope.read() {
+            let acceleration = self.accelerometer.read().unwrap();
+            self.update_imu(&acceleration, &gyro, magnitism);
         }
         true
     }

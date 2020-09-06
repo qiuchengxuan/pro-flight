@@ -65,18 +65,10 @@ pub struct Misc {
     pub battery: Battery,
 }
 
-#[derive(Copy, Clone, Default, Debug, Value)]
-pub struct TelemetryData {
-    pub basic: Basic,
-    pub misc: Misc,
-    pub raw: Raw,
-}
-
-impl core::fmt::Display for TelemetryData {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        sval_json::to_fmt(f, self).ok();
-        Ok(())
-    }
+#[derive(Copy, Clone, Debug, Value)]
+pub struct GNSS {
+    pub fixed: bool,
+    pub course: u16,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -84,7 +76,7 @@ pub struct Raw {
     pub acceleration: Acceleration,
     pub gyro: Gyro,
     pub quaternion: UnitQuaternion<f32>,
-    pub gnss_fixed: Option<bool>,
+    pub gnss: Option<GNSS>,
     pub speed_vector: VelocityVector<f32, Meter>,
     pub displacement: DistanceVector<i32, Meter>,
 }
@@ -95,7 +87,7 @@ impl Default for Raw {
             quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             acceleration: Acceleration::default(),
             gyro: Gyro::default(),
-            gnss_fixed: None,
+            gnss: None,
             speed_vector: VelocityVector::default(),
             displacement: DistanceVector::default(),
         }
@@ -104,7 +96,7 @@ impl Default for Raw {
 
 impl sval::value::Value for Raw {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(5 + if self.gnss_fixed.is_some() { 1 } else { 0 }))?;
+        stream.map_begin(Some(5 + if self.gnss.is_some() { 1 } else { 0 }))?;
         stream.map_key("acceleration")?;
         stream.map_value(&self.acceleration)?;
         stream.map_key("gyro")?;
@@ -113,9 +105,9 @@ impl sval::value::Value for Raw {
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         stream.map_value(&value[..])?;
-        if let Some(fixed) = self.gnss_fixed {
-            stream.map_key("gnss-fix")?;
-            stream.map_value(fixed)?;
+        if let Some(gnss) = self.gnss {
+            stream.map_key("gnss")?;
+            stream.map_value(gnss)?;
         }
         stream.map_key("speed-vector")?;
         stream.map_value(&self.speed_vector)?;
@@ -125,6 +117,20 @@ impl sval::value::Value for Raw {
     }
 }
 impl core::fmt::Display for Raw {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        sval_json::to_fmt(f, self).ok();
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug, Value)]
+pub struct TelemetryData {
+    pub basic: Basic,
+    pub misc: Misc,
+    pub raw: Raw,
+}
+
+impl core::fmt::Display for TelemetryData {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         sval_json::to_fmt(f, self).ok();
         Ok(())

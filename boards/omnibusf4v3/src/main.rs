@@ -287,7 +287,7 @@ fn main() -> ! {
         telemetry.set_control_input(Box::new(sbus.input_reader()));
     }
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
-        telemetry.set_gnss(Box::new(gnss.fixed()));
+        telemetry.set_gnss(Box::new(gnss.fixed()), Box::new(gnss.course()));
     }
 
     info!("Initialize OSD & Barometer");

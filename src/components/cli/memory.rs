@@ -69,7 +69,7 @@ where
             if unsafe { MEMORY_ADDRESS_VALIDATOR }(address) {
                 unsafe { *(address as *mut u32) = value };
                 count_down.start(Duration::from_millis(1));
-                nb::block!(count_down.wait()).unwrap();
+                nb::block!(count_down.wait()).ok();
                 let value = unsafe { *(address as *const u32) };
                 return writeln!(w, "Write result: {:x?}", value);
             }

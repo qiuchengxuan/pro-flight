@@ -34,7 +34,7 @@ impl<T: StaticData<TelemetryData>> CLI<T> {
             match first_word {
                 "logread" => write!(serial, "{}", logger::get()),
                 "uptime" => write!(serial, "{:?}", get_jiffies()),
-                "read" | "readx" | "readf" => memory::read(line, serial),
+                "read" | "readx" => memory::read(line, serial),
                 "dump" => memory::dump(line, serial),
                 "write" => memory::write(line, serial, &mut self.timer),
                 "set" => config::set(serial, line),

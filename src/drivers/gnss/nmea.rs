@@ -18,7 +18,7 @@ use crate::datastructures::data_source::singular::{SingularData, SingularDataSou
 use crate::datastructures::data_source::u16_source::{U16Data, U16DataSource};
 use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::measurement::distance::Distance;
-use crate::datastructures::measurement::unit::{CentiMeter, Knot, Meter, MilliMeter};
+use crate::datastructures::measurement::unit::{CentiMeter, Knot, MilliMeter};
 use crate::datastructures::measurement::VelocityVector;
 use crate::datastructures::measurement::{Course, HeadingOrCourse};
 use crate::datastructures::GNSSFixed;
@@ -124,7 +124,17 @@ impl NMEADecoder {
         }
         let latitude = gga.latitude.into();
         let longitude = gga.longitude.into();
-        let altitude = Distance::new(gga.altitude.integer, Meter).to_unit(CentiMeter);
+
+        let mut decimal = gga.altitude.decimal as i32;
+        if gga.altitude.integer < 0 {
+            decimal = -decimal;
+        }
+        let decimal_length = gga.altitude.decimal_length as u32;
+        let decimal_part = match decimal_length {
+            1 => decimal * 10,
+            _ => decimal / 10i32.pow(decimal_length - 2),
+        };
+        let altitude = Distance::new(gga.altitude.integer * 100 + decimal_part, CentiMeter);
         self.position.write(Position { latitude, longitude, altitude });
     }
 

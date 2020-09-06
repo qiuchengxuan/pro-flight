@@ -99,8 +99,8 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
 
         let mut note_buffer = [0u8; 30];
         let mut index = 0;
-        if let Some(fixed) = raw.gnss_fixed {
-            if !fixed {
+        if let Some(gnss) = raw.gnss {
+            if !gnss.fixed {
                 note_buffer[index..index + NO_GPS.len()].copy_from_slice(NO_GPS.as_bytes());
                 index += NO_GPS.len();
             }

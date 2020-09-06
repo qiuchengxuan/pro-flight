@@ -18,7 +18,7 @@ use crate::datastructures::input::{ControlInput, RSSI};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
-use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, VelocityVector};
+use crate::datastructures::measurement::{Acceleration, Altitude, Course, Gyro, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
 use crate::datastructures::GNSSFixed;
 
@@ -26,6 +26,11 @@ impl<U: Copy + Default + Into<u32>> Into<hud::SphericalCoordinate> for Spherical
     fn into(self) -> hud::SphericalCoordinate {
         hud::SphericalCoordinate { rho: self.rho.value() as u16, theta: self.theta, phi: self.phi }
     }
+}
+
+pub struct GNSS {
+    fix: Box<dyn StaticData<GNSSFixed>>,
+    course: Box<dyn StaticData<Course>>,
 }
 
 pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
@@ -39,7 +44,7 @@ pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
     rssi: Option<Box<dyn AgingStaticData<RSSI>>>,
     control_input: Option<Box<dyn AgingStaticData<ControlInput>>>,
-    gnss_fix: Option<Box<dyn StaticData<GNSSFixed>>>,
+    gnss: Option<GNSS>,
 
     initial_altitude: Altitude,
     battery_cells: u8,
@@ -77,7 +82,12 @@ where
 
         let acceleration = self.accelerometer.read();
         let gyro = self.gyroscope.read();
-        let gnss_fixed = self.gnss_fix.as_mut().map(|g| g.read().into());
+        let mut gnss: Option<data::GNSS> = None;
+        if let Some(ref mut _gnss) = self.gnss {
+            let fixed = _gnss.fix.read().into();
+            let course = _gnss.course.read();
+            gnss = Some(data::GNSS { fixed, course });
+        }
 
         let speed_vector = self.speedometer.read();
         let vector = speed_vector.convert(|v| v as i32);
@@ -93,7 +103,6 @@ where
             airspeed: vector.to_unit(Knot).distance().value() as u16,
             vario: vector.z.to_unit(FTpM).value() as i16,
         };
-
         let misc = Misc {
             battery: battery / self.battery_cells as u16,
             position,
@@ -101,8 +110,7 @@ where
             rssi: self.rssi.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
         };
-
-        let raw = Raw { acceleration, gyro, quaternion, gnss_fixed, speed_vector, displacement };
+        let raw = Raw { acceleration, gyro, quaternion, gnss, speed_vector, displacement };
 
         let data = TelemetryData { basic, misc, raw };
         self.telemetry.write(data);
@@ -113,6 +121,9 @@ where
         50
     }
 }
+
+type Fixed = Box<dyn StaticData<GNSSFixed>>;
+type GNSSCourse = Box<dyn StaticData<Course>>;
 
 impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
     pub fn new(
@@ -136,7 +147,7 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
             rssi: None,
             control_input: None,
-            gnss_fix: None,
+            gnss: None,
 
             initial_altitude: Default::default(),
             battery_cells: config.battery.cells,
@@ -152,8 +163,8 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
         self.control_input = Some(input)
     }
 
-    pub fn set_gnss(&mut self, gnss: Box<dyn StaticData<GNSSFixed>>) {
-        self.gnss_fix = Some(gnss)
+    pub fn set_gnss(&mut self, fix: Fixed, course: GNSSCourse) {
+        self.gnss = Some(GNSS { fix, course })
     }
 
     pub fn reader(&self) -> SingularDataSource<TelemetryData> {
