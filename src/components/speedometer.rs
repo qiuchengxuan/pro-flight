@@ -32,7 +32,7 @@ impl<A, ACCEL> Speedometer<A, ACCEL> {
             interval: 1.0 / sample_rate as f32,
             gnss: None,
             acceleration: Vector3::new(0.0, 0.0, 0.0),
-            filters: [ComplementaryFilter::new(0.1, 1.0 / sample_rate as f32); 3],
+            filters: [ComplementaryFilter::new(0.5, 1.0 / sample_rate as f32); 3],
             altitude: Altitude::default(),
             vector: (0.0, 0.0, 0.0),
             output: Rc::new(SingularData::default()),

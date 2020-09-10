@@ -37,16 +37,18 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         let size = accelerometer.capacity();
         let acceleration = Vector3::<f32>::new(0.0, 0.0, 0.0);
         let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(1.0, 0.0, 0.0, 0.0));
-        let config = &config::get().accelerometer;
+        let config = &config::get().imu;
+        let kp = config.mahony.kp.into();
+        let ki = config.mahony.ki.into();
         Self {
             accelerometer,
             gyroscope,
 
             heading: None,
 
-            ahrs: Mahony::new(1.0 / sample_rate as f32, 0.5, 0.0),
-            accel_bias: config.bias.into(),
-            accel_gain: config.gain.into(),
+            ahrs: Mahony::new(1.0 / sample_rate as f32, kp, ki),
+            accel_bias: config.accelerometer.bias.into(),
+            accel_gain: config.accelerometer.gain.into(),
             gyro_bias: Default::default(),
             calibration_loop: 50,
             counter: 0,
@@ -120,7 +122,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         gyro = gyro / DEGREE_PER_DAG;
 
         let result = if let Some(magnetism) = mag {
-            self.ahrs.update(&gyro, &-acceleration, &-magnetism)
+            self.ahrs.update(&gyro, &-acceleration, &magnetism)
         } else {
             self.ahrs.update_imu(&gyro, &-acceleration)
         };

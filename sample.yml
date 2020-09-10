@@ -1,19 +1,23 @@
-accelerometer:
-  bias:
-    x: -236
-    y: 22
-    z: -713
-  gain:
-    x: 8222
-    y: 8142
-    z: 8188
 aircraft:
   configuration: airplane
 battery:
   cells: 3
-  min-cell-voltage: 3300
-  max-cell-voltage: 4200
-  warning-cell-voltage: 3500
+  min-cell-voltage: 3.3
+  max-cell-voltage: 4.2
+  warning-cell-voltage: 3.5
+imu:
+  accelerometer:
+    bias:
+      x: -236
+      y: 22
+      z: -713
+    gain:
+      x: 8222
+      y: 8142
+      z: 8188
+  mahony:
+    kp: 0.5
+    ki: 0.0
 osd:
   aspect-ratio: '16:9'
   font: sdcard://font.bin
@@ -36,8 +40,8 @@ receiver:
 serials:
   USART1:
     type: GNSS
-    baudrate: 38400
-    protocol: UBX
+    baudrate: 9600
+    protocol: NMEA
   USART6:
     type: SBUS
     fast: false

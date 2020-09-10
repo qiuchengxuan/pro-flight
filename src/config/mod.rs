@@ -1,9 +1,9 @@
 pub mod aircraft;
 pub mod battery;
+pub mod imu;
 pub mod osd;
 pub mod output;
 pub mod receiver;
-pub mod sensor;
 pub mod serial;
 pub mod setter;
 pub mod yaml;
@@ -16,10 +16,10 @@ use crate::hal::io::Read;
 
 pub use aircraft::Aircraft;
 pub use battery::Battery;
+pub use imu::IMU;
 pub use osd::{Offset, Standard, OSD};
 pub use output::{Output, Outputs, Protocol};
 pub use receiver::Receiver;
-pub use sensor::Accelerometer;
 pub use serial::{Config as SerialConfig, Serials};
 use setter::{SetError, Setter};
 use yaml::{FromYAML, ToYAML, YamlParser};
@@ -53,9 +53,9 @@ impl ToYAML for Axes {
 
 #[derive(Default, Clone)]
 pub struct Config {
-    pub accelerometer: Accelerometer,
     pub battery: Battery,
     pub aircraft: Aircraft,
+    pub imu: IMU,
     pub osd: OSD,
     pub receiver: Receiver,
     pub serials: Serials,
@@ -77,9 +77,9 @@ impl FromYAML for Config {
         let mut config = Self::default();
         while let Some(key) = parser.next_entry() {
             match key {
-                "accelerometer" => config.accelerometer = Accelerometer::from_yaml(parser),
                 "aircraft" => config.aircraft = Aircraft::from_yaml(parser),
                 "battery" => config.battery = Battery::from_yaml(parser),
+                "imu" => config.imu = IMU::from_yaml(parser),
                 "osd" => config.osd = OSD::from_yaml(parser),
                 "receiver" => config.receiver = Receiver::from_yaml(parser),
                 "serials" => config.serials = Serials::from_yaml(parser),
@@ -94,16 +94,16 @@ impl FromYAML for Config {
 impl ToYAML for Config {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
-        writeln!(w, "accelerometer:")?;
-        self.accelerometer.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
         writeln!(w, "aircraft:")?;
         self.aircraft.write_to(indent + 1, w)?;
 
         self.write_indent(indent, w)?;
         writeln!(w, "battery:")?;
         self.battery.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "imu:")?;
+        self.imu.write_to(indent + 1, w)?;
 
         self.write_indent(indent, w)?;
         writeln!(w, "osd:")?;
