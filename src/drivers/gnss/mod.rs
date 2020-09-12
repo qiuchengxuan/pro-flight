@@ -46,14 +46,14 @@ impl GNSS {
         }
     }
 
-    pub fn heading(&self) -> U16DataSource<HeadingOrCourse> {
+    pub fn heading(&self) -> SingularDataSource<HeadingOrCourse> {
         match self {
             Self::UBX(ubx) => ubx.heading(),
             Self::NMEA(nmea) => nmea.heading(),
         }
     }
 
-    pub fn course(&self) -> U16DataSource<Course> {
+    pub fn course(&self) -> SingularDataSource<Course> {
         match self {
             Self::UBX(ubx) => ubx.course(),
             Self::NMEA(nmea) => nmea.course(),

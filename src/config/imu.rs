@@ -41,20 +41,20 @@ impl ToYAML for Accelerometer {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Mahony {
-    pub kp: IntegerDecimal<u8, u8>,
-    pub ki: IntegerDecimal<u8, u8>,
+    pub kp: IntegerDecimal<u8, u16>,
+    pub ki: IntegerDecimal<u8, u16>,
 }
 
 impl Default for Mahony {
     fn default() -> Self {
-        Self { kp: IntegerDecimal::from("0.5"), ki: IntegerDecimal::from("0.0") }
+        Self { kp: IntegerDecimal::from("0.25"), ki: IntegerDecimal::from("0.005") }
     }
 }
 
 impl FromYAML for Mahony {
     fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut kp = IntegerDecimal::from("0.5");
-        let mut ki = IntegerDecimal::from("0.0");
+        let mut kp = IntegerDecimal::from("0.25");
+        let mut ki = IntegerDecimal::from("0.005");
 
         while let Some((key, value)) = parser.next_key_value() {
             match key {

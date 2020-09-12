@@ -1,7 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(trait_alias)]
 
-extern crate ahrs;
 #[macro_use]
 extern crate alloc;
 extern crate ascii;

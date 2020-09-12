@@ -12,6 +12,12 @@ pub struct IntegerDecimal<I, D> {
     pub decimal_length: u8,
 }
 
+impl<I: Copy, D: Copy> IntegerDecimal<I, D> {
+    pub fn new(integer: I, decimal: D, decimal_length: u8) -> Self {
+        Self { integer, decimal, decimal_length }
+    }
+}
+
 macro_rules! impl_into_f32 {
     () => {};
     (, ($integer_type:tt, $decimal_type:tt) $(, ($integer_types:tt, $decimal_types:tt))*) => {
@@ -30,7 +36,7 @@ macro_rules! impl_into_f32 {
     };
 }
 
-impl_into_f32! { (u8, u8) }
+impl_into_f32! { (u8, u8), (u16, u8), (u8, u16) }
 
 impl<I: Display, D: Display> Debug for IntegerDecimal<I, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -72,7 +78,7 @@ macro_rules! impl_from_str {
     };
 }
 
-impl_from_str! { (u8 -> 2) }
+impl_from_str! { (u8 -> 2), (u16 -> 4) }
 
 impl<I: Display, D: Into<u32> + Copy + Display> Display for IntegerDecimal<I, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -88,7 +94,13 @@ impl<I: Display, D: Into<u32> + Copy + Display> Display for IntegerDecimal<I, D>
         if padding_length == 0 {
             return write!(f, "{}.{}", self.integer, self.decimal);
         }
-        write!(f, "{}.{:padding$}{}", "0", self.integer, self.decimal, padding = padding_length)
+        write!(f, "{}.{:0padding$}{}", 0, self.integer, self.decimal, padding = padding_length)
+    }
+}
+
+impl<I: Display, D: Into<u32> + Copy + Display> sval::value::Value for IntegerDecimal<I, D> {
+    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
+        stream.fmt(format_args!("{}", self))
     }
 }
 
@@ -107,5 +119,8 @@ mod test {
         assert_eq!("0.01", format!("{}", decimal));
         let decimal: IntegerDecimal<u8, u8> = IntegerDecimal::from("0.11");
         assert_eq!("0.11", format!("{}", decimal));
+
+        let decimal: IntegerDecimal<u8, u16> = IntegerDecimal::from("0.001");
+        assert_eq!("0.001", format!("{}", decimal));
     }
 }

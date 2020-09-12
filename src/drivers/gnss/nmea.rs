@@ -9,7 +9,7 @@ use nmea0183::messages::rmc::RMC;
 use nmea0183::types::latitude::Latitude;
 use nmea0183::types::longitude::Longitude;
 use nmea0183::types::position_mode::PositionMode;
-use nmea0183::types::Quality;
+use nmea0183::types::{IntegerFloat, Quality};
 use nmea0183::Parser;
 
 use crate::datastructures::coordinate::Position;
@@ -17,6 +17,7 @@ use crate::datastructures::coordinate::{latitude, longitude};
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::u16_source::{U16Data, U16DataSource};
 use crate::datastructures::data_source::DataWriter;
+use crate::datastructures::decimal::IntegerDecimal;
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{CentiMeter, Knot, MilliMeter};
 use crate::datastructures::measurement::VelocityVector;
@@ -28,8 +29,8 @@ pub struct NMEADecoder {
     fixed: Rc<U16Data<GNSSFixed>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<VelocityVector<i32, MilliMeter>>>,
-    heading: Rc<U16Data<HeadingOrCourse>>,
-    course: Rc<U16Data<Course>>,
+    heading: Rc<SingularData<HeadingOrCourse>>,
+    course: Rc<SingularData<Course>>,
 }
 
 impl Into<longitude::Longitude> for Longitude {
@@ -52,6 +53,16 @@ impl Into<latitude::Latitude> for Latitude {
     }
 }
 
+impl<I: Copy, D: Copy> From<&IntegerFloat<I, D>> for IntegerDecimal<I, D> {
+    fn from(float: &IntegerFloat<I, D>) -> Self {
+        Self {
+            integer: float.integer,
+            decimal: float.decimal,
+            decimal_length: float.decimal_length,
+        }
+    }
+}
+
 impl NMEADecoder {
     pub fn new() -> Self {
         Self {
@@ -59,8 +70,8 @@ impl NMEADecoder {
             fixed: Rc::new(U16Data::default()),
             position: Rc::new(SingularData::default()),
             velocity: Rc::new(SingularData::default()),
-            heading: Rc::new(U16Data::default()),
-            course: Rc::new(U16Data::default()),
+            heading: Rc::new(SingularData::default()),
+            course: Rc::new(SingularData::default()),
         }
     }
 
@@ -76,12 +87,12 @@ impl NMEADecoder {
         SingularDataSource::new(&self.velocity)
     }
 
-    pub fn course(&self) -> U16DataSource<Course> {
-        U16DataSource::new(&self.course)
+    pub fn course(&self) -> SingularDataSource<Course> {
+        SingularDataSource::new(&self.course)
     }
 
-    pub fn heading(&self) -> U16DataSource<HeadingOrCourse> {
-        U16DataSource::new(&self.heading)
+    pub fn heading(&self) -> SingularDataSource<HeadingOrCourse> {
+        SingularDataSource::new(&self.heading)
     }
 
     fn handle_rmc(&mut self, rmc: &RMC) {
@@ -95,11 +106,11 @@ impl NMEADecoder {
             return;
         }
 
-        self.course.write(rmc.course.integer);
+        self.course.write((&rmc.course).into());
         if let Some(heading) = &rmc.heading {
-            self.heading.write(HeadingOrCourse::Heading(heading.integer));
+            self.heading.write(HeadingOrCourse::Heading(heading.into()));
         } else {
-            self.heading.write(HeadingOrCourse::Course(rmc.course.integer));
+            self.heading.write(HeadingOrCourse::Course((&rmc.course).into()));
         }
 
         let mut course: f32 = rmc.course.into();

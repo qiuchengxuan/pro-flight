@@ -9,6 +9,7 @@ use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::euler::Euler;
 use crate::datastructures::measurement::unit::Meter;
+use crate::datastructures::measurement::Course;
 use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
 
@@ -68,7 +69,7 @@ pub struct Misc {
 #[derive(Copy, Clone, Debug, Value)]
 pub struct GNSS {
     pub fixed: bool,
-    pub course: u16,
+    pub course: Course,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -116,6 +117,7 @@ impl sval::value::Value for Raw {
         stream.map_end()
     }
 }
+
 impl core::fmt::Display for Raw {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         sval_json::to_fmt(f, self).ok();

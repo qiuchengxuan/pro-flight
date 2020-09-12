@@ -11,7 +11,7 @@ use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{CentiMeter, MilliMeter};
 use crate::datastructures::measurement::VelocityVector;
-use crate::datastructures::measurement::{Course, HeadingOrCourse};
+use crate::datastructures::measurement::{Course, Heading, HeadingOrCourse};
 use crate::datastructures::GNSSFixed;
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
@@ -37,8 +37,8 @@ pub struct UBXDecoder {
     fixed: Rc<U16Data<GNSSFixed>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<VelocityVector<i32, MilliMeter>>>,
-    heading: Rc<U16Data<HeadingOrCourse>>,
-    course: Rc<U16Data<Course>>,
+    heading: Rc<SingularData<HeadingOrCourse>>,
+    course: Rc<SingularData<Course>>,
     buffer: [u8; MAX_MESSAGE_SIZE],
 }
 
@@ -50,8 +50,8 @@ impl UBXDecoder {
             fixed: Rc::new(U16Data::default()),
             position: Rc::new(SingularData::default()),
             velocity: Rc::new(SingularData::default()),
-            heading: Rc::new(U16Data::default()),
-            course: Rc::new(U16Data::default()),
+            heading: Rc::new(SingularData::default()),
+            course: Rc::new(SingularData::default()),
             buffer: [0u8; MAX_MESSAGE_SIZE],
         }
     }
@@ -68,12 +68,12 @@ impl UBXDecoder {
         SingularDataSource::new(&self.velocity)
     }
 
-    pub fn course(&self) -> U16DataSource<Course> {
-        U16DataSource::new(&self.course)
+    pub fn course(&self) -> SingularDataSource<Course> {
+        SingularDataSource::new(&self.course)
     }
 
-    pub fn heading(&self) -> U16DataSource<HeadingOrCourse> {
-        U16DataSource::new(&self.heading)
+    pub fn heading(&self) -> SingularDataSource<HeadingOrCourse> {
+        SingularDataSource::new(&self.heading)
     }
 
     fn handle_pvt_message(&mut self) {
@@ -103,10 +103,13 @@ impl UBXDecoder {
                 -payload.velocity_down,
                 MilliMeter,
             )); // NED to XYZ
-            let course = payload.heading_of_motion / 10;
-            self.course.write(if course > 0 { course } else { 360 + course } as u16);
-            let hov = payload.heading_of_vehicle / 10;
-            let heading = if hov > 0 { hov } else { 360 + hov } as u16;
+            let course = payload.heading_of_motion;
+            let course = if course > 0 { course } else { 3600 + course } as u16;
+            self.course.write(Course::new(course / 10, (course % 10) as u8, 1));
+
+            let heading = payload.heading_of_vehicle;
+            let heading = if heading > 0 { heading } else { 3600 + heading } as u16;
+            let heading = Heading::new(heading / 10, (heading % 10) as u8, 1);
             let heading_or_course = if payload.flags1.heading_of_vehicle_valid() {
                 HeadingOrCourse::Heading(heading)
             } else {

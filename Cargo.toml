@@ -6,7 +6,6 @@ name = "rs-flight"
 version = "0.0.2"
 
 [dependencies]
-ahrs = { version = "0.2", default-features = false }
 ascii = { version = "1.0", default-features = false }
 ascii-osd-hud = { path = "../ascii-osd-hud" }
 bmp280-core = "0.1"
@@ -18,7 +17,7 @@ integer-sqrt = "0.1"
 max7456 = "0.1"
 micromath = "1.0"
 mpu6000 = "0.1"
-nalgebra = { version = "0.18", default-features = false }
+nalgebra = { version = "0.21", default-features = false }
 nb = "0.1"
 nmea0183-core = { version = "0.1.2" }
 sbus-parser = "0.0.2"

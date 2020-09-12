@@ -16,8 +16,8 @@ imu:
       y: 8142
       z: 8188
   mahony:
-    kp: 0.5
-    ki: 0.0
+    kp: 0.25
+    ki: 0.005
 osd:
   aspect-ratio: '16:9'
   font: sdcard://font.bin

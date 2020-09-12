@@ -7,6 +7,8 @@ pub mod distance;
 pub mod euler;
 pub mod unit;
 
+use crate::datastructures::decimal::IntegerDecimal;
+
 use distance::Distance;
 use unit::CentiMeter;
 
@@ -16,8 +18,8 @@ pub type VelocityVector<T, U> = displacement::DistanceVector<T, U>;
 pub type Temperature = i16;
 pub type Altitude = Distance<i32, CentiMeter>;
 
-pub type Heading = u16;
-pub type Course = u16;
+pub type Heading = IntegerDecimal<u16, u8>;
+pub type Course = IntegerDecimal<u16, u8>;
 
 #[derive(Copy, Clone)]
 pub enum HeadingOrCourse {
@@ -26,7 +28,7 @@ pub enum HeadingOrCourse {
 }
 
 impl HeadingOrCourse {
-    pub fn or_course(self) -> u16 {
+    pub fn or_course(self) -> Heading {
         match self {
             Self::Heading(h) => h,
             Self::Course(c) => c,
@@ -36,26 +38,7 @@ impl HeadingOrCourse {
 
 impl Default for HeadingOrCourse {
     fn default() -> Self {
-        Self::Course(0)
-    }
-}
-
-impl Into<u16> for HeadingOrCourse {
-    fn into(self) -> u16 {
-        match self {
-            Self::Heading(h) => h,
-            Self::Course(c) => u16::MAX - c,
-        }
-    }
-}
-
-impl From<u16> for HeadingOrCourse {
-    fn from(value: u16) -> Self {
-        if value <= 360 {
-            Self::Heading(value)
-        } else {
-            Self::Course(u16::MAX - value)
-        }
+        Self::Course(IntegerDecimal::default())
     }
 }
 
