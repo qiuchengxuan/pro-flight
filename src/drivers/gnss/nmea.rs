@@ -106,17 +106,17 @@ impl NMEADecoder {
             return;
         }
 
-        self.course.write((&rmc.course).into());
+        let course_valid = rmc.speed.integer > 0;
+        if course_valid {
+            self.course.write((&rmc.course).into());
+        }
         if let Some(heading) = &rmc.heading {
             self.heading.write(HeadingOrCourse::Heading(heading.into()));
-        } else {
+        } else if course_valid {
             self.heading.write(HeadingOrCourse::Course((&rmc.course).into()));
         }
 
-        let mut course: f32 = rmc.course.into();
-        if course > 180.0 {
-            course = -360.0 + course;
-        }
+        let course: f32 = rmc.course.into();
         let speed: f32 = rmc.speed.into();
         let x = speed * course.to_radians().sin();
         let y = speed * course.to_radians().cos();
@@ -142,6 +142,7 @@ impl NMEADecoder {
         }
         let decimal_length = gga.altitude.decimal_length as u32;
         let decimal_part = match decimal_length {
+            0 => 0,
             1 => decimal * 10,
             _ => decimal / 10i32.pow(decimal_length - 2),
         };

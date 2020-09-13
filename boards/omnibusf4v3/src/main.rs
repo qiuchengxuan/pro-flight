@@ -278,7 +278,7 @@ fn main() -> ! {
         battery,
         accelerometer,
         gyroscope,
-        imu.as_imu(),
+        imu.reader(),
         speedometer.reader(),
         navigation.reader(),
     );

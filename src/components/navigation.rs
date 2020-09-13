@@ -89,6 +89,8 @@ where
         if self.waypoints[HOME].position.latitude.0 == 0 {
             if let Some(position) = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten() {
                 self.waypoints[HOME].position = position;
+                self.displacement.0 = 0.0;
+                self.displacement.1 = 0.0;
             }
         }
 

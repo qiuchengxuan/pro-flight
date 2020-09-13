@@ -5,6 +5,7 @@ use nalgebra::Vector3;
 
 use crate::algorithm::ComplementaryFilter;
 use crate::components::schedule::{Rate, Schedulable};
+use crate::config;
 use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData, StaticData};
 use crate::datastructures::measurement::unit::{Meter, MilliMeter};
@@ -26,13 +27,14 @@ pub struct Speedometer<A, ACCEL> {
 
 impl<A, ACCEL> Speedometer<A, ACCEL> {
     pub fn new(altimeter: A, accelerometer: ACCEL, sample_rate: usize) -> Self {
+        let config = &config::get().speedometer;
         Self {
             altimeter,
             accelerometer,
             interval: 1.0 / sample_rate as f32,
             gnss: None,
             acceleration: Vector3::new(0.0, 0.0, 0.0),
-            filters: [ComplementaryFilter::new(0.5, 1.0 / sample_rate as f32); 3],
+            filters: [ComplementaryFilter::new(config.kp.into(), 1.0 / sample_rate as f32); 3],
             altitude: Altitude::default(),
             vector: (0.0, 0.0, 0.0),
             output: Rc::new(SingularData::default()),
@@ -63,6 +65,7 @@ where
         let gnss = self.gnss.as_mut().map(|gnss| gnss.read(rate)).flatten()
                                      .map(|velocity| velocity.convert(|v| v as f32).to_unit(Meter));
         while let Some(mut a) = self.accelerometer.read() {
+            // TODO: calibrate accelerometer
             a *= GRAVITY;
             self.acceleration = a;
             if let Some(vector) = gnss {

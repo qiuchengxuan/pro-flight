@@ -50,7 +50,8 @@ impl Mahony {
 
                 return mag.cross(&w);
             }
-            MagnetismOrHeading::Heading(heading) => {
+            MagnetismOrHeading::Heading(mut heading) => {
+                heading = -heading.to_radians(); // to right hand rule
                 let mut forward = q.inverse_transform_vector(&Vector3::new(0.0, 1.0, 0.0));
                 forward[2] = 0.0;
                 if forward.norm_squared() > 0.01 {
@@ -97,5 +98,33 @@ impl Mahony {
 
         self.quaternion = UnitQuaternion::new_normalize(q.into_inner() + q_intergral);
         Some(self.quaternion)
+    }
+}
+
+mod test {
+    #[test]
+    fn test_mahony_course() {
+        use nalgebra::Vector3;
+
+        use crate::datastructures::measurement::euler::Euler;
+
+        use super::{MagnetismOrHeading, Mahony};
+
+        let gyro = Vector3::new(0.0, 0.0, 0.0);
+        let accel = Vector3::new(0.0, 0.0, -1.0);
+
+        let mut mahony = Mahony::new(10.0, 10.0, 0.0);
+
+        let course: f32 = 270.0;
+        let magnetism = Some(MagnetismOrHeading::Heading(course));
+        for _ in 0..10 {
+            mahony.update(&gyro, &accel, magnetism);
+        }
+        let euler: Euler = mahony.quaternion().into();
+        let mut yaw = -euler.yaw.to_degrees() as isize;
+        if yaw < 0 {
+            yaw = 360 + yaw
+        };
+        assert_eq!(yaw, 270);
     }
 }

@@ -47,6 +47,8 @@ serials:
     fast: false
     rx-inverted: true
     half-duplex: false
+speedometer:
+  kp: 0.1
 outputs:
   PWM1:
     type: motor

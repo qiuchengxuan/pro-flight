@@ -155,7 +155,7 @@ impl Acceleration {
         let square_sum = x * x + y * y + z * z;
         if square_sum > 0 {
             let g_force = square_sum.integer_sqrt();
-            (g_force * 10 / self.0.sensitive) as u8
+            ((g_force * 10 + self.0.sensitive / 2) / self.0.sensitive) as u8
         } else {
             0
         }

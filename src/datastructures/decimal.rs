@@ -98,12 +98,6 @@ impl<I: Display, D: Into<u32> + Copy + Display> Display for IntegerDecimal<I, D>
     }
 }
 
-impl<I: Display, D: Into<u32> + Copy + Display> sval::value::Value for IntegerDecimal<I, D> {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.fmt(format_args!("{}", self))
-    }
-}
-
 mod test {
     #[test]
     fn test_display() {

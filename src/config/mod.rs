@@ -11,6 +11,7 @@ pub mod yaml;
 use core::fmt::Write;
 use core::str::Split;
 
+use crate::datastructures::decimal::IntegerDecimal;
 use crate::datastructures::measurement::Axes;
 use crate::hal::io::Read;
 
@@ -51,6 +52,37 @@ impl ToYAML for Axes {
     }
 }
 
+#[derive(Clone)]
+pub struct Speedometer {
+    pub kp: IntegerDecimal<u8, u16>,
+}
+
+impl Default for Speedometer {
+    fn default() -> Self {
+        Self { kp: IntegerDecimal::new(0, 25, 2) }
+    }
+}
+
+impl FromYAML for Speedometer {
+    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
+        let mut kp = IntegerDecimal::default();
+        while let Some((key, value)) = parser.next_key_value() {
+            match key {
+                "kp" => kp = IntegerDecimal::from(value),
+                _ => continue,
+            }
+        }
+        Self { kp }
+    }
+}
+
+impl ToYAML for Speedometer {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+        self.write_indent(indent, w)?;
+        writeln!(w, "kp: {}", self.kp)
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct Config {
     pub battery: Battery,
@@ -59,6 +91,7 @@ pub struct Config {
     pub osd: OSD,
     pub receiver: Receiver,
     pub serials: Serials,
+    pub speedometer: Speedometer,
     pub outputs: Outputs,
 }
 
@@ -83,6 +116,7 @@ impl FromYAML for Config {
                 "osd" => config.osd = OSD::from_yaml(parser),
                 "receiver" => config.receiver = Receiver::from_yaml(parser),
                 "serials" => config.serials = Serials::from_yaml(parser),
+                "speedometer" => config.speedometer = Speedometer::from_yaml(parser),
                 "outputs" => config.outputs = Outputs::from_yaml(parser),
                 _ => parser.skip(),
             };
@@ -121,6 +155,10 @@ impl ToYAML for Config {
             self.write_indent(indent, w)?;
             writeln!(w, "serials: []")?;
         }
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "speedometer:")?;
+        self.speedometer.write_to(indent + 1, w)?;
 
         if self.outputs.len() > 0 {
             self.write_indent(indent, w)?;

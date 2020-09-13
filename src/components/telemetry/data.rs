@@ -66,10 +66,24 @@ pub struct Misc {
     pub battery: Battery,
 }
 
-#[derive(Copy, Clone, Debug, Value)]
+#[derive(Copy, Clone, Debug)]
 pub struct GNSS {
     pub fixed: bool,
     pub course: Course,
+}
+
+impl sval::value::Value for GNSS {
+    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
+        stream.map_begin(Some(if self.fixed { 2 } else { 1 }))?;
+        stream.map_key("fixed")?;
+        stream.map_value(self.fixed)?;
+        if self.fixed {
+            stream.map_key("fixed")?;
+            let course: f32 = self.course.into();
+            stream.map_value(course)?;
+        }
+        stream.map_end()
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

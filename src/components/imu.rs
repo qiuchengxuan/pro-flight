@@ -9,7 +9,6 @@ use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};
 use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
-use crate::datastructures::data_source::singular::{SingularData, SingularDataSource};
 use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData, WithCapacity};
 use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, HeadingOrCourse};
@@ -29,7 +28,6 @@ pub struct IMU<A, G> {
     calibrated: bool,
     acceleration: Rc<OverwritingData<Vector3<f32>>>,
     quaternion: Rc<OverwritingData<UnitQuaternion<f32>>>,
-    gyro: Rc<SingularData<Gyro>>,
 }
 
 impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> {
@@ -53,7 +51,6 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
             calibrated: false,
             acceleration: Rc::new(OverwritingData::new(vec![acceleration; size])),
             quaternion: Rc::new(OverwritingData::new(vec![unit; size])),
-            gyro: Rc::new(SingularData::default()),
         }
     }
 
@@ -69,12 +66,8 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         OverwritingDataSource::new(&self.acceleration)
     }
 
-    pub fn as_imu(&self) -> OverwritingDataSource<UnitQuaternion<f32>> {
+    pub fn reader(&self) -> OverwritingDataSource<UnitQuaternion<f32>> {
         OverwritingDataSource::new(&self.quaternion)
-    }
-
-    pub fn as_gyroscope(&self) -> SingularDataSource<Gyro> {
-        SingularDataSource::new(&self.gyro)
     }
 
     fn calibrate(&mut self) -> bool {
@@ -110,11 +103,10 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
 
-        let magnetism = heading.map(|h| MagnetismOrHeading::Heading(h.to_radians()));
+        let magnetism = heading.map(|h| MagnetismOrHeading::Heading(h));
         if let Some(quaternion) = self.ahrs.update(&gyro, &acceleration, magnetism) {
             let acceleration = quaternion.transform_vector(&acceleration);
             self.acceleration.write(acceleration);
-            self.gyro.write(raw_gyro);
             self.quaternion.write(quaternion);
         }
     }

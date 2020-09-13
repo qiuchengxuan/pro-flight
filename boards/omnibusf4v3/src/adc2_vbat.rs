@@ -9,6 +9,7 @@ use stm32f4xx_hal::gpio::Input;
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::stm32;
 
+use rs_flight::algorithm::lpf::LPF;
 use rs_flight::datastructures::data_source::u16_source::{U16Data, U16DataSource};
 use rs_flight::datastructures::data_source::DataWriter;
 use rs_flight::datastructures::measurement::battery::Battery;
@@ -19,13 +20,16 @@ const VREF: usize = 3300;
 
 pub struct Adc2VBat {
     adc: Adc<stm32::ADC2>,
+    lpf: LPF<u16>,
     vbat_data: Rc<U16Data<Battery>>,
     dma_buffer: [u16; SAMPLE_SIZE],
 }
 
 impl Adc2VBat {
     pub fn new(adc: Adc<stm32::ADC2>) -> Self {
-        Self { adc, vbat_data: Rc::new(U16Data::default()), dma_buffer: Default::default() }
+        let vbat_data = Rc::new(U16Data::default());
+        let lpf = LPF::<u16>::new(1.0, 5.0);
+        Self { adc, lpf, vbat_data, dma_buffer: Default::default() }
     }
 
     pub fn reader(&self) -> U16DataSource<Battery> {
@@ -34,7 +38,8 @@ impl Adc2VBat {
 
     fn dma_rx_done(&mut self) {
         let sum: usize = self.dma_buffer.iter().map(|&v| v as usize).sum();
-        let milli_voltages = (sum / SAMPLE_SIZE) * VREF / 0xFFF * VOLTAGE_SCALE_X100 / 100;
+        let value = self.lpf.filter((sum / SAMPLE_SIZE * VREF / 0xFFF) as u16) as usize;
+        let milli_voltages = value * VOLTAGE_SCALE_X100 / 100;
         self.vbat_data.write(Battery(milli_voltages as u16));
     }
 }
