@@ -151,11 +151,13 @@ impl UBXDecoder {
                     }
                 }
                 (State::Skip(size), _) => {
-                    if ring.len() <= size {
-                        self.state = State::Skip(size - ring.len());
-                        return;
+                    let remain = ring.len() - index;
+                    if remain >= size {
+                        self.state = State::WaitHeader0;
+                        index += size;
                     } else {
-                        index = size;
+                        self.state = State::Skip(size - remain);
+                        index += remain;
                     }
                 }
                 (State::Remain(remain), _) => {
