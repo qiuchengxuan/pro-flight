@@ -90,7 +90,7 @@ pub fn init<E, BUS: Bus<Error = E>>(bus: BUS, sample_rate: u16) -> Result<bool, 
     delay.delay_us(15u8);
     mpu6000.set_gyro_sensitive(GYRO_SENSITIVE)?;
     delay.delay_us(15u8);
-    mpu6000.set_dlpf(1)?;
+    mpu6000.set_dlpf(2)?;
     delay.delay_us(15u8);
     mpu6000.set_sample_rate(sample_rate)?;
     delay.delay_us(15u8);

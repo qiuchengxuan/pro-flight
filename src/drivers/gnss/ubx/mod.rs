@@ -105,11 +105,11 @@ impl UBXDecoder {
             )); // NED to XYZ
             let course = payload.heading_of_motion;
             let course = if course > 0 { course } else { 3600 + course } as u16;
-            self.course.write(Course::new(course / 10, (course % 10) as u8, 1));
+            self.course.write(Course::new(course as isize, 1));
 
             let heading = payload.heading_of_vehicle;
             let heading = if heading > 0 { heading } else { 3600 + heading } as u16;
-            let heading = Heading::new(heading / 10, (heading % 10) as u8, 1);
+            let heading = Heading::new(heading as isize, 1);
             let heading_or_course = if payload.flags1.heading_of_vehicle_valid() {
                 HeadingOrCourse::Heading(heading)
             } else {

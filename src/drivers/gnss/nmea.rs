@@ -9,7 +9,7 @@ use nmea0183::messages::rmc::RMC;
 use nmea0183::types::latitude::Latitude;
 use nmea0183::types::longitude::Longitude;
 use nmea0183::types::position_mode::PositionMode;
-use nmea0183::types::{IntegerFloat, Quality};
+use nmea0183::types::Quality;
 use nmea0183::Parser;
 
 use crate::datastructures::coordinate::Position;
@@ -53,13 +53,9 @@ impl Into<latitude::Latitude> for Latitude {
     }
 }
 
-impl<I: Copy, D: Copy> From<&IntegerFloat<I, D>> for IntegerDecimal<I, D> {
-    fn from(float: &IntegerFloat<I, D>) -> Self {
-        Self {
-            integer: float.integer,
-            decimal: float.decimal,
-            decimal_length: float.decimal_length,
-        }
+impl From<nmea0183::types::IntegerDecimal> for IntegerDecimal {
+    fn from(decimal: nmea0183::types::IntegerDecimal) -> Self {
+        Self(decimal.0)
     }
 }
 
@@ -106,14 +102,14 @@ impl NMEADecoder {
             return;
         }
 
-        let course_valid = rmc.speed.integer > 0;
+        let course_valid = rmc.speed.integer() > 0;
         if course_valid {
-            self.course.write((&rmc.course).into());
+            self.course.write(rmc.course.into());
         }
-        if let Some(heading) = &rmc.heading {
+        if let Some(heading) = rmc.heading {
             self.heading.write(HeadingOrCourse::Heading(heading.into()));
         } else if course_valid {
-            self.heading.write(HeadingOrCourse::Course((&rmc.course).into()));
+            self.heading.write(HeadingOrCourse::Course(rmc.course.into()));
         }
 
         let course: f32 = rmc.course.into();
@@ -136,17 +132,14 @@ impl NMEADecoder {
         let latitude = gga.latitude.into();
         let longitude = gga.longitude.into();
 
-        let mut decimal = gga.altitude.decimal as i32;
-        if gga.altitude.integer < 0 {
-            decimal = -decimal;
-        }
-        let decimal_length = gga.altitude.decimal_length as u32;
-        let decimal_part = match decimal_length {
+        let integer = gga.altitude.integer() as i32;
+        let decimal = gga.altitude.decimal() as i32;
+        let decimal_part = match gga.altitude.decimal_length() {
             0 => 0,
             1 => decimal * 10,
-            _ => decimal / 10i32.pow(decimal_length - 2),
+            _ => decimal / 10i32.pow(gga.altitude.decimal_length() as u32 - 2),
         };
-        let altitude = Distance::new(gga.altitude.integer * 100 + decimal_part, CentiMeter);
+        let altitude = Distance::new(integer * 100 + decimal_part, CentiMeter);
         self.position.write(Position { latitude, longitude, altitude });
     }
 

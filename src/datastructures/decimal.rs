@@ -1,100 +1,71 @@
-use core::fmt::{Debug, Display};
-use core::num::ParseIntError;
-use core::str::FromStr;
+use core::fmt::Display;
 
-#[allow(unused_imports)] // false warning
-use micromath::F32Ext;
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
+pub struct IntegerDecimal(pub isize);
 
-#[derive(Copy, Clone, Default, PartialEq)]
-pub struct IntegerDecimal<I, D> {
-    pub integer: I,
-    pub decimal: D,
-    pub decimal_length: u8,
-}
+impl IntegerDecimal {
+    pub fn new(value: isize, decimal_length: u8) -> Self {
+        Self(value << 8 | decimal_length as isize)
+    }
 
-impl<I: Copy, D: Copy> IntegerDecimal<I, D> {
-    pub fn new(integer: I, decimal: D, decimal_length: u8) -> Self {
-        Self { integer, decimal, decimal_length }
+    pub fn decimal_length(self) -> u8 {
+        self.0 as u8
+    }
+
+    pub fn exp(self) -> usize {
+        let decimal_length = self.0 as u8;
+        10_usize.pow(decimal_length as u32)
+    }
+
+    pub fn integer(self) -> isize {
+        let number = self.0 >> 8;
+        number / self.exp() as isize
+    }
+
+    pub fn decimal(self) -> isize {
+        let number = self.0 >> 8;
+        number % self.exp() as isize
     }
 }
 
-macro_rules! impl_into_f32 {
-    () => {};
-    (, ($integer_type:tt, $decimal_type:tt) $(, ($integer_types:tt, $decimal_types:tt))*) => {
-        impl_into_f32!{ ($integer_type, $decimal_type) $(, ($integer_types, $decimal_types))* }
-    };
-    (($integer_type:tt, $decimal_type:tt) $(, ($integer_types:tt, $decimal_types:tt))*) => {
-        impl Into<f32> for IntegerDecimal<$integer_type, $decimal_type> {
-            fn into(self) -> f32 {
-                let integer = self.integer as f32;
-                let decimal = (self.decimal as f32).copysign(integer);
-                integer + decimal * 0.1f32.powf(self.decimal_length as f32)
-            }
-        }
-
-        impl_into_f32!{ $(, ($integer_types, $decimal_types))* }
-    };
-}
-
-impl_into_f32! { (u8, u8), (u16, u8), (u8, u16) }
-
-impl<I: Display, D: Display> Debug for IntegerDecimal<I, D> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{}.{}#{}", self.integer, self.decimal, self.decimal_length)
+impl Into<f32> for IntegerDecimal {
+    fn into(self) -> f32 {
+        let number = self.0 >> 8;
+        number as f32 / self.exp() as f32
     }
 }
 
-macro_rules! impl_from_str {
-    () => {};
-    (, ($type:tt -> $length:expr) $(, ($types:tt -> $lengths:expr))*) => {
-        impl_from_str!{ ($type -> $length) $(, ($types -> $lengths))* }
-    };
-    (($type:tt -> $length:expr) $(, ($types:tt -> $lengths:expr))*) => {
-        impl<I: FromStr<Err = ParseIntError> + Default> From<&str> for IntegerDecimal<I, $type> {
-            fn from(string: &str) -> Self {
-                if string.len() == 0 {
-                    return Self::default();
-                }
-                let mut splitted = string.split('.');
-                let mut integer = I::default();
-                if let Some(field) = splitted.next() {
-                    integer = field.parse().unwrap_or_default();
-                }
-                let mut decimal_length = 0;
-                let mut decimal = $type::default();
-                if let Some(field) = splitted.next() {
-                    decimal_length = core::cmp::min(field.len(), $length);
-                    decimal = (&field[..decimal_length]).parse().unwrap_or_default();
-                }
-                Self {
-                    integer,
-                    decimal,
-                    decimal_length: decimal_length as u8,
-                }
+impl From<&str> for IntegerDecimal {
+    fn from(string: &str) -> Self {
+        if string == "" {
+            return Self::default();
+        }
+        let mut splitted = string.split('.');
+        let mut integer = 0;
+        if let Some(field) = splitted.next() {
+            integer = field.parse().unwrap_or_default();
+        }
+        let mut decimal_length = 0;
+        let mut decimal = 0;
+        if let Some(field) = splitted.next() {
+            decimal_length = core::cmp::min(field.len(), 255);
+            decimal = field.parse().unwrap_or_default();
+            if integer < 0 {
+                decimal = -decimal
             }
         }
-
-        impl_from_str!{ $(, ($types -> $lengths))* }
-    };
+        let exp = 10_isize.pow(decimal_length as u32);
+        Self::new(integer * exp + decimal, decimal_length as u8)
+    }
 }
 
-impl_from_str! { (u8 -> 2), (u16 -> 4) }
-
-impl<I: Display, D: Into<u32> + Copy + Display> Display for IntegerDecimal<I, D> {
+impl Display for IntegerDecimal {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        if self.decimal_length == 0 {
-            return write!(f, "{}", self.integer);
+        let decimal_length = self.decimal_length() as usize;
+        if decimal_length == 0 {
+            return write!(f, "{}", self.integer());
         }
-        let mut decimal: u32 = self.decimal.into();
-        let mut padding_length: usize = self.decimal_length as usize - 1;
-        while decimal / 10 > 0 {
-            decimal /= 10;
-            padding_length -= 1;
-        }
-        if padding_length == 0 {
-            return write!(f, "{}.{}", self.integer, self.decimal);
-        }
-        write!(f, "{}.{:0padding$}{}", 0, self.integer, self.decimal, padding = padding_length)
+        write!(f, "{}.{:0length$}", self.integer(), self.decimal().abs(), length = decimal_length)
     }
 }
 
@@ -103,18 +74,18 @@ mod test {
     fn test_display() {
         use super::IntegerDecimal;
 
-        let decimal: IntegerDecimal<u8, u8> = IntegerDecimal::from("0");
+        let decimal = IntegerDecimal::from("0");
         assert_eq!("0", format!("{}", decimal));
-        let decimal: IntegerDecimal<u8, u8> = IntegerDecimal::from("0.0");
+        let decimal = IntegerDecimal::from("0.0");
         assert_eq!("0.0", format!("{}", decimal));
-        let decimal: IntegerDecimal<u8, u8> = IntegerDecimal::from("0.1");
+        let decimal = IntegerDecimal::from("0.1");
         assert_eq!("0.1", format!("{}", decimal));
-        let decimal: IntegerDecimal<u8, u8> = IntegerDecimal::from("0.01");
+        let decimal = IntegerDecimal::from("0.01");
         assert_eq!("0.01", format!("{}", decimal));
-        let decimal: IntegerDecimal<u8, u8> = IntegerDecimal::from("0.11");
+        let decimal = IntegerDecimal::from("0.11");
         assert_eq!("0.11", format!("{}", decimal));
 
-        let decimal: IntegerDecimal<u8, u16> = IntegerDecimal::from("0.001");
+        let decimal = IntegerDecimal::from("0.001");
         assert_eq!("0.001", format!("{}", decimal));
     }
 }

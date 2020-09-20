@@ -8,7 +8,7 @@ use crate::components::logger;
 use crate::components::telemetry::TelemetryData;
 use crate::datastructures::data_source::StaticData;
 use crate::drivers::serial::Readline;
-use crate::sys::timer::{get_jiffies, SysTimer};
+use crate::sys::timer::SysTimer;
 
 pub struct CLI<T> {
     vec: Vec<u8>,
@@ -33,7 +33,6 @@ impl<T: StaticData<TelemetryData>> CLI<T> {
         if let Some(first_word) = line.split(' ').next() {
             match first_word {
                 "logread" => write!(serial, "{}", logger::get()),
-                "uptime" => write!(serial, "{:?}", get_jiffies()),
                 "read" | "readx" => memory::read(line, serial),
                 "dump" => memory::dump(line, serial),
                 "write" => memory::write(line, serial, &mut self.timer),

@@ -7,9 +7,9 @@ use super::yaml::{FromYAML, ToYAML, YamlParser};
 #[derive(Copy, Clone, Debug)]
 pub struct Battery {
     pub cells: u8,
-    pub min_cell_voltage: IntegerDecimal<u8, u8>,
-    pub max_cell_voltage: IntegerDecimal<u8, u8>,
-    pub warning_cell_voltage: IntegerDecimal<u8, u8>,
+    pub min_cell_voltage: IntegerDecimal,
+    pub max_cell_voltage: IntegerDecimal,
+    pub warning_cell_voltage: IntegerDecimal,
 }
 
 impl Default for Battery {

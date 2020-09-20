@@ -8,7 +8,7 @@ version = "0.1.0"
 [dependencies]
 alloc-cortex-m = { path = "../../modules/alloc-cortex-m" }
 arrayvec = { version = "0.5", default-features = false, features = ["array-sizes-33-128"] }
-ascii-osd-hud = { path = "../../../ascii-osd-hud" }
+ascii-osd-hud = { git = "https://github.com/qiuchengxuan/ascii-osd-hud" }
 bmp280-core = "0.1"
 cast = { version = "0.2.2", default-features = false }
 chips = { path = "../../chips", features = ["stm32f4xx-hal"] }

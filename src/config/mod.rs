@@ -54,12 +54,12 @@ impl ToYAML for Axes {
 
 #[derive(Clone)]
 pub struct Speedometer {
-    pub kp: IntegerDecimal<u8, u16>,
+    pub kp: IntegerDecimal,
 }
 
 impl Default for Speedometer {
     fn default() -> Self {
-        Self { kp: IntegerDecimal::new(0, 25, 2) }
+        Self { kp: IntegerDecimal::new(25, 2) }
     }
 }
 

@@ -18,8 +18,8 @@ pub type VelocityVector<T, U> = displacement::DistanceVector<T, U>;
 pub type Temperature = i16;
 pub type Altitude = Distance<i32, CentiMeter>;
 
-pub type Heading = IntegerDecimal<u16, u8>;
-pub type Course = IntegerDecimal<u16, u8>;
+pub type Heading = IntegerDecimal;
+pub type Course = IntegerDecimal;
 
 #[derive(Copy, Clone)]
 pub enum HeadingOrCourse {

@@ -41,8 +41,8 @@ impl ToYAML for Accelerometer {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Mahony {
-    pub kp: IntegerDecimal<u8, u16>,
-    pub ki: IntegerDecimal<u8, u16>,
+    pub kp: IntegerDecimal,
+    pub ki: IntegerDecimal,
 }
 
 impl Default for Mahony {
