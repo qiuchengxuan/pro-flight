@@ -35,7 +35,8 @@ impl<PWMS: PwmByIdentifier, S: StaticData<ControlInput>> OnEvent for Airplane<S,
                             ServoType::Elevator => input.pitch,
                             ServoType::Rudder => input.yaw,
                         };
-                        to_servo_pwm_duty(max_duty, axis, servo.center_angle, servo.reversed)
+                        let (min, max) = (servo.min_angle, servo.max_angle);
+                        to_servo_pwm_duty(max_duty, axis, min, max, servo.reversed)
                     }
                     _ => return,
                 };

@@ -242,8 +242,8 @@ mod test {
         file.read_to_string(&mut yaml_string)?;
         let mut config = Config::from_yaml(&mut YamlParser::from(yaml_string.as_ref() as &str));
 
-        config.set(&mut "outputs.PWM5.center-angle".split('.'), Some("-10")).unwrap();
-        let expected = Output::Servo(Servo::new(ServoType::AileronLeft, -10, false));
+        config.set(&mut "outputs.PWM5.min-angle".split('.'), Some("-80")).unwrap();
+        let expected = Output::Servo(Servo::new(ServoType::AileronLeft, -80, 90, false));
         assert_eq!(config.outputs.get("PWM5").unwrap(), expected);
         Ok(())
     }

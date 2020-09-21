@@ -69,4 +69,5 @@ outputs:
     type: aileron-left
   PWM6:
     type: rudder
-    center-angle: -10
+    min-angle: -80
+    max-angle: 80

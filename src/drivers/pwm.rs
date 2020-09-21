@@ -21,12 +21,10 @@ macro_rules! pwms {
         impl<$($P: PwmPin<Duty = u16>,)+> PwmByIdentifier for ($($P,)+) {
             fn with(&mut self, identifier: Identifier, mut f: impl FnMut(&mut dyn PwmPin<Duty = u16>)) {
                 match identifier {
-                    Identifier::PWM(id) => match (id - 1) {
-                        $(
-                            $idx => f(&mut self.$idx),
-                        )+
-                        _ => (),
-                    }
+                    $(
+                        Identifier::PWM($idx) => f(&mut self.$idx),
+                    )+
+                    _ => (),
                 }
             }
 

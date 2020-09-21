@@ -1,3 +1,4 @@
+use core::cmp;
 use core::fmt::Write;
 use core::str::Split;
 
@@ -12,7 +13,7 @@ pub enum Identifier {
 impl From<&str> for Identifier {
     fn from(name: &str) -> Identifier {
         if name.starts_with("PWM") {
-            return Identifier::PWM(name[3..].parse().ok().unwrap_or(0));
+            return Identifier::PWM(name[3..].parse::<u8>().ok().map(|v| v - 1).unwrap_or(u8::MAX));
         }
         Identifier::PWM(0)
     }
@@ -21,7 +22,7 @@ impl From<&str> for Identifier {
 impl Into<bool> for Identifier {
     fn into(self) -> bool {
         match self {
-            Self::PWM(index) => index > 0,
+            Self::PWM(index) => index < u8::MAX,
         }
     }
 }
@@ -29,7 +30,7 @@ impl Into<bool> for Identifier {
 impl core::fmt::Display for Identifier {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
-            Self::PWM(index) => write!(f, "PWM{}", index),
+            Self::PWM(index) => write!(f, "PWM{}", index + 1),
         }
     }
 }
@@ -80,17 +81,18 @@ impl Into<&str> for ServoType {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Servo {
     pub servo_type: ServoType,
-    pub center_angle: i8,
+    pub min_angle: i8,
+    pub max_angle: i8,
     pub reversed: bool,
 }
 
 impl Servo {
-    pub fn new(servo_type: ServoType, center_angle: i8, reversed: bool) -> Self {
-        Self { servo_type, center_angle, reversed }
+    pub fn new(servo_type: ServoType, min_angle: i8, max_angle: i8, reversed: bool) -> Self {
+        Self { servo_type, min_angle, max_angle, reversed }
     }
 
     pub fn of(servo_type: ServoType) -> Self {
-        Self { servo_type, center_angle: 0, reversed: false }
+        Self { servo_type, min_angle: -90, max_angle: 90, reversed: false }
     }
 }
 
@@ -118,7 +120,8 @@ impl FromYAML for Output {
         let mut index = 0;
         let mut protocol: &str = &"";
         let mut rate = 400;
-        let mut angle = 0;
+        let mut min = -90;
+        let mut max = 90;
         let mut reversed = false;
         while let Some((key, value)) = parser.next_key_value() {
             match key {
@@ -126,23 +129,23 @@ impl FromYAML for Output {
                 "index" => index = value.parse().ok().unwrap_or(0),
                 "protocol" => protocol = value,
                 "rate" => rate = value.parse().ok().unwrap_or(400),
-                "center-angle" => angle = value.parse().ok().unwrap_or(0),
+                "min-angle" => min = value.parse().ok().unwrap_or(-90),
+                "max-angle" => max = value.parse().ok().unwrap_or(90),
                 "reversed" => reversed = value == "true",
                 _ => continue,
             }
         }
-        if angle < -90 || angle > 90 {
-            angle = 0;
-        }
+        min = cmp::min(cmp::max(min, -90), 0);
+        max = cmp::max(cmp::min(max, 90), 0);
         match type_string {
             "motor" => match protocol {
                 "PWM" => Self::Motor(Motor::new(Protocol::PWM, index, rate)),
                 _ => Self::Motor(Motor::default()),
             },
-            "aileron-left" => Self::Servo(Servo::new(ServoType::AileronLeft, angle, reversed)),
-            "aileron-right" => Self::Servo(Servo::new(ServoType::AileronRight, angle, reversed)),
-            "elevator" => Self::Servo(Servo::new(ServoType::Elevator, angle, reversed)),
-            "rudder" => Self::Servo(Servo::new(ServoType::Rudder, angle, reversed)),
+            "aileron-left" => Self::Servo(Servo::new(ServoType::AileronLeft, min, max, reversed)),
+            "aileron-right" => Self::Servo(Servo::new(ServoType::AileronRight, min, max, reversed)),
+            "elevator" => Self::Servo(Servo::new(ServoType::Elevator, min, max, reversed)),
+            "rudder" => Self::Servo(Servo::new(ServoType::Rudder, min, max, reversed)),
             _ => Self::None,
         }
     }
@@ -169,9 +172,13 @@ impl ToYAML for Output {
                 self.write_indent(indent, w)?;
                 let servo_type: &str = servo.servo_type.into();
                 writeln!(w, "type: {}", servo_type)?;
-                if servo.center_angle != 0 {
+                if servo.min_angle != -90 {
                     self.write_indent(indent, w)?;
-                    writeln!(w, "center-angle: {}", servo.center_angle)?;
+                    writeln!(w, "min-angle: {}", servo.min_angle)?;
+                }
+                if servo.max_angle != 90 {
+                    self.write_indent(indent, w)?;
+                    writeln!(w, "max-angle: {}", servo.max_angle)?;
                 }
                 if servo.reversed {
                     self.write_indent(indent, w)?;
@@ -190,8 +197,12 @@ impl Setter for Output {
             Some(v) => v,
             None => return Err(SetError::ExpectValue),
         };
-        match path.next() {
-            Some("type") => match value {
+        let key = match path.next() {
+            Some(key) => key,
+            None => return Err(SetError::MalformedPath),
+        };
+        match key {
+            "type" => match value {
                 "motor" => *self = Self::Motor(Motor::default()),
                 "aileron-left" => *self = Self::Servo(Servo::of(ServoType::AileronLeft)),
                 "aileron-right" => *self = Self::Servo(Servo::of(ServoType::AileronRight)),
@@ -199,20 +210,23 @@ impl Setter for Output {
                 "rudder" => *self = Self::Servo(Servo::of(ServoType::Rudder)),
                 _ => return Err(SetError::UnexpectedValue),
             },
-            Some("center-angle") => {
+            "min-angle" | "max-angle" => {
                 let angle = match value.parse::<i8>() {
                     Ok(angle) => angle,
                     Err(_) => return Err(SetError::UnexpectedValue),
                 };
-                if angle < -90 || angle > 90 {
-                    return Err(SetError::UnexpectedValue);
-                }
                 match self {
-                    Self::Servo(servo) => servo.center_angle = angle,
+                    Self::Servo(servo) => {
+                        if key == "min-angle" {
+                            servo.min_angle = cmp::min(cmp::max(angle, -90), 0);
+                        } else {
+                            servo.max_angle = cmp::max(cmp::min(angle, 90), 0);
+                        }
+                    }
                     _ => return Err(SetError::MalformedPath),
                 }
             }
-            Some("reversed") => match self {
+            "reversed" => match self {
                 Self::Servo(servo) => servo.reversed = value == "true",
                 _ => return Err(SetError::MalformedPath),
             },
