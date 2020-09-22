@@ -60,10 +60,11 @@ impl GNSS {
         }
     }
 
-    pub fn handle(&mut self, ring: &[u8], _: bool) {
+    pub fn handle(&mut self, ring: &[u8], half: bool) {
+        let bytes = if half { &ring[..ring.len() / 2] } else { &ring[ring.len() / 2..] };
         match self {
-            Self::UBX(ubx) => ubx.handle(ring),
-            Self::NMEA(nmea) => nmea.handle(ring),
+            Self::UBX(ubx) => ubx.handle(bytes),
+            Self::NMEA(nmea) => nmea.handle(bytes),
         }
     }
 }

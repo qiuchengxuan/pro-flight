@@ -2,6 +2,7 @@ pub mod message;
 pub mod nav_pos_pvt;
 
 use alloc::rc::Rc;
+use core::mem::size_of;
 use core::mem::transmute;
 
 use crate::datastructures::coordinate::Position;
@@ -17,7 +18,7 @@ use crate::datastructures::GNSSFixed;
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
 
-const MAX_MESSAGE_SIZE: usize = core::mem::size_of::<Message<NavPositionVelocityTime>>();
+const MAX_MESSAGE_SIZE: usize = size_of::<Message<NavPositionVelocityTime>>();
 
 #[derive(Copy, Clone)]
 pub enum State {
@@ -33,7 +34,6 @@ pub enum State {
 
 pub struct UBXDecoder {
     state: State,
-    normal: bool,
     fixed: Rc<U16Data<GNSSFixed>>,
     position: Rc<SingularData<Position>>,
     velocity: Rc<SingularData<VelocityVector<i32, MilliMeter>>>,
@@ -46,7 +46,6 @@ impl UBXDecoder {
     pub fn new() -> Self {
         Self {
             state: State::WaitHeader0,
-            normal: true,
             fixed: Rc::new(U16Data::default()),
             position: Rc::new(SingularData::default()),
             velocity: Rc::new(SingularData::default()),
@@ -78,11 +77,9 @@ impl UBXDecoder {
 
     fn handle_pvt_message(&mut self) {
         let pvt_message: &Message<NavPositionVelocityTime> = unsafe { transmute(&self.buffer) };
-        if !pvt_message.validate_checksum() && self.normal {
-            warn!("UBX checksum invalid");
+        if !pvt_message.validate_checksum() {
             return;
         }
-        self.normal = true;
 
         let payload = &pvt_message.payload;
 
@@ -119,11 +116,10 @@ impl UBXDecoder {
         }
     }
 
-    pub fn handle(&mut self, ring: &[u8]) {
-        let mut index = 0;
+    pub fn handle(&mut self, mut bytes: &[u8]) {
         let mut message: &mut Message<()> = unsafe { transmute(&mut self.buffer) };
-        while index < ring.len() {
-            match (self.state, ring[index]) {
+        while bytes.len() > 0 {
+            match (self.state, bytes[0]) {
                 (State::WaitHeader0, UBX_HEADER0) => {
                     self.state = State::WaitHeader1;
                 }
@@ -143,41 +139,42 @@ impl UBXDecoder {
                     self.state = State::WaitLength1;
                 }
                 (State::WaitLength1, value) => {
-                    message.length = u16::from_le_bytes([message.length as u8, value]);
-                    let length = message.length as usize + CHECKSUM_SIZE;
-                    match message.payload_type() {
-                        Some(_) => self.state = State::Remain(length),
-                        None => self.state = State::Skip(length),
+                    let length = u16::from_le_bytes([message.length as u8, value]);
+                    message.length = u16::to_le(length);
+                    let length = length as usize + CHECKSUM_SIZE;
+                    self.state = match message.payload_type() {
+                        Some(_) => State::Remain(length),
+                        None => State::Skip(length),
                     }
                 }
                 (State::Skip(size), _) => {
-                    let remain = ring.len() - index;
-                    if remain >= size {
-                        self.state = State::WaitHeader0;
-                        index += size;
-                    } else {
-                        self.state = State::Skip(size - remain);
-                        index += remain;
-                    }
-                }
-                (State::Remain(remain), _) => {
-                    let offset = (message.length as usize + CHECKSUM_SIZE) - remain;
-                    let payload = &mut self.buffer[PAYLOAD_OFFSET + offset..];
-                    let size = ring.len() - index;
-                    if size < remain {
-                        payload[..size].copy_from_slice(&ring[index..]);
-                        self.state = State::Remain(remain - (ring.len() - index));
+                    if bytes.len() < size {
+                        self.state = State::Skip(size - bytes.len());
                         return;
                     }
-                    payload[..remain].copy_from_slice(&ring[index..index + remain]);
-                    self.handle_pvt_message();
+                    bytes = &bytes[size..];
                     self.state = State::WaitHeader0;
+                    continue;
+                }
+                (State::Remain(size), _) => {
+                    let offset = PAYLOAD_OFFSET + (message.length() + CHECKSUM_SIZE) - size;
+                    let buffer = &mut self.buffer[offset..];
+                    if bytes.len() < size {
+                        buffer[..bytes.len()].copy_from_slice(bytes);
+                        self.state = State::Remain(size - bytes.len());
+                        return;
+                    }
+                    buffer[..size].copy_from_slice(&bytes[..size]);
+                    self.handle_pvt_message();
+                    bytes = &bytes[size..];
+                    self.state = State::WaitHeader0;
+                    continue;
                 }
                 _ => {
                     self.state = State::WaitHeader0;
                 }
             }
-            index += 1;
+            bytes = &bytes[1..];
         }
     }
 }
@@ -188,24 +185,25 @@ mod test {
         use crate::datastructures::data_source::OptionData;
         use crate::drivers::gnss::ubx::message::Message;
 
-        use super::NavPositionVelocityTime;
-        use super::UBXDecoder;
+        use super::{NavPositionVelocityTime, UBXDecoder};
 
         assert_eq!(core::mem::size_of::<Message<NavPositionVelocityTime>>(), 100);
 
         let message = hex!(
             "00 00
-             B5 62 01 07 5C 00 00 00 00 00 E0 07 0A 15 16 0D
-             0A 04 01 00 00 00 01 00 00 00 03 0C E0 0B 86 BE
-             2F FF AD 1F 21 20 E0 F2 09 00 A0 56 09 00 01 00
-             00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00
+             B5 62 01 07 5C 00
+             00 00 00 00 E0 07 0A 15 16 0D 0A 04 01 00 00 00
+             01 00 00 00 03 0C E0 0B 86 BE 2F FF AD 1F 21 04
+             E0 F2 09 00 A0 56 09 00 01 00 00 00 01 00 00 00
              00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
              00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-             00 00 1F F2 00 00"
+             00 00 00 00 00 00 00 00 00 00 00 00
+             D6 73"
         );
         let mut decoder = UBXDecoder::new();
         let mut position = decoder.position();
         decoder.handle(&message[0..64]);
+        assert_eq!(position.read().is_none(), true);
         decoder.handle(&message[64..message.len()]);
         assert_eq!(position.read().is_some(), true);
     }

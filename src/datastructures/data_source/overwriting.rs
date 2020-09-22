@@ -124,13 +124,13 @@ impl fmt::Write for OverwritingData<u8> {
 
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let buffer = unsafe { &mut *self.buffer.get() };
-        let size = buffer.len();
         let mut bytes = s.as_bytes();
         if buffer.len() <= bytes.len() {
             bytes = &bytes[..buffer.len()];
         }
-        let write = self.write.load(Ordering::Relaxed) as usize;
-        let next_write = write.wrapping_add(bytes.len());
+        let size = buffer.len();
+        let write = self.write.load(Ordering::Relaxed) as usize % size;
+        let next_write = write.wrapping_add(bytes.len()) % size;
         self.write.store(next_write, Ordering::Relaxed);
 
         if size - write > bytes.len() {

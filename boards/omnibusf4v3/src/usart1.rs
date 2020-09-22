@@ -15,7 +15,8 @@ type PA10 = gpioa::PA10<Input<Floating>>;
 const HTIF_OFFSET: usize = 4;
 const STREAM5_OFFSET: usize = 6;
 
-static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
+// TODO: use allocator
+static mut DMA_BUFFER: [u8; 128] = [0u8; 128];
 static mut DEVICE: Option<Device> = None;
 
 #[interrupt]
