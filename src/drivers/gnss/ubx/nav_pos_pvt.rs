@@ -84,7 +84,7 @@ pub struct Longitude(i32);
 impl Into<coordinate::Longitude> for Longitude {
     fn into(self) -> coordinate::Longitude {
         let sub_seconds = longitude::SUB_SECOND as i64;
-        coordinate::Longitude((self.0 as i64 * 36 * sub_seconds / 10_000) as i32)
+        coordinate::Longitude((self.0 as i64 * 36 * sub_seconds / 100_000) as i32)
     }
 }
 
@@ -94,7 +94,7 @@ pub struct Latitude(i32);
 impl Into<coordinate::Latitude> for Latitude {
     fn into(self) -> coordinate::Latitude {
         let sub_seconds = latitude::SUB_SECOND as i64;
-        coordinate::Latitude((self.0 as i64 * 36 * sub_seconds / 10_000) as i32)
+        coordinate::Latitude((self.0 as i64 * 36 * sub_seconds / 100_000) as i32)
     }
 }
 
@@ -162,9 +162,11 @@ mod test {
         let nav_pos_pvt: &NavPositionVelocityTime =
             unsafe { core::mem::transmute(message.as_ptr()) };
         assert_eq!(nav_pos_pvt.year, 2016);
+        assert_eq!("-13648250", format!("{}", nav_pos_pvt.longitude.0));
         let longitude: Longitude = nav_pos_pvt.longitude.into();
-        assert_eq!("W013°38.700", format!("{}", longitude));
+        assert_eq!("W001°21.370", format!("{}", longitude));
+        assert_eq!("69279661", format!("{}", nav_pos_pvt.latitude.0));
         let latitude: Latitude = nav_pos_pvt.latitude.into();
-        assert_eq!("N69°16.779", format!("{}", latitude));
+        assert_eq!("N06°55.677", format!("{}", latitude));
     }
 }

@@ -1,30 +1,30 @@
 use core::fmt::Display;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
-pub struct IntegerDecimal(pub isize);
+pub struct IntegerDecimal(pub i32);
 
 impl IntegerDecimal {
-    pub fn new(value: isize, decimal_length: u8) -> Self {
-        Self(value << 8 | decimal_length as isize)
+    pub fn new(value: i32, decimal_length: u8) -> Self {
+        Self(value << 8 | decimal_length as i32)
     }
 
     pub fn decimal_length(self) -> u8 {
         self.0 as u8
     }
 
-    pub fn exp(self) -> usize {
+    pub fn exp(self) -> u32 {
         let decimal_length = self.0 as u8;
-        10_usize.pow(decimal_length as u32)
+        10_u32.pow(decimal_length as u32)
     }
 
-    pub fn integer(self) -> isize {
+    pub fn integer(self) -> i32 {
         let number = self.0 >> 8;
-        number / self.exp() as isize
+        number / self.exp() as i32
     }
 
-    pub fn decimal(self) -> isize {
+    pub fn decimal(self) -> i32 {
         let number = self.0 >> 8;
-        number % self.exp() as isize
+        number % self.exp() as i32
     }
 }
 
@@ -54,7 +54,7 @@ impl From<&str> for IntegerDecimal {
                 decimal = -decimal
             }
         }
-        let exp = 10_isize.pow(decimal_length as u32);
+        let exp = 10_i32.pow(decimal_length as u32);
         Self::new(integer * exp + decimal, decimal_length as u8)
     }
 }

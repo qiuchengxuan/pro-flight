@@ -3,7 +3,7 @@ authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
 name = "rs-flight"
-version = "0.0.2"
+version = "0.1.0"
 
 [dependencies]
 ascii = { version = "1.0", default-features = false }
@@ -13,6 +13,7 @@ crc = { version = "1.8", default-features = false }
 embedded-hal = "0.2"
 embedded-sdmmc = "0.3"
 enum-map = { version = "0.6", default-features = false }
+git-version = "0.3.4"
 integer-sqrt = "0.1"
 max7456 = "0.1"
 micromath = "1.0"

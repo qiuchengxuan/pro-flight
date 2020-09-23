@@ -94,25 +94,25 @@ impl UBXDecoder {
                 longitude: payload.longitude.into(),
                 altitude: Distance::new(payload.height_above_msl / 10, CentiMeter),
             });
-            self.velocity.write(VelocityVector::new(
-                payload.velocity_north,
-                payload.velocity_east,
-                -payload.velocity_down,
-                MilliMeter,
-            )); // NED to XYZ
+            let (x, y, z) = (payload.velocity_east, payload.velocity_north, -payload.velocity_down);
+            self.velocity.write(VelocityVector::new(x, y, z, MilliMeter));
+
             let course = payload.heading_of_motion;
-            let course = if course > 0 { course } else { 3600 + course } as u16;
-            self.course.write(Course::new(course as isize, 1));
+            let course = if course > 0 { course } else { 360_00000 + course } as i32;
+            let course = Course::new(course / 10, 4);
+            let course_valid = payload.ground_speed / 1000 > 0;
+            if course_valid {
+                self.course.write(course);
+            }
 
             let heading = payload.heading_of_vehicle;
-            let heading = if heading > 0 { heading } else { 3600 + heading } as u16;
-            let heading = Heading::new(heading as isize, 1);
-            let heading_or_course = if payload.flags1.heading_of_vehicle_valid() {
-                HeadingOrCourse::Heading(heading)
-            } else {
-                HeadingOrCourse::Course(heading)
-            };
-            self.heading.write(heading_or_course);
+            let heading = if heading > 0 { heading } else { 360_00000 + heading } as i32;
+            let heading = Heading::new(heading / 10, 4);
+            if payload.flags1.heading_of_vehicle_valid() {
+                self.heading.write(HeadingOrCourse::Heading(heading));
+            } else if course_valid {
+                self.heading.write(HeadingOrCourse::Course(course));
+            }
         }
     }
 

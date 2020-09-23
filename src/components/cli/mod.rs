@@ -3,12 +3,17 @@ pub mod memory;
 
 use alloc::vec::Vec;
 
+use git_version::git_version;
+
 use crate::alloc;
 use crate::components::logger;
 use crate::components::telemetry::TelemetryData;
 use crate::datastructures::data_source::StaticData;
 use crate::drivers::serial::Readline;
 use crate::sys::timer::SysTimer;
+
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const REVISION: &'static str = git_version!();
 
 pub struct CLI<T> {
     vec: Vec<u8>,
@@ -40,6 +45,7 @@ impl<T: StaticData<TelemetryData>> CLI<T> {
                 "show" => config::show(serial),
                 "save" => config::save(),
                 "telemetry" => writeln!(serial, "{}", self.telemetry.read()),
+                "version" => writeln!(serial, "{}-{}", VERSION, REVISION),
                 "" => Ok(()),
                 _ => {
                     if extra(line, serial) {
