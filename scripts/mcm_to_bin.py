@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-import sys
-import os
-import crcmod
 import binascii
+import os
+import sys
+
+import crcmod
 
 if len(sys.argv) <= 1:
     print('Usage: convert.py filename')

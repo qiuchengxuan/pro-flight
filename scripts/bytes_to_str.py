@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 
+
 def main():
     line = next(sys.stdin).strip()
     parts = line.split(' ', 1)

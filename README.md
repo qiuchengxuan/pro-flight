@@ -29,6 +29,8 @@ Progress
 * WIP
   - [ ] Stabilizer
 * Future
+  - [ ] Replace JSON with Mavlink
+  - [ ] Setup calibration
   - [ ] Blackbox
   - [ ] DMA based SDCARD read & write
   - [ ] Navigation
