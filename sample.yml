@@ -26,6 +26,7 @@ osd:
   offset:
     horizental: 8
     vertical: 0
+  refresh-rate: 50
   standard: PAL
 receiver:
   channels:

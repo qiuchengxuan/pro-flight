@@ -1,9 +1,11 @@
 use alloc::rc::Rc;
 use alloc::string::String;
-use core::fmt::{Display, Formatter, Result, Write};
+use core::fmt::{Display, Formatter, Write};
+use core::str::Split;
 
 use crate::datastructures::Ratio;
 
+use super::setter::{SetError, Setter};
 use super::yaml::{FromYAML, ToYAML, YamlParser};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -28,7 +30,7 @@ impl From<&str> for Standard {
 }
 
 impl Display for Standard {
-    fn fmt(&self, f: &mut Formatter) -> Result {
+    fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
         let string = match self {
             Self::PAL => "PAL",
             Self::NTSC => "NTSC",
@@ -69,7 +71,7 @@ impl FromYAML for Offset {
 }
 
 impl ToYAML for Offset {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "horizental: {}", self.horizental)?;
         self.write_indent(indent, w)?;
@@ -80,21 +82,23 @@ impl ToYAML for Offset {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct OSD {
-    pub fov: u8,
-    pub font: Rc<String>,
     pub aspect_ratio: Ratio,
-    pub standard: Standard,
+    pub font: Rc<String>,
+    pub fov: u8,
     pub offset: Offset,
+    pub refresh_rate: u8,
+    pub standard: Standard,
 }
 
 impl Default for OSD {
     fn default() -> Self {
         Self {
+            aspect_ratio: Ratio::default(),
             fov: 120,
             font: Rc::new(String::default()),
-            aspect_ratio: Ratio::default(),
-            standard: Standard::default(),
             offset: Offset::default(),
+            refresh_rate: 50,
+            standard: Standard::default(),
         }
     }
 }
@@ -104,8 +108,9 @@ impl FromYAML for OSD {
         let mut aspect_ratio = Ratio::default();
         let mut font = Rc::new(String::default());
         let mut fov = 120u8;
-        let mut standard = Standard::default();
         let mut offset = Offset::default();
+        let mut refresh_rate = 50;
+        let mut standard = Standard::default();
         while let Some(key) = parser.next_entry() {
             match key {
                 "aspect-ratio" => {
@@ -126,6 +131,11 @@ impl FromYAML for OSD {
                     }
                 }
                 "offset" => offset = Offset::from_yaml(parser),
+                "refresh-rate" => {
+                    if let Some(value) = parser.next_value() {
+                        refresh_rate = value.parse().unwrap_or(50);
+                    }
+                }
                 "standard" => {
                     if let Some(value) = parser.next_value() {
                         standard = Standard::from(value);
@@ -134,12 +144,12 @@ impl FromYAML for OSD {
                 _ => parser.skip(),
             }
         }
-        OSD { aspect_ratio, font, fov, standard, offset }
+        OSD { aspect_ratio, font, fov, offset, refresh_rate, standard }
     }
 }
 
 impl ToYAML for OSD {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "aspect-ratio: '{}'", self.aspect_ratio)?;
 
@@ -156,6 +166,23 @@ impl ToYAML for OSD {
         self.offset.write_to(indent + 1, w)?;
 
         self.write_indent(indent, w)?;
+        writeln!(w, "refresh-rate: {}", self.refresh_rate)?;
+
+        self.write_indent(indent, w)?;
         writeln!(w, "standard: {}", self.standard)
+    }
+}
+
+impl Setter for OSD {
+    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
+        if path.next() == Some("refresh-rate") {
+            let value = match value.map(|v| v.parse::<u8>().ok()).flatten() {
+                Some(value) => value,
+                None => return Err(SetError::UnexpectedValue),
+            };
+            self.refresh_rate = value;
+            return Ok(());
+        }
+        Err(SetError::MalformedPath)
     }
 }

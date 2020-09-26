@@ -100,6 +100,7 @@ impl Setter for Config {
         match path.next() {
             Some("receiver") => self.receiver.set(path, value),
             Some("outputs") => self.outputs.set(path, value),
+            Some("osd") => self.osd.set(path, value),
             _ => Err(SetError::MalformedPath),
         }
     }

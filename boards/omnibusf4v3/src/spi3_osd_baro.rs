@@ -129,7 +129,7 @@ pub struct OSDScheduler<T>(AsciiHud<T>);
 
 impl<T: StaticData<TelemetryData>> Schedulable for OSDScheduler<T> {
     fn rate(&self) -> Rate {
-        50
+        config::get().osd.refresh_rate as Rate
     }
 
     fn schedule(&mut self) -> bool {
