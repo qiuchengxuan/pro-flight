@@ -29,8 +29,8 @@ fn trim(string: &str) -> &str {
 
 impl<'a> YamlParser<'a> {
     fn next_non_blank_line(&mut self) -> Option<&'a str> {
-        let mut split = self.string.split('\n');
-        while let Some(line) = split.next() {
+        let mut lines = self.string.lines();
+        while let Some(line) = lines.next() {
             let trim_start = line.trim_start();
             if trim_start.is_empty() || trim_start.starts_with("#") {
                 self.string = &self.string[min(line.len() + 1, self.string.len())..];
@@ -77,7 +77,7 @@ impl<'a> YamlParser<'a> {
         let indent = (self.indent - self.unindent) as usize;
         self.unindent = 0;
 
-        if !line[..indent].trim_start().is_empty() {
+        if line.len() <= indent || !line[..indent].trim_start().is_empty() {
             return None;
         }
         self.string = &self.string[indent as usize..];

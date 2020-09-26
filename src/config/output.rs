@@ -15,7 +15,7 @@ impl From<&str> for Identifier {
         if name.starts_with("PWM") {
             return Identifier::PWM(name[3..].parse::<u8>().ok().map(|v| v - 1).unwrap_or(u8::MAX));
         }
-        Identifier::PWM(0)
+        Identifier::PWM(u8::MAX)
     }
 }
 
@@ -241,7 +241,7 @@ pub struct Outputs(pub [(Identifier, Output); MAX_OUTPUT_CONFIG]);
 
 impl Default for Outputs {
     fn default() -> Outputs {
-        Outputs([(Identifier::PWM(0), Output::None); MAX_OUTPUT_CONFIG])
+        Outputs([(Identifier::PWM(u8::MAX), Output::None); MAX_OUTPUT_CONFIG])
     }
 }
 

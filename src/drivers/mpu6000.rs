@@ -8,13 +8,14 @@ use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
 use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
 
 use crate::alloc;
+use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
 use crate::datastructures::data_source::DataWriter;
 use crate::datastructures::measurement::{Acceleration, Axes, Gyro, Measurement, Temperature};
 use crate::sys::timer::SysTimer;
 
-pub const ACCELEROMETER_SENSITIVE: AccelerometerSensitive =
-    accelerometer_sensitive!(+/-4g, 8192/LSB);
+static mut ACCELEROMETER_SENSITIVE: AccelerometerSensitive =
+    accelerometer_sensitive!(+/-16g, 2048/LSB);
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 
 pub struct MPU6000Data {
@@ -28,7 +29,7 @@ static mut MPU6000_DATA: MaybeUninit<MPU6000Data> = MaybeUninit::uninit();
 impl Into<Measurement> for mpu6000::measurement::Measurement<AccelerometerSensitive> {
     fn into(self) -> Measurement {
         let axes = Axes { x: -self.x as i32, y: -self.y as i32, z: -self.z as i32 };
-        let sensitive: f32 = ACCELEROMETER_SENSITIVE.into();
+        let sensitive: f32 = unsafe { ACCELEROMETER_SENSITIVE }.into();
         Measurement { axes, sensitive: sensitive as i32 }
     }
 }
@@ -86,7 +87,15 @@ pub fn init<E, BUS: Bus<Error = E>>(bus: BUS, sample_rate: u16) -> Result<bool, 
     delay.delay_us(15u8);
     mpu6000.set_clock_source(ClockSource::PLLGyroZ)?;
     delay.delay_us(15u8);
-    mpu6000.set_accelerometer_sensitive(ACCELEROMETER_SENSITIVE)?;
+    let imu = config::get().imu;
+    let sensitive = match imu.accelerometer.sensitive.integer() {
+        0..=2 => accelerometer_sensitive!(+/-2g, 16384/LSB),
+        3..=4 => accelerometer_sensitive!(+/-4g, 8192/LSB),
+        5..=8 => accelerometer_sensitive!(+/-8g, 4096/LSB),
+        _ => accelerometer_sensitive!(+/-16g, 2048/LSB),
+    };
+    mpu6000.set_accelerometer_sensitive(sensitive)?;
+    unsafe { ACCELEROMETER_SENSITIVE = sensitive };
     delay.delay_us(15u8);
     mpu6000.set_gyro_sensitive(GYRO_SENSITIVE)?;
     delay.delay_us(15u8);

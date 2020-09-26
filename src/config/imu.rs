@@ -9,21 +9,26 @@ use super::yaml::{FromYAML, ToYAML, YamlParser};
 pub struct Accelerometer {
     pub bias: Axes,
     pub gain: Axes,
+    pub sensitive: IntegerDecimal,
 }
 
 impl FromYAML for Accelerometer {
     fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
         let mut bias = Axes::default();
         let mut gain = Axes::default();
+        let mut sensitive = IntegerDecimal::new(160, 1);
 
         while let Some(key) = parser.next_entry() {
             match key {
                 "bias" => bias = Axes::from_yaml(parser),
                 "gain" => gain = Axes::from_yaml(parser),
+                "sensitive" => {
+                    sensitive = IntegerDecimal::from(parser.next_value().unwrap_or("16.0"))
+                }
                 _ => continue,
             }
         }
-        Self { bias, gain }
+        Self { bias, gain, sensitive }
     }
 }
 
@@ -35,7 +40,10 @@ impl ToYAML for Accelerometer {
 
         self.write_indent(indent, w)?;
         writeln!(w, "gain:")?;
-        self.gain.write_to(indent + 1, w)
+        self.gain.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "sensitive: {}", self.sensitive)
     }
 }
 

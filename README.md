@@ -29,6 +29,7 @@ Progress
 * WIP
   - [ ] Stabilizer
 * Future
+  - [ ] INS calibration
   - [ ] Replace JSON with Mavlink
   - [ ] Setup calibration
   - [ ] Blackbox
