@@ -119,7 +119,7 @@ where
         self.displacements[CURRENT] = s.convert(|v| v as i32);
         let waypoint = self.waypoints[self.next_waypoint as usize];
         let steerpoint = Steerpoint { index: self.next_waypoint, waypoint };
-        let position = self.waypoints[HOME].position + self.displacements[CURRENT];
+        let position = self.waypoints[HOME].position - self.displacements[CURRENT];
         self.output.write((position, steerpoint));
         true
     }

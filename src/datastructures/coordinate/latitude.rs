@@ -57,6 +57,19 @@ impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Latitud
     }
 }
 
+impl<U: Copy + Into<i32> + Default> core::ops::Sub<Distance<i32, U>> for Latitude {
+    type Output = Self;
+
+    fn sub(self, delta: Distance<i32, U>) -> Self {
+        let cm = delta.to_unit(CentiMeter).value() as i64;
+        let seconds = self.0 - (cm * SUB_SECOND as i64 / 30_92) as i32;
+        if seconds.abs() > MAX_SECONDS {
+            return Self(-(seconds % MAX_SECONDS));
+        }
+        Self(seconds)
+    }
+}
+
 impl core::ops::Sub for Latitude {
     type Output = Distance<i32, Meter>;
 

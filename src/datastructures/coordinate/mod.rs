@@ -75,6 +75,17 @@ impl<U: Copy + Default + Into<i32>> core::ops::Add<Displacement<U>> for Position
     }
 }
 
+impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<U>> for Position {
+    type Output = Self;
+
+    fn sub(self, displacement: Displacement<U>) -> Self {
+        let longitude = self.longitude - displacement.x;
+        let latitude = self.latitude - displacement.y;
+        let altitude = self.altitude - displacement.z.to_unit(CentiMeter);
+        Self { latitude, longitude, altitude }
+    }
+}
+
 mod test {
     #[test]
     fn test_spherical_coordinate() {
