@@ -73,38 +73,24 @@ fn select_max7456() {
 }
 
 fn spi3_prepare_rx(dma_buffer: &[u8]) {
-    let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
-    let data_register = &spi3.dr as *const _ as u32;
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
     unsafe { dma1.lifcr.write(|w| w.bits(0x3D << 16)) }; // stream 2
     let stream = &dma1.st[2]; // dma1 channel 0 stream 2 rx
+    stream.m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
     stream.ndtr.write(|w| w.ndt().bits(dma_buffer.len() as u16));
-    stream.par.write(|w| w.pa().bits(data_register));
-    let m0ar = &stream.m0ar;
-    m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
-    #[rustfmt::skip]
-    stream.cr.write(|w| {
-        w.chsel().bits(0).minc().incremented().dir().peripheral_to_memory()
-            .tcie().enabled().en().enabled()
-    });
+    stream.cr.modify(|_, w| w.en().enabled());
 }
 
 fn spi3_start_tx(dma_buffer: &[u8], size: usize) {
-    let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
-    let data_register = &spi3.dr as *const _ as u32;
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
     unsafe { dma1.hifcr.write(|w| w.bits(0x3D << 22)) }; // stream 7
     let stream = &dma1.st[7]; // dma1 channel 0 stream 7 tx
-    stream.ndtr.write(|w| w.ndt().bits(size as u16));
-    stream.par.write(|w| w.pa().bits(data_register));
     stream.m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
-    let cr = &stream.cr;
+    stream.ndtr.write(|w| w.ndt().bits(size as u16));
     if dma_buffer.len() != size {
-        cr.write(|w| w.chsel().bits(0).dir().memory_to_peripheral().en().enabled());
+        stream.cr.modify(|_, w| w.minc().fixed().en().enabled());
     } else {
-        cr.write(|w| {
-            w.chsel().bits(0).minc().incremented().dir().memory_to_peripheral().en().enabled()
-        });
+        stream.cr.modify(|_, w| w.minc().incremented().en().enabled());
     }
 }
 
@@ -148,6 +134,21 @@ impl<T: StaticData<TelemetryData>> Schedulable for OSDScheduler<T> {
     }
 }
 
+fn init_dma() {
+    let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
+    let data_register = &spi3.dr as *const _ as u32;
+    let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
+    let stream = &dma1.st[2]; // dma1 channel 0 stream 2 rx
+    stream.par.write(|w| w.pa().bits(data_register));
+    stream.cr.write(|w| {
+        w.chsel().bits(0).minc().incremented().dir().peripheral_to_memory().tcie().enabled()
+    });
+
+    let stream = &dma1.st[7]; // dma1 channel 0 stream 7 tx
+    stream.par.write(|w| w.pa().bits(data_register));
+    stream.cr.write(|w| w.chsel().bits(0).dir().memory_to_peripheral());
+}
+
 pub fn init<'a, CRC: Hasher32>(
     spi3: stm32::SPI3,
     spi3_pins: (PC10<Input<Floating>>, PC11<Input<Floating>>, PC12<Input<Floating>>),
@@ -175,10 +176,11 @@ pub fn init<'a, CRC: Hasher32>(
 
     let spi3 = unsafe { &(*stm32::SPI3::ptr()) };
     spi3.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
+    init_dma();
+
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
     unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::DMA1_STREAM2) }
-    let config = &config::get().osd;
-    let ascii_hud =
-        AsciiHud::new(telemetry, config.fov, Ratio(12, 18).into(), config.aspect_ratio.into());
-    Ok((BaroScheduler, OSDScheduler(ascii_hud)))
+    let cfg = &config::get().osd;
+    let hud = AsciiHud::new(telemetry, cfg.fov, Ratio(12, 18).into(), cfg.aspect_ratio.into());
+    Ok((BaroScheduler, OSDScheduler(hud)))
 }

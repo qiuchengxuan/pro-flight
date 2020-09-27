@@ -45,31 +45,15 @@ unsafe fn EXTI4() {
 
     { &mut *CS.as_mut_ptr() }.set_low().ok();
 
-    let spi1 = &(*stm32::SPI1::ptr());
-    let data_register = &spi1.dr as *const _ as u32;
     let dma2 = &*(stm32::DMA2::ptr());
 
-    // dma2 channel 3 stream 0 rx
     let stream = &dma2.st[0];
     stream.ndtr.write(|w| w.ndt().bits(DMA_SIZE as u16));
-    stream.par.write(|w| w.pa().bits(data_register));
-    let m0ar = &stream.m0ar;
-    m0ar.write(|w| w.m0a().bits(DMA_BUFFER.as_ptr() as u32 + 1));
-    #[rustfmt::skip]
-    stream.cr.write(|w| {
-        w.chsel().bits(3).minc().incremented().dir().peripheral_to_memory()
-            .pburst().incr16().tcie().enabled().en().enabled()
-    });
+    stream.cr.modify(|_, w| w.en().enabled());
 
-    static READ_REG: u8 = Register::AccelerometerXHigh as u8 | 0x80;
-
-    // dma2 channel 3 stream 3 tx
     let stream = &dma2.st[3];
     stream.ndtr.write(|w| w.ndt().bits(DMA_SIZE as u16));
-    stream.par.write(|w| w.pa().bits(data_register));
-    stream.m0ar.write(|w| w.m0a().bits(&READ_REG as *const _ as u32));
-    let cr = &stream.cr;
-    cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().pburst().incr16().en().enabled());
+    stream.cr.modify(|_, w| w.en().enabled());
 }
 
 #[interrupt]
@@ -89,6 +73,31 @@ type PA5 = gpioa::PA5<Input<Floating>>;
 type PA6 = gpioa::PA6<Input<Floating>>;
 type PA7 = gpioa::PA7<Input<Floating>>;
 type PC4 = gpioc::PC4<Input<PullUp>>;
+
+fn init_dma() {
+    let spi1 = unsafe { &(*stm32::SPI1::ptr()) };
+    let data_register = &spi1.dr as *const _ as u32;
+    let dma2 = unsafe { &*(stm32::DMA2::ptr()) };
+
+    // dma2 channel 3 stream 0 rx
+    let stream = &dma2.st[0];
+    stream.par.write(|w| w.pa().bits(data_register));
+    let m0ar = &stream.m0ar;
+    m0ar.write(|w| w.m0a().bits(unsafe { DMA_BUFFER.as_ptr() } as u32 + 1));
+    #[rustfmt::skip]
+    stream.cr.write(|w| {
+        w.chsel().bits(3).minc().incremented().dir().peripheral_to_memory()
+            .pburst().incr16().tcie().enabled()
+    });
+
+    static READ_REG: u8 = Register::AccelerometerXHigh as u8 | 0x80;
+
+    // dma2 channel 3 stream 3 tx
+    let stream = &dma2.st[3];
+    stream.par.write(|w| w.pa().bits(data_register));
+    stream.m0ar.write(|w| w.m0a().bits(&READ_REG as *const _ as u32));
+    stream.cr.write(|w| w.chsel().bits(3).dir().memory_to_peripheral().pburst().incr16());
+}
 
 pub fn init(
     spi1: stm32::SPI1,
@@ -111,21 +120,8 @@ pub fn init(
         return Ok(false);
     }
 
-    let freq: stm32f4xx_hal::time::Hertz = 20.mhz().into();
-    let br = match clocks.pclk2().0 / freq.0 {
-        0 => unreachable!(),
-        1..=2 => 0b000,
-        3..=5 => 0b001,
-        6..=11 => 0b010,
-        12..=23 => 0b011,
-        24..=47 => 0b100,
-        48..=95 => 0b101,
-        96..=191 => 0b110,
-        _ => 0b011,
-    };
-    let spi1 = unsafe { &(*stm32::SPI1::ptr()) };
-    spi1.cr1.modify(|_, w| w.br().bits(br));
-    spi1.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
+    unsafe { &(*stm32::SPI1::ptr()) }.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
+    init_dma();
 
     unsafe {
         CS = MaybeUninit::new(cs);
