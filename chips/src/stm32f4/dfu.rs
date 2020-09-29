@@ -1,22 +1,16 @@
 use core::ptr::{read_volatile, write_volatile};
 
-const DFU_ARM: usize = 0x4446550A;
+const DFU_ARM: usize = 0xDEADBEEF;
+const DFU_DISARM: usize = 0xCAFEFEED;
 
-pub struct Dfu(usize);
+pub struct Dfu(pub usize);
 
 impl Dfu {
-    pub fn new() -> Self {
-        Self(0)
-    }
-
-    #[inline(never)]
     fn enter(&self) -> ! {
-        cortex_m::interrupt::disable();
         unsafe {
-            llvm_asm!("ldr r0, =0x1fff0000
-                       ldr sp, [r0, #0]
-                       ldr r0, [r0, #4]
-                       bx r0" :::: "volatile");
+            cortex_m::register::msp::write(0x1FFF0004);
+            let reset_handler: fn() = core::mem::transmute(0x1FFF0000);
+            reset_handler();
         }
         loop {}
     }
@@ -35,6 +29,6 @@ impl Dfu {
     }
 
     pub fn disarm(&mut self) {
-        unsafe { write_volatile(&mut self.0, 0) };
+        unsafe { write_volatile(&mut self.0, DFU_DISARM) };
     }
 }

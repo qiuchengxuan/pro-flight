@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(llvm_asm)]
 
 #[macro_use]
 extern crate cortex_m_rt;

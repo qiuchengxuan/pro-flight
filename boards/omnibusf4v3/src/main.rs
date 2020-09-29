@@ -32,8 +32,6 @@ mod usart6;
 
 use alloc::boxed::Box;
 use core::alloc::Layout;
-use core::fmt::Write as _;
-use core::mem::MaybeUninit;
 use core::panic::PanicInfo;
 use core::time::Duration;
 
@@ -96,6 +94,9 @@ static mut CCM_MEMORY: [u8; 65536] = [0u8; 65536];
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
+#[link_section = ".uninit.STACKS"]
+static mut DFU: Dfu = Dfu(0);
+
 macro_rules! panic_logger {
     () => {
         &mut *(&mut CCM_MEMORY[LOG_BUFFER_SIZE] as *mut _ as *mut PanicLogger)
@@ -110,6 +111,7 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
         let rcc = &*stm32::RCC::ptr();
         rcc.apb2enr.write(|w| w.syscfgen().enabled());
         rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled().crcen().enabled());
+        DFU.check();
     }
 
     systick_init(syst, clocks.sysclk().0);
@@ -133,11 +135,22 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     clocks
 }
 
+fn reboot() {
+    unsafe { DFU.disarm() };
+    cortex_m::peripheral::SCB::sys_reset();
+}
+
+fn bootloader() {
+    cortex_m::peripheral::SCB::sys_reset();
+}
+
+fn free() -> (usize, usize) {
+    (ALLOCATOR.used(), ALLOCATOR.free())
+}
+
 #[entry]
 fn main() -> ! {
     unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
-    let mut dfu = unsafe { MaybeUninit::new(Box::new(Dfu::new())).assume_init() };
-    dfu.check();
 
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
@@ -312,7 +325,7 @@ fn main() -> ! {
     let group = Scheduler::new(tasks, 200);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 200);
 
-    let mut cli = CLI::new(telemetry_source);
+    let mut cli = CLI::new(telemetry_source, reboot, bootloader, free);
     let mut timer = SysTimer::new();
     loop {
         if timer.wait().is_ok() {
@@ -323,23 +336,7 @@ fn main() -> ! {
         if !device.poll(&mut [&mut serial.0]) {
             continue;
         }
-        cli.interact(&mut serial, |line, serial| -> bool {
-            match line.split(' ').next() {
-                Some("dfu") => {
-                    cortex_m::peripheral::SCB::sys_reset();
-                }
-                Some("reboot") => {
-                    dfu.disarm();
-                    cortex_m::peripheral::SCB::sys_reset()
-                }
-                Some("free") => {
-                    writeln!(serial, "Used: {}, free: {}", ALLOCATOR.used(), ALLOCATOR.free()).ok();
-                }
-                _ => return false,
-            }
-            true
-        })
-        .ok();
+        cli.interact(&mut serial).ok();
     }
 }
 
