@@ -12,7 +12,7 @@ MEMORY
 /* The stack is of the full descending type. */
 /* You may want to use this variable to locate the call stack and static
    variables in different memory regions. Below is shown the default value */
-/* _stack_start = ORIGIN(RAM) + LENGTH(RAM); */
+_stack_start = ORIGIN(CCMRAM) + LENGTH(CCMRAM);
 
 /* You can use this symbol to customize the location of the .text section */
 /* If omitted the .text section will be placed right after the .vector_table
@@ -26,9 +26,9 @@ MEMORY
    sources added the attribute `#[link_section = ".ram2bss"]` to the data
    you want to place there. */
 /* Note that the section will not be zero-initialized by the runtime! */
-SECTIONS {
-    .ccmram (NOLOAD) : ALIGN(4) {
-      *(.ccmram);
-      . = ALIGN(4);
-    } > CCMRAM
-} INSERT AFTER .bss;
+/* SECTIONS { */
+/*     .ccmram (NOLOAD) : ALIGN(4) { */
+/*       *(.ccmram); */
+/*       . = ALIGN(4); */
+/*     } > CCMRAM */
+/* } INSERT AFTER .bss; */

@@ -1,3 +1,0 @@
-[submodule "modules/alloc-cortex-m"]
-	path = modules/alloc-cortex-m
-	url = https://github.com/rust-embedded/alloc-cortex-m.git

@@ -21,7 +21,7 @@ mpu6000 = "0.1"
 nalgebra = { version = "0.21", default-features = false }
 nb = "0.1"
 nmea0183-core = { git = "https://github.com/qiuchengxuan/nmea0183" }
-sbus-parser = "0.0.2"
+sbus-parser = { git = "https://github.com/qiuchengxuan/sbus" }
 stm32f4xx-hal = { version = "0.8", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }
 sval_json = "0.5"

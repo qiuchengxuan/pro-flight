@@ -53,7 +53,7 @@ use rs_flight::{
         logger::{self, Level},
         mixer::ControlMixer,
         navigation::Navigation,
-        panic::{log_panic, PanicLogger},
+        panic::log_panic,
         schedule::Scheduler,
         speedometer::Speedometer,
         TelemetryUnit,
@@ -84,24 +84,13 @@ use stm32f4xx_hal::{
 
 const MHZ: u32 = 1000_000;
 const GYRO_SAMPLE_RATE: usize = 1000;
-const LOG_BUFFER_SIZE: usize = 1024;
 const SERVO_SCHEDULE_RATE: usize = 50;
-
-#[link_section = ".uninit.STACKS"]
-#[link_section = ".ccmram"]
-static mut CCM_MEMORY: [u8; 65536] = [0u8; 65536];
 
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
 #[link_section = ".uninit.STACKS"]
 static mut DFU: Dfu = Dfu(0);
-
-macro_rules! panic_logger {
-    () => {
-        &mut *(&mut CCM_MEMORY[LOG_BUFFER_SIZE] as *mut _ as *mut PanicLogger)
-    };
-}
 
 fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     let rcc = rcc.constrain();
@@ -118,12 +107,6 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     timer::init(get_jiffies);
     logger::init(Level::Debug);
     memory::init(valid_memory_address);
-
-    let panic_logger = unsafe { panic_logger!() };
-    if panic_logger.is_valid() {
-        warn!("Last panic: {}", panic_logger);
-        panic_logger.invalidate();
-    }
 
     let sysclk = clocks.sysclk().0 / MHZ;
     let hclk = clocks.hclk().0 / MHZ;
@@ -150,12 +133,11 @@ fn free() -> (usize, usize) {
 
 #[entry]
 fn main() -> ! {
-    unsafe { ALLOCATOR.init(CCM_MEMORY.as_ptr() as usize, CCM_MEMORY.len()) }
-
     let cortex_m_peripherals = cortex_m::Peripherals::take().unwrap();
     let mut peripherals = stm32::Peripherals::take().unwrap();
     let mut nvic = cortex_m_peripherals.NVIC;
 
+    unsafe { ALLOCATOR.init(cortex_m_rt::heap_start() as usize, 32 * 1024) }
     let clocks = init(cortex_m_peripherals.SYST, peripherals.RCC);
 
     let gpio_a = peripherals.GPIOA.split();
@@ -320,8 +302,8 @@ fn main() -> ! {
     }
 
     let telemetry_source = telemetry.reader();
-    let schedule_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
-    let tasks = (schedule_trigger, baro, altimeter, imu, speedometer, navigation, telemetry, osd);
+    let servo_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
+    let tasks = (servo_trigger, baro, altimeter, imu, speedometer, navigation, telemetry, osd);
     let group = Scheduler::new(tasks, 200);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 200);
 
@@ -342,24 +324,24 @@ fn main() -> ! {
 
 #[panic_handler]
 unsafe fn panic(panic_info: &PanicInfo) -> ! {
-    log_panic(format_args!("{}", panic_info), panic_logger!());
+    log_panic(format_args!("{}", panic_info));
     cortex_m::peripheral::SCB::sys_reset();
 }
 
 #[exception]
 unsafe fn HardFault(exception_frame: &ExceptionFrame) -> ! {
-    log_panic(format_args!("{:?}", exception_frame), panic_logger!());
+    log_panic(format_args!("{:?}", exception_frame));
     cortex_m::peripheral::SCB::sys_reset();
 }
 
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
-    log_panic(format_args!("{}", irqn), panic_logger!());
+    log_panic(format_args!("{}", irqn));
     cortex_m::peripheral::SCB::sys_reset();
 }
 
 #[alloc_error_handler]
 unsafe fn oom(_: Layout) -> ! {
-    log_panic(format_args!("OOM"), panic_logger!());
+    log_panic(format_args!("OOM"));
     cortex_m::peripheral::SCB::sys_reset();
 }
