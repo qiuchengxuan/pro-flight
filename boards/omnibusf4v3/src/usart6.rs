@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use rs_flight::config::SerialConfig;
 use rs_flight::drivers::sbus::SbusReceiver;
 use rs_flight::drivers::uart::Device;
@@ -5,9 +7,10 @@ use stm32f4xx_hal::gpio::gpioc;
 use stm32f4xx_hal::gpio::{Floating, Input};
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
-use stm32f4xx_hal::serial::config::{Config, StopBits};
 use stm32f4xx_hal::serial::Serial;
-use stm32f4xx_hal::{prelude::*, stm32};
+use stm32f4xx_hal::stm32;
+
+use crate::stm32f4::{alloc_by_config, to_serial_config};
 
 type PC6 = gpioc::PC6<Input<Floating>>;
 type PC7 = gpioc::PC7<Input<Floating>>;
@@ -15,7 +18,7 @@ type PC7 = gpioc::PC7<Input<Floating>>;
 const HTIF_OFFSET: usize = 4;
 const STREAM1_OFFSET: usize = 6;
 
-static mut DMA_BUFFER: [u8; 64] = [0u8; 64];
+static mut DMA_BUFFER: Vec<u8> = Vec::new();
 static mut DEVICE: Option<Device> = None;
 
 #[interrupt]
@@ -39,24 +42,17 @@ pub fn init(
     config: &SerialConfig,
     clocks: Clocks,
 ) -> Option<&'static mut Device> {
-    let mut cfg = Config::default();
-    match config {
-        SerialConfig::SBUS(sbus) => {
-            debug!("Config USART6 as SBUS receiver");
-            cfg = cfg.baudrate(sbus.baudrate().bps());
-            // word-length-9 must be selected when parity is even
-            cfg = cfg.stopbits(StopBits::STOP2).parity_even().wordlength_9();
-        }
-        _ => return None,
-    };
-
     let (pc6, pc7) = pins;
     let pins = (pc6.into_alternate_af8(), pc7.into_alternate_af8());
-    Serial::usart6(usart6, pins, cfg, clocks).unwrap();
+    Serial::usart6(usart6, pins, to_serial_config(&config), clocks).unwrap();
 
     // dma2 stream1 channel 5 rx
     unsafe {
         (&*stm32::USART6::ptr()).cr3.modify(|_, w| w.dmar().enabled());
+
+        DMA_BUFFER = alloc_by_config(&config);
+        let address = DMA_BUFFER.as_ptr() as usize;
+        debug!("Alloc DMA buffer at {:#X} size {} on USART6", address, DMA_BUFFER.len());
 
         let dma2 = &*(stm32::DMA2::ptr());
         let stream = &dma2.st[1];

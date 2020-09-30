@@ -41,8 +41,7 @@ pub fn __write_log(args: core::fmt::Arguments, level: Level) {
     let logger = unsafe { LOGGER.as_mut().unwrap() };
     let jiffies = get_jiffies();
     let seconds = jiffies.as_secs() as u32;
-    write!(logger, "[{:5}.{:03}] {} ", seconds, jiffies.subsec_millis(), level).ok();
-    writeln!(logger, "{}", args).ok();
+    writeln!(logger, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), args).ok();
 }
 
 #[doc(hidden)]
@@ -53,8 +52,7 @@ pub fn __write_log_literal(message: &'static str, level: Level) {
     let logger = unsafe { LOGGER.as_mut().unwrap() };
     let jiffies = get_jiffies();
     let seconds = jiffies.as_secs() as u32;
-    write!(logger, "[{:5}.{:03}] {} ", seconds, jiffies.subsec_millis(), level).ok();
-    writeln!(logger, "{}", message).ok();
+    writeln!(logger, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), message).ok();
 }
 
 #[doc(hidden)]

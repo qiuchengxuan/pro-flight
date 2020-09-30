@@ -2,6 +2,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
+#[macro_use]
 extern crate alloc;
 extern crate ascii_osd_hud;
 extern crate bmp280_core as bmp280;
@@ -26,6 +27,7 @@ mod pwm;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
 mod spi3_osd_baro;
+mod stm32f4;
 mod tim7_scheduler;
 mod usart1;
 mod usart6;
@@ -113,7 +115,7 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     let pclk1 = clocks.pclk1().0 / MHZ;
     let pclk2 = clocks.pclk2().0 / MHZ;
     debug!("sysclk: {}mhz, hclk: {}mhz, pclk1: {}mhz, pclk2: {}mhz", sysclk, hclk, pclk1, pclk2);
-    debug!("stack top: {:x}", cortex_m::register::msp::read());
+    debug!("stack top: {:#X}", cortex_m::register::msp::read());
 
     clocks
 }

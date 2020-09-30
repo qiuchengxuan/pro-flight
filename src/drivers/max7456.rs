@@ -28,7 +28,7 @@ where
     let length = match file.metadata() {
         Ok(metadata) => metadata.len(),
         Err(e) => {
-            warn!("{:?}", e);
+            info!("{:?}", e);
             return Ok(false);
         }
     };
