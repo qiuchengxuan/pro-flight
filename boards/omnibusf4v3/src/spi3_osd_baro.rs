@@ -11,7 +11,7 @@ use rs_flight::components::telemetry::TelemetryData;
 use rs_flight::config;
 use rs_flight::datastructures::data_source::StaticData;
 use rs_flight::datastructures::Ratio;
-use rs_flight::drivers::bmp280::{init as bmp280_init, on_dma_receive};
+use rs_flight::drivers::barometer::bmp280::{init as bmp280_init, on_dma_receive};
 use rs_flight::drivers::max7456::init as max7456_init;
 use rs_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
 use stm32f4xx_hal::gpio::gpioa::PA15;

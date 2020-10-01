@@ -65,12 +65,7 @@ use rs_flight::{
         data_source::{AgingStaticData, NoDataSource},
         input::ControlInput,
     },
-    drivers::{
-        bmp280::{init_data_source as init_bmp280_data_source, BMP280_SAMPLE_RATE},
-        mpu6000::init_data_source as init_mpu6000_data_source,
-        uart::Device,
-        usb_serial,
-    },
+    drivers::{accelerometer, barometer, gyroscope, uart::Device, usb_serial},
     sys::{
         fs::File,
         timer::{self, SysTimer},
@@ -182,8 +177,11 @@ fn main() -> ! {
         }
     };
 
+    let accelerometer = accelerometer::init_data_source();
+    let gyroscope = gyroscope::init_data_source();
+    let barometer = barometer::init_data_source();
+
     info!("Initialize MPU6000");
-    let (accelerometer, gyroscope, _) = init_mpu6000_data_source();
     let mut int = gpio_c.pc4.into_pull_up_input();
     int.make_interrupt_source(&mut peripherals.SYSCFG);
     int.enable_interrupt(&mut peripherals.EXTI);
@@ -200,9 +198,6 @@ fn main() -> ! {
 
     info!("Initialize ADC VBAT");
     let battery = adc2_vbat::init(peripherals.ADC2, gpio_c.pc2).reader();
-
-    let barometer = init_bmp280_data_source();
-    let altimeter = Altimeter::new(barometer, BMP280_SAMPLE_RATE);
 
     let mut gnss: Option<&'static mut Device> = None;
     let mut receiver: Option<&'static mut Device> = None;
@@ -253,6 +248,7 @@ fn main() -> ! {
         Configuration::Airplane => Airplane::new(mixer, pwms),
     };
 
+    let altimeter = Altimeter::new(barometer, barometer::bmp280::SAMPLE_RATE);
     let rate = GYRO_SAMPLE_RATE as u16;
     let mut imu = IMU::new(accelerometer.clone(), gyroscope.clone(), rate);
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
