@@ -21,7 +21,7 @@ imu:
       x: -78
       y: 289
       z: -33
-    variation: 5.8
+    declination: 5.8
   mahony:
     kp: 0.25
     ki: 0.005

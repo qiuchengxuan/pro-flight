@@ -17,6 +17,7 @@ extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 extern crate nmea0183_core as nmea0183;
+extern crate qmc5883l;
 extern crate sbus_parser;
 #[macro_use]
 extern crate sval;

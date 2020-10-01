@@ -6,6 +6,7 @@ pub struct Mahony {
     sample_interval: f32,
     kp: f32,
     ki: f32,
+    magnetic_declination: Vector3<f32>,
     error_integral: Vector3<f32>,
     quaternion: UnitQuaternion<f32>,
 }
@@ -17,11 +18,13 @@ pub enum MagnetismOrHeading {
 }
 
 impl Mahony {
-    pub fn new(sample_rate: f32, kp: f32, ki: f32) -> Self {
+    pub fn new(sample_rate: f32, kp: f32, ki: f32, magnetic_declination: f32) -> Self {
+        let declination = magnetic_declination.to_radians();
         Self {
             sample_interval: 1.0 / sample_rate,
             kp,
             ki,
+            magnetic_declination: Vector3::new(declination.cos(), declination.sin(), 0.0),
             error_integral: Vector3::new(0.0, 0.0, 0.0),
             quaternion: UnitQuaternion::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
         }
@@ -113,7 +116,7 @@ mod test {
         let gyro = Vector3::new(0.0, 0.0, 0.0);
         let accel = Vector3::new(0.0, 0.0, -1.0);
 
-        let mut mahony = Mahony::new(10.0, 10.0, 0.0);
+        let mut mahony = Mahony::new(10.0, 10.0, 0.0, 0.0);
 
         let course: f32 = 270.0;
         let magnetism = Some(MagnetismOrHeading::Heading(course));
