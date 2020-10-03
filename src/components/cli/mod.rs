@@ -15,6 +15,7 @@ use crate::sys::timer::SysTimer;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const REVISION: &'static str = git_version!();
+const PROMPT: &'static str = "cli> ";
 
 pub struct CLI<T> {
     vec: Vec<u8>,
@@ -42,27 +43,30 @@ impl<T: StaticData<TelemetryData>> CLI<T> {
             Some(line) => unsafe { core::str::from_utf8_unchecked(line) },
             None => return Ok(()),
         };
-        if let Some(first_word) = line.split(' ').next() {
-            match first_word {
-                "logread" => write!(serial, "{}", logger::get())?,
-                "read" | "readx" => memory::read(line, serial)?,
-                "dump" => memory::dump(line, serial)?,
-                "write" => memory::write(line, serial, &mut self.timer)?,
-                "set" => config::set(serial, line)?,
-                "show" => config::show(serial)?,
-                "save" => config::save()?,
-                "telemetry" => writeln!(serial, "{}", self.telemetry.read())?,
-                "version" => writeln!(serial, "{}-{}", VERSION, REVISION)?,
-                "reboot" => (self.reboot)(),
-                "bootloader" => (self.bootloader)(),
-                "free" => {
-                    let (used, free) = (self.free)();
-                    writeln!(serial, "Used: {}, free: {}", used, free)?;
+        if !line.starts_with('#') {
+            if let Some(first_word) = line.split(' ').next() {
+                match first_word {
+                    "bootloader" => (self.bootloader)(),
+                    "dump" => memory::dump(line, serial)?,
+                    "free" => {
+                        let (used, free) = (self.free)();
+                        writeln!(serial, "Used: {}, free: {}", used, free)?;
+                    }
+                    "logread" => write!(serial, "{}", logger::get())?,
+                    "read" | "readx" => memory::read(line, serial)?,
+                    "reboot" => (self.reboot)(),
+                    "set" => config::set(serial, line)?,
+                    "show" => config::show(serial)?,
+                    "save" => config::save()?,
+                    "telemetry" => writeln!(serial, "{}", self.telemetry.read())?,
+                    "version" => writeln!(serial, "{}-{}", VERSION, REVISION)?,
+                    "write" => memory::write(line, serial, &mut self.timer)?,
+                    "" => (),
+                    _ => writeln!(serial, "Unknown command")?,
                 }
-                _ => (),
             }
         }
-        write!(serial, "# ")?;
+        write!(serial, "{}", PROMPT)?;
         self.vec.truncate(0);
         Ok(())
     }

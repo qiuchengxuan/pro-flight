@@ -172,3 +172,5 @@ impl Into<Altitude> for Pressure {
         Distance::new(((1013_25 - self.0 as isize) * 82 / 10) as i32, CentiMeter)
     }
 }
+
+pub type Magnetism = Measurement;

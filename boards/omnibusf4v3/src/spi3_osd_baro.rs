@@ -24,6 +24,8 @@ use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::{prelude::*, stm32};
 
+const STREAM5_OFFSET: usize = 6;
+
 // NOTE: actually empty, no need to initialize
 static mut CS_BMP280: MaybeUninit<PB3<Output<PushPull>>> = MaybeUninit::uninit();
 static mut CS_MAX7456: MaybeUninit<PA15<Output<PushPull>>> = MaybeUninit::uninit();
@@ -48,7 +50,7 @@ unsafe fn DMA1_STREAM2() {
     cortex_m::interrupt::free(|_| {
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA1_STREAM2);
         let dma1 = &*stm32::DMA1::ptr();
-        dma1.hifcr.write(|w| w.bits(0x3D << 22)); // stream 7
+        dma1.hifcr.write(|w| w.bits(0x3D << STREAM5_OFFSET));
         dma1.lifcr.write(|w| w.bits(0x3D << 16)); // stream 2
     });
 
@@ -59,7 +61,7 @@ pub struct BaroScheduler;
 
 fn spi3_dma_ready() -> bool {
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
-    dma1.st[2].cr.read().en().is_disabled() && dma1.st[7].cr.read().en().is_disabled()
+    dma1.st[2].cr.read().en().is_disabled() && dma1.st[5].cr.read().en().is_disabled()
 }
 
 fn select_bmp280() {
@@ -83,8 +85,8 @@ fn spi3_prepare_rx(dma_buffer: &[u8]) {
 
 fn spi3_start_tx(dma_buffer: &[u8], size: usize) {
     let dma1 = unsafe { &*(stm32::DMA1::ptr()) };
-    unsafe { dma1.hifcr.write(|w| w.bits(0x3D << 22)) }; // stream 7
-    let stream = &dma1.st[7]; // dma1 channel 0 stream 7 tx
+    unsafe { dma1.hifcr.write(|w| w.bits(0x3D << 22)) }; // stream 5
+    let stream = &dma1.st[5]; // dma1 channel 0 stream 5 tx
     stream.m0ar.write(|w| w.m0a().bits(dma_buffer.as_ptr() as u32));
     stream.ndtr.write(|w| w.ndt().bits(size as u16));
     if dma_buffer.len() != size {
@@ -144,7 +146,7 @@ fn init_dma() {
         w.chsel().bits(0).minc().incremented().dir().peripheral_to_memory().tcie().enabled()
     });
 
-    let stream = &dma1.st[7]; // dma1 channel 0 stream 7 tx
+    let stream = &dma1.st[5]; // dma1 channel 0 stream 5 tx
     stream.par.write(|w| w.pa().bits(data_register));
     stream.cr.write(|w| w.chsel().bits(0).dir().memory_to_peripheral());
 }

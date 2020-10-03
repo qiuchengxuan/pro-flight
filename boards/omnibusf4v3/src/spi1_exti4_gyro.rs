@@ -76,6 +76,7 @@ type PC4 = gpioc::PC4<Input<PullUp>>;
 
 fn init_dma() {
     let spi1 = unsafe { &(*stm32::SPI1::ptr()) };
+    spi1.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
     let data_register = &spi1.dr as *const _ as u32;
     let dma2 = unsafe { &*(stm32::DMA2::ptr()) };
 
@@ -120,7 +121,6 @@ pub fn init(
         return Ok(false);
     }
 
-    unsafe { &(*stm32::SPI1::ptr()) }.cr2.modify(|_, w| w.txdmaen().enabled().rxdmaen().enabled());
     init_dma();
 
     unsafe {

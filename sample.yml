@@ -16,6 +16,12 @@ imu:
       y: 8142
       z: 8188
     sensitive: 2.0
+  magnetometer:
+    bias:
+      x: -78
+      y: 289
+      z: -33
+    variation: 5.8
   mahony:
     kp: 0.25
     ki: 0.005

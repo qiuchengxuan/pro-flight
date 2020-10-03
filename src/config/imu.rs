@@ -47,6 +47,41 @@ impl ToYAML for Accelerometer {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone)]
+pub struct Magnetometer {
+    pub bias: Axes,
+    pub variation: IntegerDecimal,
+}
+
+impl FromYAML for Magnetometer {
+    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
+        let mut bias = Axes::default();
+        let mut variation = IntegerDecimal::new(0, 0);
+
+        while let Some(key) = parser.next_entry() {
+            match key {
+                "bias" => bias = Axes::from_yaml(parser),
+                "variation" => {
+                    variation = IntegerDecimal::from(parser.next_value().unwrap_or("0.0"))
+                }
+                _ => continue,
+            }
+        }
+        Self { bias, variation }
+    }
+}
+
+impl ToYAML for Magnetometer {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+        self.write_indent(indent, w)?;
+        writeln!(w, "bias:")?;
+        self.bias.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "variation: {}", self.variation)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Mahony {
     pub kp: IntegerDecimal,
@@ -88,22 +123,25 @@ impl ToYAML for Mahony {
 #[derive(Default, Debug, Copy, Clone)]
 pub struct IMU {
     pub accelerometer: Accelerometer,
+    pub magnetometer: Magnetometer,
     pub mahony: Mahony,
 }
 
 impl FromYAML for IMU {
     fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
         let mut accelerometer = Accelerometer::default();
+        let mut magnetometer = Magnetometer::default();
         let mut mahony = Mahony::default();
 
         while let Some(key) = parser.next_entry() {
             match key {
                 "accelerometer" => accelerometer = Accelerometer::from_yaml(parser),
+                "magnetometer" => magnetometer = Magnetometer::from_yaml(parser),
                 "mahony" => mahony = Mahony::from_yaml(parser),
                 _ => continue,
             }
         }
-        Self { accelerometer, mahony }
+        Self { accelerometer, magnetometer, mahony }
     }
 }
 
@@ -112,6 +150,10 @@ impl ToYAML for IMU {
         self.write_indent(indent, w)?;
         writeln!(w, "accelerometer:")?;
         self.accelerometer.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "magnetometer:")?;
+        self.magnetometer.write_to(indent + 1, w)?;
 
         self.write_indent(indent, w)?;
         writeln!(w, "mahony:")?;

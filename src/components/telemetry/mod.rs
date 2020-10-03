@@ -18,7 +18,9 @@ use crate::datastructures::input::{ControlInput, RSSI};
 use crate::datastructures::measurement::battery::Battery;
 use crate::datastructures::measurement::euler::{Euler, DEGREE_PER_DAG};
 use crate::datastructures::measurement::unit::{FTpM, Knot, Meter};
-use crate::datastructures::measurement::{Acceleration, Altitude, Course, Gyro, VelocityVector};
+use crate::datastructures::measurement::{
+    Acceleration, Altitude, Course, Gyro, Magnetism, VelocityVector,
+};
 use crate::datastructures::waypoint::Steerpoint;
 use crate::datastructures::GNSSFixed;
 
@@ -44,6 +46,7 @@ pub struct TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
     rssi: Option<Box<dyn AgingStaticData<RSSI>>>,
     control_input: Option<Box<dyn AgingStaticData<ControlInput>>>,
+    magnetometer: Option<Box<dyn StaticData<Magnetism>>>,
     gnss: Option<GNSS>,
 
     initial_altitude: Altitude,
@@ -82,6 +85,9 @@ where
 
         let acceleration = self.accelerometer.read();
         let gyro = self.gyroscope.read();
+
+        let magnetism = self.magnetometer.as_mut().map(|m| m.read());
+
         let mut gnss: Option<data::GNSS> = None;
         if let Some(ref mut _gnss) = self.gnss {
             let fixed = _gnss.fix.read().into();
@@ -110,7 +116,8 @@ where
             rssi: self.rssi.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
             input: input_option.unwrap_or_default(),
         };
-        let raw = Raw { acceleration, gyro, quaternion, gnss, speed_vector, displacement };
+        let raw =
+            Raw { acceleration, gyro, quaternion, magnetism, gnss, speed_vector, displacement };
 
         let data = TelemetryData { basic, misc, raw };
         self.telemetry.write(data);
@@ -147,6 +154,7 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
             rssi: None,
             control_input: None,
+            magnetometer: None,
             gnss: None,
 
             initial_altitude: Default::default(),
@@ -161,6 +169,10 @@ impl<A, B, C, G, IMU, S, NAV> TelemetryUnit<A, B, C, G, IMU, S, NAV> {
 
     pub fn set_control_input(&mut self, input: Box<dyn AgingStaticData<ControlInput>>) {
         self.control_input = Some(input)
+    }
+
+    pub fn set_magnetometer(&mut self, magnetometer: Box<dyn StaticData<Magnetism>>) {
+        self.magnetometer = Some(magnetometer)
     }
 
     pub fn set_gnss(&mut self, fix: Fixed, course: GNSSCourse) {
