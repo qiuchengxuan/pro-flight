@@ -2,7 +2,6 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
-#[macro_use]
 extern crate alloc;
 extern crate ascii_osd_hud;
 extern crate bmp280_core as bmp280;

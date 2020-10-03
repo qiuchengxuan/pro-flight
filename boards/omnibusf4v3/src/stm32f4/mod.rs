@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::boxed::Box;
 
 use rs_flight::config::SerialConfig;
 use stm32f4xx_hal::prelude::*;
@@ -16,10 +16,10 @@ pub fn to_serial_config(config: &SerialConfig) -> Config {
     }
 }
 
-pub fn alloc_by_config(config: &SerialConfig) -> Vec<u8> {
+pub fn alloc_by_config(config: &SerialConfig) -> Box<[u8]> {
     match config {
-        SerialConfig::GNSS(_) => vec![0u8; 128],
-        SerialConfig::SBUS(_) => vec![0u8; 64],
-        _ => vec![0u8; 64],
+        SerialConfig::GNSS(_) => Box::new([0u8; 128 + 2]),
+        SerialConfig::SBUS(_) => Box::new([0u8; 64 + 2]),
+        _ => Box::new([0u8; 64 + 2]),
     }
 }

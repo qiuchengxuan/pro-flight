@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::boxed::Box;
 
 use rs_flight::config::SerialConfig;
 use rs_flight::drivers::gnss::GNSS;
@@ -18,20 +18,23 @@ type PA10 = gpioa::PA10<Input<Floating>>;
 const HTIF_OFFSET: usize = 4;
 const STREAM5_OFFSET: usize = 6;
 
-static mut DMA_BUFFER: Vec<u8> = Vec::new();
 static mut DEVICE: Option<Device> = None;
 
 #[interrupt]
 unsafe fn DMA2_STREAM5() {
     let mut half = false;
+    let mut buffer: &[u8] = &[0u8; 0];
     cortex_m::interrupt::free(|_| {
         cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::DMA2_STREAM5);
         let dma2 = &*stm32::DMA2::ptr();
         half = dma2.hisr.read().bits() & (1 << (HTIF_OFFSET + STREAM5_OFFSET)) > 0;
         dma2.hifcr.write(|w| w.bits(0x3D << STREAM5_OFFSET));
+        let address = dma2.st[5].m0ar.read().bits();
+        let size = *((address - 2) as *const u16) as usize;
+        buffer = core::slice::from_raw_parts(address as *const _, size);
     });
     if let Some(ref mut device) = DEVICE {
-        device.handle(DMA_BUFFER.as_slice(), half);
+        device.handle(buffer, half);
     }
 }
 
@@ -48,15 +51,17 @@ pub fn init(
     unsafe {
         (&*stm32::USART1::ptr()).cr3.modify(|_, w| w.dmar().enabled());
 
-        DMA_BUFFER = alloc_by_config(&config);
-        let address = DMA_BUFFER.as_ptr() as usize;
-        debug!("Alloc DMA buffer at {:#X} size {} on USART1", address, DMA_BUFFER.len());
+        let dma_buffer = Box::leak(alloc_by_config(&config));
+        let address = dma_buffer.as_ptr() as usize + 2;
+        let size = dma_buffer.len() - 2;
+        *(dma_buffer as *mut _ as *mut u16) = size as u16;
+        debug!("Alloc DMA buffer at {:#X} size {} on USART6", address, size);
+
         let dma2 = &*(stm32::DMA2::ptr());
         let stream = &dma2.st[5];
-        stream.ndtr.write(|w| w.ndt().bits(DMA_BUFFER.len() as u16));
+        stream.ndtr.write(|w| w.ndt().bits(size as u16));
         stream.par.write(|w| w.pa().bits(&(&*(stm32::USART1::ptr())).dr as *const _ as u32));
-        let m0ar = &stream.m0ar;
-        m0ar.write(|w| w.m0a().bits(DMA_BUFFER.as_ptr() as u32));
+        stream.m0ar.write(|w| w.m0a().bits(address as u32));
         #[rustfmt::skip]
         stream.cr.write(|w| {
             w.chsel().bits(4).minc().incremented().dir().peripheral_to_memory().circ().enabled()
