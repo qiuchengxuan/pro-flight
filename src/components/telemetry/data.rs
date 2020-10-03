@@ -10,7 +10,7 @@ use crate::datastructures::measurement::displacement::DistanceVector;
 use crate::datastructures::measurement::euler::Euler;
 use crate::datastructures::measurement::unit::Meter;
 use crate::datastructures::measurement::Course;
-use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, VelocityVector};
+use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, Magnetism, VelocityVector};
 use crate::datastructures::waypoint::Steerpoint;
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -91,6 +91,7 @@ pub struct Raw {
     pub acceleration: Acceleration,
     pub gyro: Gyro,
     pub quaternion: UnitQuaternion<f32>,
+    pub magnetism: Option<Magnetism>,
     pub gnss: Option<GNSS>,
     pub speed_vector: VelocityVector<f32, Meter>,
     pub displacement: DistanceVector<i32, Meter>,
@@ -102,6 +103,7 @@ impl Default for Raw {
             quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
             acceleration: Acceleration::default(),
             gyro: Gyro::default(),
+            magnetism: None,
             gnss: None,
             speed_vector: VelocityVector::default(),
             displacement: DistanceVector::default(),
@@ -120,6 +122,10 @@ impl sval::value::Value for Raw {
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         stream.map_value(&value[..])?;
+        if let Some(magnetism) = self.magnetism {
+            stream.map_key("magnetism")?;
+            stream.map_value(magnetism)?;
+        }
         if let Some(gnss) = self.gnss {
             stream.map_key("gnss")?;
             stream.map_value(gnss)?;

@@ -2,6 +2,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 
+#[macro_use]
 extern crate alloc;
 extern crate ascii_osd_hud;
 extern crate bmp280_core as bmp280;
@@ -32,6 +33,7 @@ mod usart1;
 mod usart6;
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 use core::time::Duration;
@@ -55,7 +57,7 @@ use rs_flight::{
         mixer::ControlMixer,
         navigation::Navigation,
         panic::log_panic,
-        schedule::Scheduler,
+        schedule::{Schedulable, Scheduler},
         speedometer::Speedometer,
         TelemetryUnit,
     },
@@ -251,7 +253,7 @@ fn main() -> ! {
     let rate = GYRO_SAMPLE_RATE as u16;
     let mut imu = IMU::new(accelerometer.clone(), gyroscope.clone(), rate);
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
-        imu.set_heading(Box::new(gnss.heading()));
+        imu.set_gnss(Box::new(gnss.heading()));
     }
 
     let mut speedometer =
@@ -300,7 +302,17 @@ fn main() -> ! {
 
     let telemetry_source = telemetry.reader();
     let servo_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
-    let tasks = (servo_trigger, baro, altimeter, imu, speedometer, navigation, telemetry, osd);
+
+    let tasks: Vec<Box<dyn Schedulable>> = vec![
+        Box::new(servo_trigger),
+        Box::new(baro),
+        Box::new(altimeter),
+        Box::new(imu),
+        Box::new(speedometer),
+        Box::new(navigation),
+        Box::new(telemetry),
+        Box::new(osd),
+    ];
     let group = Scheduler::new(tasks, 200);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 200);
 

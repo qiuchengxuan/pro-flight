@@ -51,7 +51,8 @@ pub fn init(
 
     // dma2 stream1 channel 5 rx
     unsafe {
-        (&*stm32::USART6::ptr()).cr3.modify(|_, w| w.dmar().enabled());
+        let usart = &*stm32::USART6::ptr();
+        usart.cr3.modify(|_, w| w.dmar().enabled());
 
         let dma_buffer = Box::leak(alloc_by_config(&config));
         let address = dma_buffer.as_ptr() as usize + 2;
@@ -62,7 +63,7 @@ pub fn init(
         let dma2 = &*(stm32::DMA2::ptr());
         let stream = &dma2.st[1];
         stream.ndtr.write(|w| w.ndt().bits(size as u16));
-        stream.par.write(|w| w.pa().bits(&(&*(stm32::USART6::ptr())).dr as *const _ as u32));
+        stream.par.write(|w| w.pa().bits(&usart.dr as *const _ as u32));
         stream.m0ar.write(|w| w.m0a().bits(address as u32));
         #[rustfmt::skip]
         stream.cr.write(|w| {

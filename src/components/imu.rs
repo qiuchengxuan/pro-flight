@@ -5,24 +5,28 @@ use alloc::rc::Rc;
 use micromath::F32Ext;
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
-use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};
+use crate::algorithm::mahony::{MagnetismOrHeading as Heading, Mahony};
 use crate::components::schedule::{Rate, Schedulable};
 use crate::config;
 use crate::datastructures::data_source::overwriting::{OverwritingData, OverwritingDataSource};
-use crate::datastructures::data_source::{AgingStaticData, DataWriter, OptionData, WithCapacity};
+use crate::datastructures::data_source::{
+    AgingStaticData, DataWriter, OptionData, StaticData, WithCapacity,
+};
 use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
-use crate::datastructures::measurement::{Acceleration, Axes, Gyro, HeadingOrCourse};
+use crate::datastructures::measurement::{Acceleration, Axes, Gyro, HeadingOrCourse, Magnetism};
 
 pub struct IMU<A, G> {
     accelerometer: A,
     gyroscope: G,
 
-    heading: Option<Box<dyn AgingStaticData<HeadingOrCourse>>>,
+    magnetometer: Option<Box<dyn StaticData<Magnetism>>>,
+    gnss: Option<Box<dyn AgingStaticData<HeadingOrCourse>>>,
 
     ahrs: Mahony,
     accel_bias: Axes,
     accel_gain: Axes,
     gyro_bias: Axes,
+    magnetometer_bias: Axes,
     calibration_loop: u16,
     counter: usize,
     calibrated: bool,
@@ -36,16 +40,19 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         let acceleration = Vector3::<f32>::new(0.0, 0.0, 0.0);
         let unit = UnitQuaternion::new_normalize(Quaternion::<f32>::new(1.0, 0.0, 0.0, 0.0));
         let config = &config::get().imu;
+        let (kp, ki) = (config.mahony.kp.into(), config.mahony.ki.into());
         Self {
             accelerometer,
             gyroscope,
 
-            heading: None,
+            magnetometer: None,
+            gnss: None,
 
-            ahrs: Mahony::new(sample_rate as f32, config.mahony.kp.into(), config.mahony.ki.into()),
+            ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             accel_bias: config.accelerometer.bias.into(),
             accel_gain: config.accelerometer.gain.into(),
             gyro_bias: Default::default(),
+            magnetometer_bias: config.magnetometer.bias.into(),
             calibration_loop: 50,
             counter: 0,
             calibrated: false,
@@ -54,8 +61,12 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         }
     }
 
-    pub fn set_heading(&mut self, heading: Box<dyn AgingStaticData<HeadingOrCourse>>) {
-        self.heading = Some(heading);
+    pub fn set_magnetometer(&mut self, magnetometer: Box<dyn StaticData<Magnetism>>) {
+        self.magnetometer = Some(magnetometer);
+    }
+
+    pub fn set_gnss(&mut self, gnss: Box<dyn AgingStaticData<HeadingOrCourse>>) {
+        self.gnss = Some(gnss);
     }
 
     pub fn set_calibration_loop(&mut self, value: u16) {
@@ -95,7 +106,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         true
     }
 
-    pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro, heading: Option<f32>) {
+    pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro, heading: Option<Heading>) {
         let acceleration = accel.calibrated(&self.accel_bias, &self.accel_gain);
         let raw_gyro = gyro.calibrated(&self.gyro_bias);
 
@@ -103,8 +114,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
         let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
 
-        let magnetism = heading.map(|h| MagnetismOrHeading::Heading(h));
-        if let Some(quaternion) = self.ahrs.update(&gyro, &acceleration, magnetism) {
+        if let Some(quaternion) = self.ahrs.update(&gyro, &acceleration, heading) {
             let acceleration = quaternion.transform_vector(&acceleration);
             self.acceleration.write(acceleration);
             self.quaternion.write(quaternion);
@@ -122,10 +132,16 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
             return self.calibrate();
         }
         let rate = self.rate();
-        let heading = self.heading.as_mut().map(|h| h.read(rate)).flatten();
+        let heading = if let Some(mag) = self.magnetometer.as_mut() {
+            Some(Heading::Magnetism(mag.read().calibrated(&self.magnetometer_bias).into()))
+        } else if let Some(gnss) = self.gnss.as_mut() {
+            gnss.read(rate).map(|h| Heading::Heading(h.or_course().into()))
+        } else {
+            None
+        };
         while let Some(gyro) = self.gyroscope.read() {
             let acceleration = self.accelerometer.read().unwrap();
-            self.update_imu(&acceleration, &gyro, heading.map(|h| h.or_course().into()));
+            self.update_imu(&acceleration, &gyro, heading);
         }
         true
     }

@@ -49,18 +49,19 @@ pub fn init(
     Serial::usart1(usart1, pins, to_serial_config(&config), clocks).unwrap();
 
     unsafe {
-        (&*stm32::USART1::ptr()).cr3.modify(|_, w| w.dmar().enabled());
+        let usart = &*stm32::USART1::ptr();
+        usart.cr3.modify(|_, w| w.dmar().enabled());
 
         let dma_buffer = Box::leak(alloc_by_config(&config));
         let address = dma_buffer.as_ptr() as usize + 2;
         let size = dma_buffer.len() - 2;
         *(dma_buffer as *mut _ as *mut u16) = size as u16;
-        debug!("Alloc DMA buffer at {:#X} size {} on USART6", address, size);
+        debug!("Alloc DMA buffer at {:#X} size {} on USART1", address, size);
 
         let dma2 = &*(stm32::DMA2::ptr());
         let stream = &dma2.st[5];
         stream.ndtr.write(|w| w.ndt().bits(size as u16));
-        stream.par.write(|w| w.pa().bits(&(&*(stm32::USART1::ptr())).dr as *const _ as u32));
+        stream.par.write(|w| w.pa().bits(&usart.dr as *const _ as u32));
         stream.m0ar.write(|w| w.m0a().bits(address as u32));
         #[rustfmt::skip]
         stream.cr.write(|w| {

@@ -12,6 +12,10 @@ $(BOARD).bin: $(TARGET)
 $(BOARD).hex: $(TARGET)
 	arm-none-eabi-objcopy -O ihex $(TARGET) $(BOARD).hex
 
+.PHONY: test
+test:
+	cargo test
+
 .PHONY: clean
 clean:
 	cargo clean

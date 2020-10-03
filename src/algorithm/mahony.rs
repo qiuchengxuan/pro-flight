@@ -1,11 +1,12 @@
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
-use nalgebra::{Quaternion, UnitQuaternion, Vector2, Vector3};
+use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
 pub struct Mahony {
     sample_interval: f32,
     kp: f32,
     ki: f32,
+    magnetic_declination: Vector3<f32>,
     error_integral: Vector3<f32>,
     quaternion: UnitQuaternion<f32>,
 }
@@ -17,11 +18,13 @@ pub enum MagnetismOrHeading {
 }
 
 impl Mahony {
-    pub fn new(sample_rate: f32, kp: f32, ki: f32) -> Self {
+    pub fn new(sample_rate: f32, kp: f32, ki: f32, magnetic_declination: f32) -> Self {
+        let declination = magnetic_declination.to_radians();
         Self {
             sample_interval: 1.0 / sample_rate,
             kp,
             ki,
+            magnetic_declination: Vector3::new(declination.cos(), declination.sin(), 0.0),
             error_integral: Vector3::new(0.0, 0.0, 0.0),
             quaternion: UnitQuaternion::new_unchecked(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
         }
@@ -35,28 +38,24 @@ impl Mahony {
         let q = &self.quaternion;
         match magnetism_or_heading {
             MagnetismOrHeading::Magnetism(magnetism) => {
-                let mag = match magnetism.try_normalize(0.0) {
-                    Some(m) => m,
+                let mut normalized = match magnetism.try_normalize(0.0) {
+                    Some(n) => n,
                     None => return Vector3::new(0.0, 0.0, 0.0),
                 };
-                let h = q.transform_vector(&magnetism);
-                let b = Quaternion::new(0.0, Vector2::new(h[0], h[1]).norm(), 0.0, h[2]);
-
-                let w = Vector3::new(
-                    2.0 * b.i * (0.5 - q.j * q.j - q.k * q.k) + 2.0 * b.k * (q.i * q.k - q.w * q.j),
-                    2.0 * b.i * (q.i * q.j - q.w * q.k) + 2.0 * b.k * (q.w * q.i + q.j * q.k),
-                    2.0 * b.i * (q.w * q.j + q.i * q.k) + 2.0 * b.k * (0.5 - q.i * q.i - q.j * q.j),
-                );
-
-                return mag.cross(&w);
+                normalized[2] = 0.0;
+                if let Some(normalized) = normalized.try_normalize(0.01) {
+                    let earth_heading = q.inverse_transform_vector(&normalized);
+                    let error = earth_heading.cross(&self.magnetic_declination);
+                    return q.transform_vector(&error);
+                }
             }
             MagnetismOrHeading::Heading(mut heading) => {
                 heading = -heading.to_radians(); // to right hand rule
-                let mut forward = q.inverse_transform_vector(&Vector3::new(0.0, 1.0, 0.0));
-                forward[2] = 0.0;
-                if forward.norm_squared() > 0.01 {
-                    let vector = Vector3::new(heading.sin(), heading.cos(), 0.0);
-                    let error = vector.cross(&forward.normalize());
+                let mut estimated = q.inverse_transform_vector(&Vector3::new(0.0, 1.0, 0.0));
+                estimated[2] = 0.0;
+                if let Some(normalized) = estimated.try_normalize(0.01) {
+                    let earth_heading = Vector3::new(heading.sin(), heading.cos(), 0.0);
+                    let error = earth_heading.cross(&normalized);
                     return q.transform_vector(&error);
                 }
             }
@@ -113,7 +112,7 @@ mod test {
         let gyro = Vector3::new(0.0, 0.0, 0.0);
         let accel = Vector3::new(0.0, 0.0, -1.0);
 
-        let mut mahony = Mahony::new(10.0, 10.0, 0.0);
+        let mut mahony = Mahony::new(10.0, 10.0, 0.0, 0.0);
 
         let course: f32 = 270.0;
         let magnetism = Some(MagnetismOrHeading::Heading(course));
