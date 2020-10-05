@@ -90,9 +90,9 @@ impl sval::value::Value for GNSS {
 pub struct Raw {
     pub acceleration: Acceleration,
     pub gyro: Gyro,
-    pub quaternion: UnitQuaternion<f32>,
     pub magnetism: Option<Magnetism>,
     pub gnss: Option<GNSS>,
+    pub quaternion: UnitQuaternion<f32>,
     pub speed_vector: VelocityVector<f32, Meter>,
     pub displacement: DistanceVector<i32, Meter>,
 }
@@ -113,15 +113,13 @@ impl Default for Raw {
 
 impl sval::value::Value for Raw {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(5 + if self.gnss.is_some() { 1 } else { 0 }))?;
+        stream.map_begin(Some(
+            6 + self.gnss.is_some() as usize + self.magnetism.is_some() as usize,
+        ))?;
         stream.map_key("acceleration")?;
         stream.map_value(&self.acceleration)?;
         stream.map_key("gyro")?;
         stream.map_value(&self.gyro)?;
-        stream.map_key("quaternion")?;
-        let q = &self.quaternion;
-        let value: [f32; 4] = [q.i, q.j, q.k, q.w];
-        stream.map_value(&value[..])?;
         if let Some(magnetism) = self.magnetism {
             stream.map_key("magnetism")?;
             stream.map_value(magnetism)?;
@@ -130,6 +128,10 @@ impl sval::value::Value for Raw {
             stream.map_key("gnss")?;
             stream.map_value(gnss)?;
         }
+        stream.map_key("quaternion")?;
+        let q = &self.quaternion;
+        let value: [f32; 4] = [q.i, q.j, q.k, q.w];
+        stream.map_value(&value[..])?;
         stream.map_key("speed-vector")?;
         stream.map_value(&self.speed_vector)?;
         stream.map_key("displacement")?;

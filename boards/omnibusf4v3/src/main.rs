@@ -23,6 +23,7 @@ extern crate stm32f4xx_hal;
 
 mod adc2_vbat;
 mod exti0_softirq;
+mod i2c2;
 mod pwm;
 mod spi1_exti4_gyro;
 mod spi2_exti7_sdcard;
@@ -66,7 +67,7 @@ use rs_flight::{
         data_source::{AgingStaticData, NoDataSource},
         input::ControlInput,
     },
-    drivers::{accelerometer, barometer, gyroscope, uart::Device, usb_serial},
+    drivers::{accelerometer, barometer, gyroscope, magnetometer, uart::Device, usb_serial},
     sys::{
         fs::File,
         timer::{self, SysTimer},
@@ -214,6 +215,12 @@ fn main() -> ! {
         }
     }
 
+    // if not USART3
+    let mut i2c2 = match i2c2::init(peripherals.I2C2, (gpio_b.pb10, gpio_b.pb11), clocks) {
+        Ok(dev) => dev,
+        Err(_) => None,
+    };
+
     if let Some(serial_config) = config.serials.get("USART6") {
         info!("Initialize USART6");
         if let SerialConfig::SBUS(sbus_config) = serial_config {
@@ -255,6 +262,9 @@ fn main() -> ! {
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         imu.set_gnss(Box::new(gnss.heading()));
     }
+    if let Some(magnetometer) = magnetometer::get_data_source() {
+        imu.set_magnetometer(Box::new(magnetometer));
+    }
 
     let mut speedometer =
         Speedometer::new(altimeter.reader(), imu.as_accelerometer(), GYRO_SAMPLE_RATE);
@@ -280,6 +290,9 @@ fn main() -> ! {
         telemetry.set_rssi(Box::new(sbus.rssi_reader()));
         telemetry.set_control_input(Box::new(sbus.input_reader()));
     }
+    if let Some(magnetometer) = magnetometer::get_data_source() {
+        telemetry.set_magnetometer(Box::new(magnetometer));
+    }
     if let Some(Device::GNSS(ref mut gnss)) = gnss {
         telemetry.set_gnss(Box::new(gnss.fixed()), Box::new(gnss.course()));
     }
@@ -303,16 +316,19 @@ fn main() -> ! {
     let telemetry_source = telemetry.reader();
     let servo_trigger = SchedulableEvent::new(trigger, SERVO_SCHEDULE_RATE);
 
-    let tasks: Vec<Box<dyn Schedulable>> = vec![
-        Box::new(servo_trigger),
+    let mut tasks: Vec<Box<dyn Schedulable>> = vec![
         Box::new(baro),
         Box::new(altimeter),
         Box::new(imu),
         Box::new(speedometer),
         Box::new(navigation),
+        Box::new(servo_trigger),
         Box::new(telemetry),
         Box::new(osd),
     ];
+    if let Some(i2c2) = i2c2.take() {
+        tasks.insert(0, Box::new(i2c2));
+    }
     let group = Scheduler::new(tasks, 200);
     tim7_scheduler::init(peripherals.TIM7, Box::new(group), clocks, 200);
 

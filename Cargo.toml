@@ -12,6 +12,7 @@ bmp280-core = "0.1"
 crc = { version = "1.8", default-features = false }
 embedded-hal = "0.2"
 embedded-sdmmc = "0.3"
+qmc5883l = { git = "https://github.com/qiuchengxuan/qmc5883l" }
 enum-map = { version = "0.6", default-features = false }
 git-version = "0.3.4"
 integer-sqrt = "0.1"

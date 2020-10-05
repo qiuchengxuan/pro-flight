@@ -126,7 +126,7 @@ impl Into<Vector3<f32>> for Measurement {
 
 impl Default for Measurement {
     fn default() -> Self {
-        Self { axes: Default::default(), sensitive: 1 }
+        Self { axes: Default::default(), sensitive: i32::MAX }
     }
 }
 
