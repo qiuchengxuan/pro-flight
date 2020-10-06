@@ -88,8 +88,12 @@ const SERVO_SCHEDULE_RATE: usize = 50;
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
-#[link_section = ".uninit.STACKS"]
 static mut DFU: Dfu = Dfu(0);
+
+#[pre_init]
+unsafe fn pre_init() {
+    DFU.check();
+}
 
 fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     let rcc = rcc.constrain();
@@ -99,7 +103,6 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
         let rcc = &*stm32::RCC::ptr();
         rcc.apb2enr.write(|w| w.syscfgen().enabled());
         rcc.ahb1enr.modify(|_, w| w.dma1en().enabled().dma2en().enabled().crcen().enabled());
-        DFU.check();
     }
 
     systick_init(syst, clocks.sysclk().0);
@@ -117,13 +120,13 @@ fn init(syst: cortex_m::peripheral::SYST, rcc: stm32::RCC) -> Clocks {
     clocks
 }
 
-fn reboot() {
-    unsafe { DFU.disarm() };
-    cortex_m::peripheral::SCB::sys_reset();
+fn reboot() -> ! {
+    cortex_m::peripheral::SCB::sys_reset()
 }
 
-fn bootloader() {
-    cortex_m::peripheral::SCB::sys_reset();
+fn bootloader() -> ! {
+    unsafe { DFU.arm() };
+    cortex_m::peripheral::SCB::sys_reset()
 }
 
 fn free() -> (usize, usize) {
@@ -351,23 +354,23 @@ fn main() -> ! {
 #[panic_handler]
 unsafe fn panic(panic_info: &PanicInfo) -> ! {
     log_panic(format_args!("{}", panic_info));
-    cortex_m::peripheral::SCB::sys_reset();
+    reboot()
 }
 
 #[exception]
 unsafe fn HardFault(exception_frame: &ExceptionFrame) -> ! {
     log_panic(format_args!("{:?}", exception_frame));
-    cortex_m::peripheral::SCB::sys_reset();
+    reboot()
 }
 
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
     log_panic(format_args!("{}", irqn));
-    cortex_m::peripheral::SCB::sys_reset();
+    reboot()
 }
 
 #[alloc_error_handler]
 unsafe fn oom(_: Layout) -> ! {
     log_panic(format_args!("OOM"));
-    cortex_m::peripheral::SCB::sys_reset();
+    reboot()
 }

@@ -21,13 +21,18 @@ pub struct CLI<T> {
     vec: Vec<u8>,
     timer: SysTimer,
     telemetry: T,
-    reboot: fn(),
-    bootloader: fn(),
+    reboot: fn() -> !,
+    bootloader: fn() -> !,
     free: fn() -> (usize, usize),
 }
 
 impl<T: StaticData<TelemetryData>> CLI<T> {
-    pub fn new(telemetry: T, reboot: fn(), bootloader: fn(), free: fn() -> (usize, usize)) -> Self {
+    pub fn new(
+        telemetry: T,
+        reboot: fn() -> !,
+        bootloader: fn() -> !,
+        free: fn() -> (usize, usize),
+    ) -> Self {
         CLI {
             vec: Vec::with_capacity(80),
             timer: SysTimer::new(),
