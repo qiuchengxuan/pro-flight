@@ -150,6 +150,7 @@ fn main() -> ! {
         usb_pwrclk: peripherals.OTG_FS_PWRCLK,
         pin_dm: gpio_a.pa11.into_alternate_af10(),
         pin_dp: gpio_a.pa12.into_alternate_af10(),
+        hclk: clocks.hclk(),
     };
     let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
     let (mut serial, mut device) = usb_serial::init(&allocator);

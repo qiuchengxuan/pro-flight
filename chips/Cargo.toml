@@ -9,7 +9,7 @@ version = "0.0.1"
 cortex-m = "0.6"
 cortex-m-rt = "0.6"
 crc = { version = "1.8", default-features = false }
-stm32f4xx-hal = { version = "0.8", optional = true }
+stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", optional = true }
 
 [lib]
 name = "chips"
