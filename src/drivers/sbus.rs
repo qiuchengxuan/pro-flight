@@ -25,6 +25,17 @@ fn to_axis(value: u16) -> i32 {
     (value as i32).wrapping_sub(0x400) << 5
 }
 
+fn scale(data: u16, scale: u8) -> i16 {
+    let scaled = to_axis(data) * scale as i32 / 100;
+    if scaled > i16::MAX as i32 {
+        i16::MAX
+    } else if scaled < i16::MIN as i32 {
+        i16::MIN
+    } else {
+        scaled as i16
+    }
+}
+
 impl SbusReceiver {
     pub fn new() -> Self {
         Self {
@@ -58,30 +69,25 @@ impl SbusReceiver {
         }
         self.rssi.write((100 - self.loss_rate) as RSSI);
 
-        let mut control_input = ControlInput::default();
-        let channels = &config::get().receiver.channels;
-        for (index, option) in channels.0.iter().enumerate() {
-            if index >= data.channels.len() {
-                continue; // TODO: two bit channel
+        let mut counter = 0;
+        let mut input = ControlInput::default();
+        for (id, cfg) in config::get().receiver.inputs.0.iter() {
+            let channel = cfg.channel as usize;
+            if channel > data.channels.len() {
+                continue;
             }
-            if let Some(channel) = option {
-                let scaled = to_axis(data.channels[index]) * channel.scale as i32 / 100;
-                let scaled = if scaled > i16::MAX as i32 {
-                    i16::MAX
-                } else if scaled < i16::MIN as i32 {
-                    i16::MIN
-                } else {
-                    scaled as i16
-                };
-                match channel.input_type {
-                    InputType::Throttle => control_input.throttle = scaled,
-                    InputType::Roll => control_input.roll = scaled,
-                    InputType::Pitch => control_input.pitch = scaled,
-                    InputType::Yaw => control_input.yaw = scaled,
-                }
+            match id {
+                InputType::Throttle => input.throttle = scale(data.channels[channel], cfg.scale),
+                InputType::Roll => input.roll = scale(data.channels[channel], cfg.scale),
+                InputType::Pitch => input.pitch = scale(data.channels[channel], cfg.scale),
+                InputType::Yaw => input.yaw = scale(data.channels[channel], cfg.scale),
+            }
+            counter += 1;
+            if counter >= 4 {
+                break;
             }
         }
-        self.control_input.write(control_input);
+        self.control_input.write(input);
         if let Some(ref mut notify) = self.notify {
             notify.notify()
         }

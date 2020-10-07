@@ -23,7 +23,7 @@ impl<PWMS: PwmByIdentifier, S: StaticData<ControlInput>> OnEvent for Airplane<S,
     fn on_event(&mut self) {
         let input = self.mixer.mix();
         let outputs = &config::get().outputs.0;
-        for &(identifier, output) in outputs.iter() {
+        for (&identifier, output) in outputs.iter() {
             self.pwms.with(identifier, |pwm| {
                 let max_duty = pwm.get_max_duty();
                 let duty = match output {
@@ -38,7 +38,6 @@ impl<PWMS: PwmByIdentifier, S: StaticData<ControlInput>> OnEvent for Airplane<S,
                         let (min, max) = (servo.min_angle, servo.max_angle);
                         to_servo_pwm_duty(max_duty, axis, min, max, servo.reversed)
                     }
-                    _ => return,
                 };
                 pwm.set_duty(duty);
             })

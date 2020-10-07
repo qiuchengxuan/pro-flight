@@ -1,95 +1,62 @@
-use alloc::vec::Vec;
 use core::fmt::Write;
 use core::str::Split;
 
+use heapless::consts::U18;
+use heapless::LinearMap;
+
 use crate::datastructures::input::InputType;
 
-use super::setter::{SetError, Setter};
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use super::setter::{Error, Setter, Value};
+use super::yaml::ToYAML;
 
 #[derive(Copy, Clone)]
-pub struct Channel {
-    pub input_type: InputType,
+pub struct Input {
+    pub channel: u8,
     pub scale: u8,
 }
 
-#[derive(Clone, Default)]
-pub struct Channels(pub Vec<Option<Channel>>);
-
-impl FromYAML for Channels {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut channels = Channels(vec![None; 16]);
-        while parser.next_list_begin() {
-            let mut channel: usize = 0;
-            let mut input_type: Option<InputType> = None;
-            let mut scale: u8 = 100;
-            while let Some((key, value)) = parser.next_key_value() {
-                match key {
-                    "channel" => channel = value.parse().ok().unwrap_or(0),
-                    "type" => input_type = InputType::from_str(value),
-                    "scale" => scale = value.parse().ok().unwrap_or(100),
-                    _ => continue,
-                }
+impl Setter for Input {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "channel" => {
+                self.channel = value.parse()?.ok_or(Error::ExpectValue)?;
+                self.channel = self.channel.wrapping_sub(1)
             }
-            if channel == 0 {
-                continue;
-            }
-            if let Some(input_type) = input_type {
-                channels.0[channel - 1] = Some(Channel { input_type, scale });
-            }
-        }
-        channels
-    }
-}
-
-impl ToYAML for Channels {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
-        for i in 0..self.0.len() {
-            let channel = match self.0[i] {
-                Some(c) => c,
-                None => continue,
-            };
-            self.write_indent(indent, w)?;
-            writeln!(w, "- channel: {}", i + 1)?;
-            self.write_indent(indent, w)?;
-            let type_string: &str = channel.input_type.into();
-            writeln!(w, "  type: {}", type_string)?;
-            if channel.scale != 100 {
-                self.write_indent(indent, w)?;
-                writeln!(w, "  scale: {}", channel.scale)?;
-            }
+            "scale" => self.scale = value.parse()?.unwrap_or(100),
+            _ => return Err(Error::MalformedPath),
         }
         Ok(())
     }
 }
 
-impl Setter for Channels {
-    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
-        let index_string = match path.next() {
-            Some(s) => s,
-            None => return Err(SetError::MalformedPath),
-        };
-        let index = match index_string.parse::<usize>() {
-            Ok(index) => index,
-            Err(_) => return Err(SetError::MalformedPath),
-        };
+#[derive(Clone, Default)]
+pub struct Inputs(pub LinearMap<InputType, Input, U18>);
 
-        if index >= self.0.len() {
-            return Err(SetError::MalformedPath);
+impl Setter for Inputs {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let type_sring = path.next().ok_or(Error::MalformedPath)?;
+        let input_type = type_sring.parse().map_err(|_| Error::MalformedPath)?;
+        if self.0.contains_key(&input_type) {
+            return self.0[&input_type].set(path, value);
         }
+        let mut config = Input { channel: u8::MAX, scale: 100 };
+        config.set(path, value)?;
+        self.0.insert(input_type, config).ok();
+        Ok(())
+    }
+}
 
-        let channel = match self.0[index] {
-            Some(ref mut channel) => channel,
-            None => return Err(SetError::MalformedPath),
-        };
-        match path.next() {
-            Some("scale") => {
-                channel.scale = match value.map(|v| v.parse::<u8>().ok()).flatten() {
-                    Some(scale) => scale,
-                    None => return Err(SetError::UnexpectedValue),
-                };
+impl ToYAML for Inputs {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+        for (input_type, config) in self.0.iter() {
+            self.write_indent(indent, w)?;
+            writeln!(w, "{}:", input_type)?;
+            self.write_indent(indent, w)?;
+            writeln!(w, "  channel: {}", config.channel + 1)?;
+            if config.scale != 100 {
+                self.write_indent(indent, w)?;
+                writeln!(w, "  scale: {}", config.scale)?;
             }
-            _ => return Err(SetError::MalformedPath),
         }
         Ok(())
     }
@@ -97,38 +64,23 @@ impl Setter for Channels {
 
 #[derive(Default, Clone)]
 pub struct Receiver {
-    pub channels: Channels,
-}
-
-impl FromYAML for Receiver {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut channels = Channels::default();
-        while let Some(key) = parser.next_entry() {
-            if key == "channels" {
-                channels = Channels::from_yaml(parser)
-            }
-        }
-        Self { channels }
-    }
+    pub inputs: Inputs,
 }
 
 impl ToYAML for Receiver {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
-        if self.channels.0.iter().all(|&c| c.is_none()) {
-            writeln!(w, "channels: []")
-        } else {
-            writeln!(w, "channels:")?;
-            self.channels.write_to(indent + 1, w)
-        }
+        writeln!(w, "inputs:")?;
+        self.inputs.write_to(indent + 1, w)
     }
 }
 
 impl Setter for Receiver {
-    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
-        if path.next() == Some("channels") {
-            return self.channels.set(path, value);
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let key = path.next().ok_or(Error::MalformedPath)?;
+        if key != "inputs" {
+            return Err(Error::MalformedPath);
         }
-        Err(SetError::MalformedPath)
+        self.inputs.set(path, value)
     }
 }

@@ -1,3 +1,4 @@
+use alloc::borrow::ToOwned;
 use alloc::rc::Rc;
 use alloc::string::String;
 use core::fmt::{Display, Formatter, Write};
@@ -5,8 +6,8 @@ use core::str::Split;
 
 use crate::datastructures::Ratio;
 
-use super::setter::{SetError, Setter};
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use super::setter::{Error, Setter, Value};
+use super::yaml::ToYAML;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Standard {
@@ -54,19 +55,15 @@ pub struct Offset {
     pub vertical: i8,
 }
 
-impl FromYAML for Offset {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut horizental: i8 = 0;
-        let mut vertical: i8 = 0;
-        while let Some((key, value)) = parser.next_key_value() {
-            let value = value.parse().ok().unwrap_or(0);
-            match key {
-                "horizental" => horizental = value,
-                "vertical" => vertical = value,
-                _ => continue,
-            };
+impl Setter for Offset {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let value = value.parse()?.unwrap_or_default();
+        match path.next().ok_or(Error::MalformedPath)? {
+            "horizental" => self.horizental = value,
+            "vertical" => self.vertical = value,
+            _ => return Err(Error::MalformedPath),
         }
-        Self { horizental, vertical }
+        Ok(())
     }
 }
 
@@ -103,48 +100,18 @@ impl Default for OSD {
     }
 }
 
-impl FromYAML for OSD {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> OSD {
-        let mut aspect_ratio = Ratio::default();
-        let mut font = Rc::new(String::default());
-        let mut fov = 120u8;
-        let mut offset = Offset::default();
-        let mut refresh_rate = 50;
-        let mut standard = Standard::default();
-        while let Some(key) = parser.next_entry() {
-            match key {
-                "aspect-ratio" => {
-                    if let Some(value) = parser.next_value() {
-                        if let Some(ratio) = Ratio::from_str(value) {
-                            aspect_ratio = ratio;
-                        }
-                    }
-                }
-                "font" => {
-                    if let Some(value) = parser.next_value() {
-                        font = Rc::new(String::from(value));
-                    }
-                }
-                "fov" => {
-                    if let Some(value) = parser.next_value() {
-                        fov = value.parse().unwrap_or(150);
-                    }
-                }
-                "offset" => offset = Offset::from_yaml(parser),
-                "refresh-rate" => {
-                    if let Some(value) = parser.next_value() {
-                        refresh_rate = value.parse().unwrap_or(50);
-                    }
-                }
-                "standard" => {
-                    if let Some(value) = parser.next_value() {
-                        standard = Standard::from(value);
-                    }
-                }
-                _ => parser.skip(),
-            }
+impl Setter for OSD {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "aspect-ratio" => self.aspect_ratio = value.parse()?.unwrap_or_default(),
+            "font" => self.font = Rc::new(value.0.unwrap_or_default().to_owned()),
+            "fov" => self.fov = value.parse()?.unwrap_or_default(),
+            "offset" => return self.offset.set(path, value),
+            "refresh-rate" => self.refresh_rate = value.parse()?.unwrap_or_default(),
+            "standard" => self.standard = value.0.map(|v| Standard::from(v)).unwrap_or_default(),
+            _ => return Err(Error::MalformedPath),
         }
-        OSD { aspect_ratio, font, fov, offset, refresh_rate, standard }
+        Ok(())
     }
 }
 
@@ -170,19 +137,5 @@ impl ToYAML for OSD {
 
         self.write_indent(indent, w)?;
         writeln!(w, "standard: {}", self.standard)
-    }
-}
-
-impl Setter for OSD {
-    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
-        if path.next() == Some("refresh-rate") {
-            let value = match value.map(|v| v.parse::<u8>().ok()).flatten() {
-                Some(value) => value,
-                None => return Err(SetError::UnexpectedValue),
-            };
-            self.refresh_rate = value;
-            return Ok(());
-        }
-        Err(SetError::MalformedPath)
     }
 }

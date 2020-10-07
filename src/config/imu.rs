@@ -1,9 +1,11 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::Split;
 
 use crate::datastructures::decimal::IntegerDecimal;
 use crate::datastructures::measurement::Axes;
 
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use super::setter::{Error, Setter, Value};
+use super::yaml::ToYAML;
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Accelerometer {
@@ -12,28 +14,20 @@ pub struct Accelerometer {
     pub sensitive: IntegerDecimal,
 }
 
-impl FromYAML for Accelerometer {
-    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut bias = Axes::default();
-        let mut gain = Axes::default();
-        let mut sensitive = IntegerDecimal::new(160, 1);
-
-        while let Some(key) = parser.next_entry() {
-            match key {
-                "bias" => bias = Axes::from_yaml(parser),
-                "gain" => gain = Axes::from_yaml(parser),
-                "sensitive" => {
-                    sensitive = IntegerDecimal::from(parser.next_value().unwrap_or("16.0"))
-                }
-                _ => continue,
-            }
+impl Setter for Accelerometer {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "bias" => return self.bias.set(path, value),
+            "gain" => return self.gain.set(path, value),
+            "sensitive" => self.sensitive = value.parse()?.unwrap_or_default(),
+            _ => return Err(Error::MalformedPath),
         }
-        Self { bias, gain, sensitive }
+        Ok(())
     }
 }
 
 impl ToYAML for Accelerometer {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "bias:")?;
         self.bias.write_to(indent + 1, w)?;
@@ -53,26 +47,19 @@ pub struct Magnetometer {
     pub declination: IntegerDecimal,
 }
 
-impl FromYAML for Magnetometer {
-    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut bias = Axes::default();
-        let mut declination = IntegerDecimal::new(0, 0);
-
-        while let Some(key) = parser.next_entry() {
-            match key {
-                "bias" => bias = Axes::from_yaml(parser),
-                "declination" => {
-                    declination = IntegerDecimal::from(parser.next_value().unwrap_or("0.0"))
-                }
-                _ => continue,
-            }
+impl Setter for Magnetometer {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "bias" => return self.bias.set(path, value),
+            "declination" => self.declination = value.parse()?.unwrap_or_default(),
+            _ => return Err(Error::MalformedPath),
         }
-        Self { bias, declination }
+        Ok(())
     }
 }
 
 impl ToYAML for Magnetometer {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "bias:")?;
         self.bias.write_to(indent + 1, w)?;
@@ -82,6 +69,9 @@ impl ToYAML for Magnetometer {
     }
 }
 
+const DEFAULT_KP: IntegerDecimal = integer_decimal!(0_25, 2);
+const DEFAULT_KI: IntegerDecimal = integer_decimal!(0_005, 3);
+
 #[derive(Debug, Copy, Clone)]
 pub struct Mahony {
     pub kp: IntegerDecimal,
@@ -90,28 +80,23 @@ pub struct Mahony {
 
 impl Default for Mahony {
     fn default() -> Self {
-        Self { kp: IntegerDecimal::from("0.25"), ki: IntegerDecimal::from("0.005") }
+        Self { kp: DEFAULT_KP, ki: DEFAULT_KI }
     }
 }
 
-impl FromYAML for Mahony {
-    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut kp = IntegerDecimal::from("0.25");
-        let mut ki = IntegerDecimal::from("0.005");
-
-        while let Some((key, value)) = parser.next_key_value() {
-            match key {
-                "kp" => kp = IntegerDecimal::from(value),
-                "ki" => ki = IntegerDecimal::from(value),
-                _ => continue,
-            }
+impl Setter for Mahony {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "kp" => self.kp = value.parse()?.unwrap_or(DEFAULT_KP),
+            "ki" => self.ki = value.parse()?.unwrap_or(DEFAULT_KI),
+            _ => return Err(Error::MalformedPath),
         }
-        Self { ki, kp }
+        Ok(())
     }
 }
 
 impl ToYAML for Mahony {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "kp: {}", self.kp)?;
 
@@ -127,26 +112,19 @@ pub struct IMU {
     pub mahony: Mahony,
 }
 
-impl FromYAML for IMU {
-    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut accelerometer = Accelerometer::default();
-        let mut magnetometer = Magnetometer::default();
-        let mut mahony = Mahony::default();
-
-        while let Some(key) = parser.next_entry() {
-            match key {
-                "accelerometer" => accelerometer = Accelerometer::from_yaml(parser),
-                "magnetometer" => magnetometer = Magnetometer::from_yaml(parser),
-                "mahony" => mahony = Mahony::from_yaml(parser),
-                _ => continue,
-            }
+impl Setter for IMU {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "accelerometer" => self.accelerometer.set(path, value),
+            "magnetometer" => self.magnetometer.set(path, value),
+            "mahony" => self.mahony.set(path, value),
+            _ => return Err(Error::MalformedPath),
         }
-        Self { accelerometer, magnetometer, mahony }
     }
 }
 
 impl ToYAML for IMU {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "accelerometer:")?;
         self.accelerometer.write_to(indent + 1, w)?;

@@ -1,21 +1,28 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::{FromStr, Split};
 
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use heapless::consts::U8;
+use heapless::LinearMap;
 
-#[derive(PartialEq, Copy, Clone)]
+use super::setter::{Error, Setter, Value};
+use super::yaml::ToYAML;
+
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Identifier {
     UART(u8),
     USART(u8),
 }
 
-impl From<&str> for Identifier {
-    fn from(name: &str) -> Identifier {
+impl FromStr for Identifier {
+    type Err = ();
+
+    fn from_str(name: &str) -> Result<Self, ()> {
         if name.starts_with("USART") {
-            return Identifier::USART(name[5..].parse().ok().unwrap_or(0));
+            return Ok(Identifier::USART(name[5..].parse().map_err(|_| ())?));
         } else if name.starts_with("UART") {
-            return Identifier::UART(name[4..].parse().ok().unwrap_or(0));
+            return Ok(Identifier::UART(name[4..].parse().map_err(|_| ())?));
         }
-        Identifier::UART(0)
+        Err(())
     }
 }
 
@@ -43,6 +50,18 @@ pub enum GNSSProtocol {
     NMEA,
 }
 
+impl FromStr for GNSSProtocol {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Self, ()> {
+        match string {
+            "UBX" => Ok(Self::UBX),
+            "NMEA" => Ok(Self::NMEA),
+            _ => Err(()),
+        }
+    }
+}
+
 impl core::fmt::Display for GNSSProtocol {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
@@ -58,11 +77,23 @@ pub struct GNSSConfig {
     pub protocol: GNSSProtocol,
 }
 
+impl Default for GNSSConfig {
+    fn default() -> Self {
+        Self { baudrate: 9600, protocol: GNSSProtocol::NMEA }
+    }
+}
+
 #[derive(PartialEq, Copy, Clone)]
 pub struct SbusConfig {
     pub fast: bool,
     pub rx_inverted: bool,
     pub half_duplex: bool,
+}
+
+impl Default for SbusConfig {
+    fn default() -> Self {
+        Self { fast: false, rx_inverted: true, half_duplex: false }
+    }
 }
 
 impl SbusConfig {
@@ -77,47 +108,43 @@ impl SbusConfig {
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum Config {
-    None,
     GNSS(GNSSConfig),
     SBUS(SbusConfig),
 }
 
-impl FromYAML for Config {
-    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut type_string: &str = &"";
-        let mut baudrate = 0;
-        let mut fast = false;
-        let mut rx_inverted = false;
-        let mut half_duplex = false;
-        let mut protocol = GNSSProtocol::UBX;
-        while let Some((key, value)) = parser.next_key_value() {
-            match key {
-                "type" => type_string = value,
-                "baudrate" => baudrate = value.parse().ok().unwrap_or(0),
-                "fast" => fast = value == "true",
-                "rx-inverted" => rx_inverted = value == "true",
-                "half-duplex" => half_duplex = value == "true",
-                "protocol" => {
-                    if value != "UBX" {
-                        protocol = GNSSProtocol::NMEA
-                    }
-                }
-                _ => continue,
-            }
+impl Setter for Config {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let key = path.next().ok_or(Error::MalformedPath)?;
+        if key == "type" {
+            *self = match value.0 {
+                Some("GNSS") => Self::GNSS(GNSSConfig::default()),
+                Some("SBUS") => Self::SBUS(SbusConfig::default()),
+                Some(_) => return Err(Error::UnexpectedValue),
+                _ => return Err(Error::ExpectValue),
+            };
+            return Ok(());
         }
-        match type_string {
-            "SBUS" => Config::SBUS(SbusConfig { fast, rx_inverted, half_duplex }),
-            "GNSS" => Config::GNSS(GNSSConfig { baudrate, protocol }),
-            _ => Config::None,
+        match self {
+            Self::GNSS(ref mut gnss) => match key {
+                "baudrate" => gnss.baudrate = value.parse()?.unwrap_or(9600),
+                "protocol" => gnss.protocol = value.parse()?.unwrap_or(GNSSProtocol::NMEA),
+                _ => return Err(Error::MalformedPath),
+            },
+            Self::SBUS(ref mut sbus) => match key {
+                "fast" => sbus.fast = value.parse()?.unwrap_or(false),
+                "rx-inverted" => sbus.rx_inverted = value.parse()?.unwrap_or(true),
+                "half-duplex" => sbus.half_duplex = value.parse()?.unwrap_or(false),
+                _ => return Err(Error::MalformedPath),
+            },
         }
+        Ok(())
     }
 }
 
 impl ToYAML for Config {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         match self {
-            Self::None => writeln!(w, "type: NONE"),
             Self::GNSS(gnss) => {
                 writeln!(w, "type: GNSS")?;
                 self.write_indent(indent, w)?;
@@ -138,57 +165,39 @@ impl ToYAML for Config {
     }
 }
 
-const MAX_SERIAL_CONFIGS: usize = 5;
-
-#[derive(Copy, Clone)]
-pub struct Serials([(Identifier, Config); MAX_SERIAL_CONFIGS]);
-
-impl Default for Serials {
-    fn default() -> Self {
-        Self([(Identifier::UART(0), Config::None); MAX_SERIAL_CONFIGS])
-    }
-}
+#[derive(Clone, Default)]
+pub struct Serials(LinearMap<Identifier, Config, U8>);
 
 impl Serials {
-    pub fn get(&self, name: &str) -> Option<Config> {
-        let identifier = Identifier::from(name);
-        if identifier.into() {
-            for &(id, config) in self.0.iter() {
-                if id == identifier {
-                    return Some(config);
-                }
-            }
+    pub fn get(&self, name: &str) -> Option<&Config> {
+        match Identifier::from_str(name) {
+            Ok(id) => self.0.get(&id),
+            Err(_) => None,
         }
-        None
     }
 
     pub fn len(&self) -> usize {
-        self.0.iter().filter(|&&(id, _)| id.into()).count()
+        self.0.len()
     }
 }
 
-impl FromYAML for Serials {
-    fn from_yaml<'a>(parser: &mut YamlParser) -> Self {
-        let mut serials = Self::default();
-        let mut index = 0;
-        while let Some(key) = parser.next_entry() {
-            if index >= MAX_SERIAL_CONFIGS {
-                parser.skip();
-            }
-            let id = Identifier::from(key);
-            let config = Config::from_yaml(parser);
-            if id.into() {
-                serials.0[index] = (id, config);
-                index += 1
-            }
+impl Setter for Serials {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let id_sring = path.next().ok_or(Error::MalformedPath)?;
+        let id = Identifier::from_str(id_sring).map_err(|_| Error::MalformedPath)?;
+        if self.0.contains_key(&id) {
+            return self.0[&id].set(path, value);
         }
-        serials
+        let mut config = Config::GNSS(GNSSConfig::default());
+        config.set(path, value)?;
+        self.0.insert(id, config).ok();
+        Ok(())
     }
 }
 
 impl ToYAML for Serials {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
-        for &(id, config) in self.0.iter() {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+        for (&id, config) in self.0.iter() {
             if id.into() {
                 self.write_indent(indent, w)?;
                 writeln!(w, "{}:", id)?;

@@ -1,17 +1,22 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::{FromStr, Split};
 
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use super::setter::{Error, Setter, Value};
+
+use super::yaml::ToYAML;
 
 #[derive(Copy, Clone)]
 pub enum Configuration {
     Airplane,
 }
 
-impl From<&str> for Configuration {
-    fn from(string: &str) -> Self {
+impl FromStr for Configuration {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Self, ()> {
         match string {
-            "airplane" => Self::Airplane,
-            _ => Self::Airplane,
+            "airplane" => Ok(Self::Airplane),
+            _ => Err(()),
         }
     }
 }
@@ -35,21 +40,20 @@ impl Default for Aircraft {
     }
 }
 
-impl FromYAML for Aircraft {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut configuration: &str = "airplane";
-        while let Some((key, value)) = parser.next_key_value() {
-            match key {
-                "configuration" => configuration = value,
-                _ => continue,
+impl Setter for Aircraft {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "configuration" => {
+                self.configuration = value.parse()?.unwrap_or(Configuration::Airplane)
             }
+            _ => return Err(Error::MalformedPath),
         }
-        Self { configuration: configuration.into() }
+        Ok(())
     }
 }
 
 impl ToYAML for Aircraft {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         let configuration: &str = self.configuration.into();
         writeln!(w, "configuration: {}", configuration)

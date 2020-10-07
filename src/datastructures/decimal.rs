@@ -1,7 +1,14 @@
 use core::fmt::Display;
+use core::str::FromStr;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct IntegerDecimal(pub i32);
+
+macro_rules! integer_decimal {
+    ($integer:expr, $decimal_length:expr) => {
+        IntegerDecimal($integer << 8 | $decimal_length as i32)
+    };
+}
 
 impl IntegerDecimal {
     pub fn new(value: i32, decimal_length: u8) -> Self {
@@ -35,27 +42,23 @@ impl Into<f32> for IntegerDecimal {
     }
 }
 
-impl From<&str> for IntegerDecimal {
-    fn from(string: &str) -> Self {
-        if string == "" {
-            return Self::default();
-        }
+impl FromStr for IntegerDecimal {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Self, ()> {
         let mut splitted = string.split('.');
-        let mut integer = 0;
-        if let Some(field) = splitted.next() {
-            integer = field.parse().unwrap_or_default();
-        }
-        let mut decimal_length = 0;
-        let mut decimal = 0;
-        if let Some(field) = splitted.next() {
-            decimal_length = core::cmp::min(field.len(), 255);
-            decimal = field.parse().unwrap_or_default();
-            if integer < 0 {
-                decimal = -decimal
-            }
+        let integer = splitted.next().ok_or(())?.parse::<i32>().map_err(|_| ())?;
+        let field = match splitted.next() {
+            Some(s) => s,
+            None => return Ok(Self::new(integer, 0)),
+        };
+        let decimal_length = core::cmp::min(field.len(), 255);
+        let mut decimal = field.parse::<i32>().map_err(|_| ())?;
+        if integer < 0 {
+            decimal = -decimal
         }
         let exp = 10_i32.pow(decimal_length as u32);
-        Self::new(integer * exp + decimal, decimal_length as u8)
+        Ok(Self::new(integer * exp + decimal, decimal_length as u8))
     }
 }
 
@@ -74,18 +77,18 @@ mod test {
     fn test_display() {
         use super::IntegerDecimal;
 
-        let decimal = IntegerDecimal::from("0");
+        let mut decimal: IntegerDecimal = "0".parse().unwrap();
         assert_eq!("0", format!("{}", decimal));
-        let decimal = IntegerDecimal::from("0.0");
+        decimal = "0.0".parse().unwrap();
         assert_eq!("0.0", format!("{}", decimal));
-        let decimal = IntegerDecimal::from("0.1");
+        decimal = "0.1".parse().unwrap();
         assert_eq!("0.1", format!("{}", decimal));
-        let decimal = IntegerDecimal::from("0.01");
+        decimal = "0.01".parse().unwrap();
         assert_eq!("0.01", format!("{}", decimal));
-        let decimal = IntegerDecimal::from("0.11");
+        decimal = "0.11".parse().unwrap();
         assert_eq!("0.11", format!("{}", decimal));
 
-        let decimal = IntegerDecimal::from("0.001");
+        decimal = "0.001".parse().unwrap();
         assert_eq!("0.001", format!("{}", decimal));
     }
 }

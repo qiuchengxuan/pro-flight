@@ -1,196 +1,166 @@
-use core::cmp::min;
 use core::fmt::{Result, Write};
 
-pub const INDENT_WIDTH: u16 = 2;
+use heapless::consts::U80;
+use heapless::String;
+
+use super::setter::{Setter, Value};
 
 pub struct YamlParser<'a> {
-    string: &'a str,
-    indent: u16,
-    unindent: u16,
-}
-
-impl<'a> From<&'a [u8]> for YamlParser<'a> {
-    fn from(bytes: &'a [u8]) -> Self {
-        let string = unsafe { core::str::from_utf8_unchecked(bytes) };
-        Self { string, indent: 0, unindent: 0 }
-    }
-}
-
-impl<'a> From<&'a str> for YamlParser<'a> {
-    fn from(string: &'a str) -> Self {
-        Self { string, indent: 0, unindent: 0 }
-    }
-}
-
-#[inline]
-fn trim(string: &str) -> &str {
-    string.trim().trim_matches('\'').trim_matches('"')
+    doc: core::str::Lines<'a>,
+    indent_width: usize,
+    buffer: String<U80>,
 }
 
 impl<'a> YamlParser<'a> {
-    fn next_non_blank_line(&mut self) -> Option<&'a str> {
-        let mut lines = self.string.lines();
-        while let Some(line) = lines.next() {
-            let trim_start = line.trim_start();
-            if trim_start.is_empty() || trim_start.starts_with("#") {
-                self.string = &self.string[min(line.len() + 1, self.string.len())..];
-                continue;
+    fn skip_blank_lines(&mut self) {
+        let lines = self.doc.clone();
+        for line in lines {
+            if line.find(|c: char| !c.is_ascii_whitespace()).is_some() {
+                break;
             }
-            return Some(line);
+            self.doc.next();
         }
-        None
     }
 
-    fn leave(&mut self) {
-        if self.indent == 0 {
-            return;
+    fn next_line(&mut self, depth: usize, ignore_dash: bool) -> bool {
+        self.skip_blank_lines();
+        let lines = self.doc.clone();
+        for line in lines {
+            let index = match line.find(|c| !(c == ' ' || (ignore_dash && c == '-'))) {
+                Some(index) => index,
+                None => return false,
+            };
+            if index == depth * self.indent_width {
+                return true;
+            } else if index < depth * self.indent_width {
+                return false;
+            }
+            self.doc.next();
         }
-        self.indent -= INDENT_WIDTH;
-        while !self.string.is_empty() {
-            let line = match self.next_non_blank_line() {
+        false
+    }
+
+    fn parse_sequence(&mut self, depth: usize, setter: &mut dyn Setter) {
+        let len = self.buffer.len();
+        let mut index = 0;
+        while self.next_line(depth, false) {
+            let line = match self.doc.clone().next() {
                 Some(line) => line,
                 None => break,
             };
-
-            let num_leading_space = line.find(|c: char| !c.is_whitespace()).unwrap_or(0);
-            if num_leading_space <= self.indent as usize {
-                break;
+            let mut stripped = &line[depth * self.indent_width..];
+            if !stripped.starts_with("- ") {
+                continue;
             }
-            if self.string.len() != line.len() {
-                self.string = &self.string[line.len() + 1..];
+            write!(self.buffer, "[{}]", index).ok();
+            stripped = (&stripped[2..]).trim_end();
+            if stripped.contains(':') {
+                self.parse_map(depth + 1, true, setter)
             } else {
-                self.string = &"";
+                setter.set(&mut self.buffer.as_str().split('.'), Value::of(stripped)).ok();
+                self.doc.next();
             }
+            index += 1;
+            self.buffer.truncate(len)
         }
     }
 
-    fn enter(&mut self, length: usize) {
-        self.string = &self.string[length..];
-        self.indent += INDENT_WIDTH;
+    fn parse_map(&mut self, depth: usize, mut ignore_dash: bool, setter: &mut dyn Setter) {
+        let len = self.buffer.len();
+        while self.next_line(depth, ignore_dash) {
+            ignore_dash = false;
+            let mut line = match self.doc.next() {
+                Some(line) => line,
+                None => break,
+            };
+            line = &line[depth * self.indent_width..];
+            let mut splitted = line.splitn(2, ':');
+            let key = match splitted.next() {
+                Some(key) => key,
+                None => continue,
+            };
+            if depth > 0 {
+                self.buffer.push_str(".").ok();
+            }
+            self.buffer.push_str(key).ok();
+
+            let trim = ['\'', '"', ' '];
+            if let Some(value) = splitted.next().map(|v| v.trim_matches(&trim[..])) {
+                match value {
+                    "" => self.parse_next(depth + 1, setter),
+                    "[]" | "~" | "null" => {
+                        setter.set(&mut self.buffer.as_str().split('.'), Value(None)).ok();
+                    }
+                    _ => {
+                        setter.set(&mut self.buffer.as_str().split('.'), Value::of(value)).ok();
+                    }
+                }
+            }
+            self.buffer.truncate(len);
+        }
     }
 
-    fn next_indent_matched_line(&mut self) -> Option<&'a str> {
-        let line = match self.next_non_blank_line() {
-            Some(line) => line,
-            None => return None,
-        };
-        let indent = (self.indent - self.unindent) as usize;
-        self.unindent = 0;
-
-        if line.len() <= indent || !line[..indent].trim_start().is_empty() {
-            return None;
-        }
-        self.string = &self.string[indent as usize..];
-        Some(&line[indent..])
-    }
-
-    pub fn next_entry(&mut self) -> Option<&'a str> {
-        if let Some(line) = self.next_indent_matched_line() {
-            if let Some(key) = line.splitn(2, ':').next() {
-                self.enter(key.len() + 1);
-                return Some(trim(key));
-            }
-        }
-        self.leave();
-        None
-    }
-
-    pub fn next_list_begin(&mut self) -> bool {
-        let line = match self.next_non_blank_line() {
-            Some(line) => line,
-            None => {
-                self.leave();
-                return false;
-            }
-        };
-
-        if !line[..self.indent as usize].trim_start().is_empty() {
-            self.leave();
-            return false;
+    fn parse_next(&mut self, depth: usize, setter: &mut dyn Setter) {
+        if !self.next_line(depth, false) {
+            return;
         }
 
-        if !line[self.indent as usize..].starts_with("- ") {
-            self.leave();
-            return false;
-        }
-        self.unindent = self.indent + INDENT_WIDTH;
-        self.string = &self.string[(self.indent + INDENT_WIDTH) as usize..];
-        self.indent += INDENT_WIDTH;
-        true
-    }
-
-    pub fn next_value(&mut self) -> Option<&'a str> {
-        self.unindent = 0;
-
-        let mut split = self.string.splitn(2, '\n');
-        if let Some(line) = split.next() {
-            self.string = split.next().unwrap_or_default();
-            if !line.trim_start().is_empty() {
-                self.leave();
-                return Some(line.trim().trim_matches('\''));
-            }
-        }
-        self.leave();
-        None
-    }
-
-    pub fn next_key_value(&mut self) -> Option<(&'a str, &'a str)> {
-        let line = match self.next_indent_matched_line() {
-            Some(line) => line,
-            None => {
-                self.leave();
-                return None;
-            }
-        };
-        self.string = &self.string[line.len()..];
-
-        let mut splitter = line.splitn(2, ':');
-        if let Some(key) = splitter.next() {
-            if let Some(value) = splitter.next() {
-                return Some((trim(key), trim(value)));
-            }
-        }
-        self.leave();
-        None
-    }
-
-    pub fn next_list_value(&mut self) -> Option<&'a str> {
-        let line = match self.next_indent_matched_line() {
-            Some(line) => line,
-            None => {
-                self.leave();
-                return None;
-            }
-        };
+        let line = &self.doc.clone().next().unwrap()[depth * self.indent_width..];
         if line.starts_with("- ") {
-            self.string = &self.string[line.len()..];
-            return Some(trim(&line[INDENT_WIDTH as usize..]));
+            return self.parse_sequence(depth, setter);
         }
-        self.leave();
-        None
+
+        if line.contains(':') {
+            return self.parse_map(depth, false, setter);
+        }
     }
 
-    pub fn skip(&mut self) {
-        self.leave()
+    pub fn parse_into(&mut self, setter: &mut dyn Setter) {
+        self.parse_next(0, setter);
     }
-}
 
-pub trait FromYAML {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self;
+    pub fn parse<T: Default + Setter>(&mut self) -> T {
+        let mut value = T::default();
+        self.parse_into(&mut value);
+        value
+    }
+
+    pub fn new(doc: &'a str) -> Self {
+        Self { doc: doc.lines(), indent_width: 2, buffer: String::new() }
+    }
 }
 
 pub trait ToYAML {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result;
 
     fn write_indent<W: Write>(&self, indent: usize, w: &mut W) -> Result {
-        write!(w, "{:indent$}", "", indent = indent * INDENT_WIDTH as usize)
+        write!(w, "{:indent$}", "", indent = indent * 2 as usize)
     }
 }
 
 mod test {
     #[test]
     fn test_yaml_parser() {
+        use core::str::Split;
+        use std::fmt::Write;
+
         use super::YamlParser;
+        use crate::config::setter::{Error, Value};
+
+        struct Handler(pub String);
+
+        impl super::Setter for Handler {
+            fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+                if let Some(v) = value.0 {
+                    writeln!(self.0, "{} = {}", path.collect::<Vec<&str>>().join("."), v).ok();
+                } else {
+                    writeln!(self.0, "{} = null", path.collect::<Vec<&str>>().join(".")).ok();
+                }
+                Ok(())
+            }
+        }
+
+        let mut handler = Handler(String::new());
 
         let string = "\
         \ndict:\
@@ -206,29 +176,17 @@ mod test {
         \nlist-entry:\
         \n  - entry-a: a\
         \n  - entry-b: b\n";
-        let mut stream = YamlParser::from(&string[..]);
-        assert_eq!(Some("dict"), stream.next_entry());
-        assert_eq!(Some(("entry-a", "a")), stream.next_key_value());
-        assert_eq!(Some(("entry-b", "b")), stream.next_key_value());
-        assert_eq!(None, stream.next_key_value());
-        assert_eq!(Some("multi-level-dict"), stream.next_entry());
-        assert_eq!(Some("level1"), stream.next_entry());
-        assert_eq!(Some(("level2", "lv2")), stream.next_key_value());
-        assert_eq!(None, stream.next_key_value());
-        assert_eq!(None, stream.next_entry());
-        assert_eq!(Some("empty-list"), stream.next_entry());
-        assert_eq!(None, stream.next_list_value());
-        assert_eq!(Some("list"), stream.next_entry());
-        assert_eq!(Some("list-a"), stream.next_list_value());
-        assert_eq!(Some("list-b"), stream.next_list_value());
-        assert_eq!(None, stream.next_list_value());
-        assert_eq!(Some("list-entry"), stream.next_entry());
-        assert_eq!(true, stream.next_list_begin());
-        assert_eq!(Some(("entry-a", "a")), stream.next_key_value());
-        assert_eq!(None, stream.next_key_value());
-        assert_eq!(true, stream.next_list_begin());
-        assert_eq!(Some(("entry-b", "b")), stream.next_key_value());
-        assert_eq!(None, stream.next_key_value());
-        assert_eq!(false, stream.next_list_begin());
+        YamlParser::new(&string).parse_into(&mut handler);
+
+        let expected = "\
+        \ndict.entry-a = a\
+        \ndict.entry-b = b\
+        \nmulti-level-dict.level1.level2 = lv2\
+        \nempty-list = null\
+        \nlist[0] = list-a\
+        \nlist[1] = list-b\
+        \nlist-entry[0].entry-a = a\
+        \nlist-entry[1].entry-b = b";
+        assert_eq!(expected.trim(), handler.0.trim());
     }
 }

@@ -1,6 +1,10 @@
 BOARD := omnibusf4v3
 TARGET := boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD)
 
+ifeq ($(shell uname),Linux)
+	SUDO := sudo
+endif
+
 .PHONY: $(TARGET)
 boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD):
 	(cd boards/$(BOARD); cargo build --release)
@@ -22,6 +26,6 @@ clean:
 
 .PHONY: dfu
 dfu: $(BOARD).bin
-	sudo dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D $(BOARD).bin
+	$(SUDO) dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D $(BOARD).bin
 
 .DEFAULT_GOAL := $(BOARD).bin

@@ -1,5 +1,5 @@
 use crate::config;
-use crate::config::setter::Setter;
+use crate::config::setter::{Setter, Value};
 use crate::config::yaml::ToYAML;
 use crate::sys::fs::OpenOptions;
 
@@ -12,7 +12,7 @@ pub fn set(writer: &mut impl core::fmt::Write, line: &str) -> core::fmt::Result 
     split.next();
     if let Some(path) = split.next() {
         let mut config = config::get().clone();
-        match config.set(&mut path.split('.'), split.next()) {
+        match config.set(&mut path.split('.'), Value(split.next())) {
             Ok(()) => (),
             Err(e) => writeln!(writer, "{}", e)?,
         }

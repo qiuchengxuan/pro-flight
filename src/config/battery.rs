@@ -1,8 +1,14 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
+use core::str::Split;
 
 use crate::datastructures::decimal::IntegerDecimal;
 
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use super::setter::{Error, Setter, Value};
+use super::yaml::ToYAML;
+
+const DEFAULT_MIN_CELL_VOLTAGE: IntegerDecimal = integer_decimal!(3_3, 1);
+const DEFAULT_MAX_CELL_VOLTAGE: IntegerDecimal = integer_decimal!(4_2, 1);
+const DEFAULT_WARNING_CELL_VOLTAGE: IntegerDecimal = integer_decimal!(3_5, 1);
 
 #[derive(Copy, Clone, Debug)]
 pub struct Battery {
@@ -16,34 +22,34 @@ impl Default for Battery {
     fn default() -> Self {
         Self {
             cells: 0,
-            min_cell_voltage: IntegerDecimal::from("3.3"),
-            max_cell_voltage: IntegerDecimal::from("4.2"),
-            warning_cell_voltage: IntegerDecimal::from("3.5"),
+            min_cell_voltage: DEFAULT_MIN_CELL_VOLTAGE,
+            max_cell_voltage: DEFAULT_MAX_CELL_VOLTAGE,
+            warning_cell_voltage: DEFAULT_WARNING_CELL_VOLTAGE,
         }
     }
 }
 
-impl FromYAML for Battery {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut cells: u8 = 0;
-        let mut min_cell_voltage = IntegerDecimal::from("3.3");
-        let mut max_cell_voltage = IntegerDecimal::from("4.2");
-        let mut warning_cell_voltage = IntegerDecimal::from("3.5");
-        while let Some((key, value)) = parser.next_key_value() {
-            match key {
-                "cells" => cells = value.parse().unwrap_or(0),
-                "min-cell-voltage" => min_cell_voltage = IntegerDecimal::from(value),
-                "max-cell-voltage" => max_cell_voltage = IntegerDecimal::from(value),
-                "warning-cell-voltage" => warning_cell_voltage = IntegerDecimal::from(value),
-                _ => continue,
+impl Setter for Battery {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "cells" => self.cells = value.parse()?.unwrap_or(0),
+            "min-cell-voltage" => {
+                self.min_cell_voltage = value.parse()?.unwrap_or(DEFAULT_MIN_CELL_VOLTAGE)
             }
+            "max-cell-voltage" => {
+                self.max_cell_voltage = value.parse()?.unwrap_or(DEFAULT_MAX_CELL_VOLTAGE)
+            }
+            "warning-cell-voltage" => {
+                self.warning_cell_voltage = value.parse()?.unwrap_or(DEFAULT_WARNING_CELL_VOLTAGE)
+            }
+            _ => return Err(Error::MalformedPath),
         }
-        Self { cells, min_cell_voltage, max_cell_voltage, warning_cell_voltage }
+        Ok(())
     }
 }
 
 impl ToYAML for Battery {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "cells: {}", self.cells)?;
         self.write_indent(indent, w)?;

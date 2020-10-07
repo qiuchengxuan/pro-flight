@@ -1,6 +1,8 @@
+use core::str::FromStr;
+
 pub type RSSI = u16;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum InputType {
     Throttle = 0,
     Roll,
@@ -8,14 +10,15 @@ pub enum InputType {
     Yaw,
 }
 
-impl InputType {
-    pub fn from_str(string: &str) -> Option<Self> {
+impl FromStr for InputType {
+    type Err = ();
+    fn from_str(string: &str) -> Result<Self, ()> {
         match string {
-            "throttle" => Some(Self::Throttle),
-            "roll" => Some(Self::Roll),
-            "pitch" => Some(Self::Pitch),
-            "yaw" => Some(Self::Yaw),
-            _ => None,
+            "throttle" => Ok(Self::Throttle),
+            "roll" => Ok(Self::Roll),
+            "pitch" => Ok(Self::Pitch),
+            "yaw" => Ok(Self::Yaw),
+            _ => Err(()),
         }
     }
 }
@@ -28,6 +31,13 @@ impl Into<&str> for InputType {
             Self::Pitch => "pitch",
             Self::Yaw => "yaw",
         }
+    }
+}
+
+impl core::fmt::Display for InputType {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let s: &str = (*self).into();
+        write!(f, "{}", s)
     }
 }
 

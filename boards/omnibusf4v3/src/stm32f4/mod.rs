@@ -16,7 +16,6 @@ pub fn to_serial_config(config: &SerialConfig) -> Config {
             wordlength: WordLength::DataBits9,
             dma: DmaConfig::TxRx,
         },
-        _ => Config::default(),
     }
 }
 
@@ -24,6 +23,5 @@ pub fn alloc_by_config(config: &SerialConfig) -> Box<[u8]> {
     match config {
         SerialConfig::GNSS(_) => Box::new([0u8; 128 + 2]),
         SerialConfig::SBUS(_) => Box::new([0u8; 64 + 2]),
-        _ => Box::new([0u8; 64 + 2]),
     }
 }

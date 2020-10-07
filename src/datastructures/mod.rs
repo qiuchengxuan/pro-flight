@@ -1,5 +1,8 @@
+use core::str::FromStr;
+
 pub mod coordinate;
 pub mod data_source;
+#[macro_use]
 pub mod decimal;
 pub mod input;
 pub mod measurement;
@@ -29,15 +32,14 @@ impl Into<bool> for GNSSFixed {
     }
 }
 
-impl Ratio {
-    pub fn from_str(string: &str) -> Option<Self> {
+impl FromStr for Ratio {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Self, ()> {
         let mut splitted = string.split(':');
-        if let Some(ratio_0) = splitted.next().map(|r0| r0.parse().ok()).flatten() {
-            if let Some(ratio_1) = splitted.next().map(|r1| r1.parse().ok()).flatten() {
-                return Some(Self(ratio_0, ratio_1));
-            }
-        }
-        None
+        let ratio_0 = splitted.next().ok_or(())?.parse().map_err(|_| ())?;
+        let ratio_1 = splitted.next().ok_or(())?.parse().map_err(|_| ())?;
+        Ok(Self(ratio_0, ratio_1))
     }
 }
 

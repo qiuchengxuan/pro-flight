@@ -1,29 +1,26 @@
 use core::cmp;
 use core::fmt::Write;
-use core::str::Split;
+use core::str::{FromStr, Split};
 
-use super::setter::{SetError, Setter};
-use super::yaml::{FromYAML, ToYAML, YamlParser};
+use heapless::consts::U8;
+use heapless::LinearMap;
 
-#[derive(PartialEq, Copy, Clone)]
+use super::setter::{Error, Setter, Value};
+use super::yaml::ToYAML;
+
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Identifier {
     PWM(u8),
 }
 
-impl From<&str> for Identifier {
-    fn from(name: &str) -> Identifier {
-        if name.starts_with("PWM") {
-            return Identifier::PWM(name[3..].parse::<u8>().ok().map(|v| v - 1).unwrap_or(u8::MAX));
-        }
-        Identifier::PWM(u8::MAX)
-    }
-}
+impl FromStr for Identifier {
+    type Err = ();
 
-impl Into<bool> for Identifier {
-    fn into(self) -> bool {
-        match self {
-            Self::PWM(index) => index < u8::MAX,
+    fn from_str(name: &str) -> Result<Identifier, ()> {
+        if name.starts_with("PWM") {
+            return Ok(Identifier::PWM(name[3..].parse::<u8>().map_err(|_| ())? - 1));
         }
+        Err(())
     }
 }
 
@@ -100,7 +97,6 @@ impl Servo {
 pub enum Output {
     Motor(Motor),
     Servo(Servo),
-    None,
 }
 
 impl Output {
@@ -112,42 +108,46 @@ impl Output {
     }
 }
 
-pub const MAX_OUTPUT_CONFIG: usize = 6;
-
-impl FromYAML for Output {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut type_string: &str = &"";
-        let mut index = 0;
-        let mut protocol: &str = &"";
-        let mut rate = 400;
-        let mut min = -90;
-        let mut max = 90;
-        let mut reversed = false;
-        while let Some((key, value)) = parser.next_key_value() {
-            match key {
-                "type" => type_string = value,
-                "index" => index = value.parse().ok().unwrap_or(0),
-                "protocol" => protocol = value,
-                "rate" => rate = value.parse().ok().unwrap_or(400),
-                "min-angle" => min = value.parse().ok().unwrap_or(-90),
-                "max-angle" => max = value.parse().ok().unwrap_or(90),
-                "reversed" => reversed = value == "true",
-                _ => continue,
-            }
+impl Setter for Output {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let key = path.next().ok_or(Error::MalformedPath)?;
+        if key == "type" {
+            *self = match value.0 {
+                Some("motor") => Self::Motor(Motor::default()),
+                Some("aileron-left") => Self::Servo(Servo::of(ServoType::AileronLeft)),
+                Some("aileron-right") => Self::Servo(Servo::of(ServoType::AileronRight)),
+                Some("elevator") => Self::Servo(Servo::of(ServoType::Elevator)),
+                Some("rudder") => Self::Servo(Servo::of(ServoType::Rudder)),
+                Some(_) => return Err(Error::UnexpectedValue),
+                _ => return Err(Error::ExpectValue),
+            };
+            return Ok(());
         }
-        min = cmp::min(cmp::max(min, -90), 0);
-        max = cmp::max(cmp::min(max, 90), 0);
-        match type_string {
-            "motor" => match protocol {
-                "PWM" => Self::Motor(Motor::new(Protocol::PWM, index, rate)),
-                _ => Self::Motor(Motor::default()),
+        match self {
+            Self::Motor(ref mut motor) => match key {
+                "index" => motor.index = value.parse()?.unwrap_or(0),
+                "protocol" => match value.0 {
+                    Some("PWM") => motor.protocol = Protocol::PWM,
+                    Some(_) => return Err(Error::UnexpectedValue),
+                    _ => motor.protocol = Protocol::PWM,
+                },
+                "rate" => motor.rate = value.parse()?.unwrap_or(400),
+                _ => return Err(Error::MalformedPath),
             },
-            "aileron-left" => Self::Servo(Servo::new(ServoType::AileronLeft, min, max, reversed)),
-            "aileron-right" => Self::Servo(Servo::new(ServoType::AileronRight, min, max, reversed)),
-            "elevator" => Self::Servo(Servo::new(ServoType::Elevator, min, max, reversed)),
-            "rudder" => Self::Servo(Servo::new(ServoType::Rudder, min, max, reversed)),
-            _ => Self::None,
+            Self::Servo(ref mut servo) => match key {
+                "min-angle" => {
+                    let min = value.parse()?.unwrap_or(-90);
+                    servo.min_angle = cmp::min(cmp::max(min, -90), 0)
+                }
+                "max-angle" => {
+                    let max = value.parse()?.unwrap_or(90);
+                    servo.max_angle = cmp::max(cmp::min(max, 90), 0)
+                }
+                "reversed" => servo.reversed = value.parse()?.unwrap_or_default(),
+                _ => return Err(Error::MalformedPath),
+            },
         }
+        Ok(())
     }
 }
 
@@ -185,130 +185,51 @@ impl ToYAML for Output {
                     writeln!(w, "reversed: true")?;
                 }
             }
-            _ => (),
         }
         Ok(())
     }
 }
 
-impl Setter for Output {
-    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
-        let value = match value {
-            Some(v) => v,
-            None => return Err(SetError::ExpectValue),
-        };
-        let key = match path.next() {
-            Some(key) => key,
-            None => return Err(SetError::MalformedPath),
-        };
-        match key {
-            "type" => match value {
-                "motor" => *self = Self::Motor(Motor::default()),
-                "aileron-left" => *self = Self::Servo(Servo::of(ServoType::AileronLeft)),
-                "aileron-right" => *self = Self::Servo(Servo::of(ServoType::AileronRight)),
-                "elevator" => *self = Self::Servo(Servo::of(ServoType::Elevator)),
-                "rudder" => *self = Self::Servo(Servo::of(ServoType::Rudder)),
-                _ => return Err(SetError::UnexpectedValue),
-            },
-            "min-angle" | "max-angle" => {
-                let angle = match value.parse::<i8>() {
-                    Ok(angle) => angle,
-                    Err(_) => return Err(SetError::UnexpectedValue),
-                };
-                match self {
-                    Self::Servo(servo) => {
-                        if key == "min-angle" {
-                            servo.min_angle = cmp::min(cmp::max(angle, -90), 0);
-                        } else {
-                            servo.max_angle = cmp::max(cmp::min(angle, 90), 0);
-                        }
-                    }
-                    _ => return Err(SetError::MalformedPath),
-                }
-            }
-            "reversed" => match self {
-                Self::Servo(servo) => servo.reversed = value == "true",
-                _ => return Err(SetError::MalformedPath),
-            },
-            _ => return Err(SetError::MalformedPath),
-        };
-        Ok(())
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct Outputs(pub [(Identifier, Output); MAX_OUTPUT_CONFIG]);
-
-impl Default for Outputs {
-    fn default() -> Outputs {
-        Outputs([(Identifier::PWM(u8::MAX), Output::None); MAX_OUTPUT_CONFIG])
-    }
-}
+#[derive(Clone, Default)]
+pub struct Outputs(pub LinearMap<Identifier, Output, U8>);
 
 impl Outputs {
-    pub fn get(&self, name: &str) -> Option<Output> {
-        let identifier = Identifier::from(name);
-        if identifier.into() {
-            for &(id, config) in self.0.iter() {
-                if id == identifier {
-                    return Some(config);
-                }
-            }
+    pub fn get(&self, name: &str) -> Option<&Output> {
+        match Identifier::from_str(name) {
+            Ok(id) => self.0.get(&id),
+            Err(_) => None,
         }
-        None
     }
 
     pub fn len(&self) -> usize {
-        self.0.iter().filter(|&&(id, _)| id.into()).count()
-    }
-}
-
-impl FromYAML for Outputs {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut outputs = Outputs::default();
-        let mut index = 0;
-        while let Some(key) = parser.next_entry() {
-            let id = Identifier::from(key);
-            let config = Output::from_yaml(parser);
-            if id.into() {
-                outputs.0[index] = (id, config);
-                index += 1;
-            }
-        }
-        outputs
+        self.0.len()
     }
 }
 
 impl ToYAML for Outputs {
     fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
-        for &(id, config) in self.0.iter() {
-            if id.into() {
-                self.write_indent(indent, w)?;
-                writeln!(w, "{}:", id)?;
-                config.write_to(indent + 1, w)?;
-            }
+        for (id, config) in self.0.iter() {
+            self.write_indent(indent, w)?;
+            writeln!(w, "{}:", id)?;
+            config.write_to(indent + 1, w)?;
         }
         Ok(())
     }
 }
 
 impl Setter for Outputs {
-    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
-        let id_string = match path.next() {
-            Some(token) => token,
-            None => return Err(SetError::MalformedPath),
-        };
-        let index = if id_string.starts_with("PWM") {
-            match id_string[3..].parse::<usize>() {
-                Ok(index) => index - 1,
-                Err(_) => return Err(SetError::MalformedPath),
-            }
-        } else {
-            return Err(SetError::MalformedPath);
-        };
-        if index >= MAX_OUTPUT_CONFIG {
-            return Err(SetError::MalformedPath);
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let id_string = path.next().ok_or(Error::MalformedPath)?;
+        if !id_string.starts_with("PWM") {
+            return Err(Error::MalformedPath);
         }
-        self.0[index].1.set(path, value)
+        let id = id_string.parse().map_err(|_| Error::MalformedPath)?;
+        if self.0.contains_key(&id) {
+            return self.0[&id].set(path, value);
+        }
+        let mut config = Output::Motor(Motor::default());
+        config.set(path, value)?;
+        self.0.insert(id, config).ok();
+        Ok(())
     }
 }

@@ -22,22 +22,20 @@ pub use osd::{Offset, Standard, OSD};
 pub use output::{Output, Outputs, Protocol};
 pub use receiver::Receiver;
 pub use serial::{Config as SerialConfig, Serials};
-use setter::{SetError, Setter};
-use yaml::{FromYAML, ToYAML, YamlParser};
+use setter::{Error, Setter, Value};
+use yaml::{ToYAML, YamlParser};
 
-impl FromYAML for Axes {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut axis = Self::default();
-        while let Some((key, value)) = parser.next_key_value() {
-            let value = value.parse().unwrap_or(0);
-            match key {
-                "x" => axis.x = value,
-                "y" => axis.y = value,
-                "z" => axis.z = value,
-                _ => continue,
-            }
+impl Setter for Axes {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let key = path.next().ok_or(Error::MalformedPath)?;
+        let value = value.parse()?.unwrap_or_default();
+        match key {
+            "x" => self.x = value,
+            "y" => self.y = value,
+            "z" => self.z = value,
+            _ => return Err(Error::MalformedPath),
         }
-        axis
+        Ok(())
     }
 }
 
@@ -52,6 +50,8 @@ impl ToYAML for Axes {
     }
 }
 
+const DEFAULT_KP: IntegerDecimal = integer_decimal!(0_25, 2);
+
 #[derive(Clone)]
 pub struct Speedometer {
     pub kp: IntegerDecimal,
@@ -59,20 +59,17 @@ pub struct Speedometer {
 
 impl Default for Speedometer {
     fn default() -> Self {
-        Self { kp: IntegerDecimal::new(25, 2) }
+        Self { kp: DEFAULT_KP }
     }
 }
 
-impl FromYAML for Speedometer {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut kp = IntegerDecimal::default();
-        while let Some((key, value)) = parser.next_key_value() {
-            match key {
-                "kp" => kp = IntegerDecimal::from(value),
-                _ => continue,
-            }
+impl Setter for Speedometer {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "kp" => self.kp = value.parse()?.unwrap_or(DEFAULT_KP),
+            _ => return Err(Error::MalformedPath),
         }
-        Self { kp }
+        Ok(())
     }
 }
 
@@ -85,8 +82,8 @@ impl ToYAML for Speedometer {
 
 #[derive(Default, Clone)]
 pub struct Config {
-    pub battery: Battery,
     pub aircraft: Aircraft,
+    pub battery: Battery,
     pub imu: IMU,
     pub osd: OSD,
     pub receiver: Receiver,
@@ -96,33 +93,18 @@ pub struct Config {
 }
 
 impl Setter for Config {
-    fn set(&mut self, path: &mut Split<char>, value: Option<&str>) -> Result<(), SetError> {
-        match path.next() {
-            Some("receiver") => self.receiver.set(path, value),
-            Some("outputs") => self.outputs.set(path, value),
-            Some("osd") => self.osd.set(path, value),
-            _ => Err(SetError::MalformedPath),
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        match path.next().ok_or(Error::MalformedPath)? {
+            "aircraft" => self.aircraft.set(path, value),
+            "battery" => self.battery.set(path, value),
+            "imu" => self.imu.set(path, value),
+            "osd" => self.osd.set(path, value),
+            "receiver" => self.receiver.set(path, value),
+            "serials" => self.serials.set(path, value),
+            "speedometer" => self.speedometer.set(path, value),
+            "outputs" => self.outputs.set(path, value),
+            _ => Err(Error::MalformedPath),
         }
-    }
-}
-
-impl FromYAML for Config {
-    fn from_yaml<'a>(parser: &mut YamlParser<'a>) -> Self {
-        let mut config = Self::default();
-        while let Some(key) = parser.next_entry() {
-            match key {
-                "aircraft" => config.aircraft = Aircraft::from_yaml(parser),
-                "battery" => config.battery = Battery::from_yaml(parser),
-                "imu" => config.imu = IMU::from_yaml(parser),
-                "osd" => config.osd = OSD::from_yaml(parser),
-                "receiver" => config.receiver = Receiver::from_yaml(parser),
-                "serials" => config.serials = Serials::from_yaml(parser),
-                "speedometer" => config.speedometer = Speedometer::from_yaml(parser),
-                "outputs" => config.outputs = Outputs::from_yaml(parser),
-                _ => parser.skip(),
-            };
-        }
-        config
     }
 }
 
@@ -161,13 +143,12 @@ impl ToYAML for Config {
         writeln!(w, "speedometer:")?;
         self.speedometer.write_to(indent + 1, w)?;
 
+        self.write_indent(indent, w)?;
         if self.outputs.len() > 0 {
-            self.write_indent(indent, w)?;
             writeln!(w, "outputs:")?;
             self.outputs.write_to(indent + 1, w)?;
         } else {
-            self.write_indent(indent, w)?;
-            writeln!(w, "outputs: []")?;
+            writeln!(w, "outputs: null")?;
         }
         Ok(())
     }
@@ -190,7 +171,7 @@ pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     let mut buffer = [0u8; 2048];
     let size = reader.read(&mut buffer).ok().unwrap_or(0);
     let config = if size > 0 {
-        Config::from_yaml(&mut YamlParser::from(&buffer[..size]))
+        YamlParser::new(unsafe { core::str::from_utf8_unchecked(&buffer[..size]) }).parse()
     } else {
         Config::default()
     };
@@ -213,13 +194,13 @@ mod test {
         use std::io::Read;
         use std::string::{String, ToString};
 
-        use super::yaml::{FromYAML, ToYAML, YamlParser};
+        use super::yaml::{ToYAML, YamlParser};
         use super::Config;
 
         let mut file = File::open("sample.yml")?;
         let mut yaml_string = String::new();
         file.read_to_string(&mut yaml_string)?;
-        let config = Config::from_yaml(&mut YamlParser::from(yaml_string.as_ref() as &str));
+        let config: Config = YamlParser::new(yaml_string.as_str()).parse();
 
         let mut buf = String::new();
         config.write_to(0, &mut buf).ok();
@@ -234,18 +215,18 @@ mod test {
         use std::string::String;
 
         use super::output::{Output, Servo, ServoType};
-        use super::setter::Setter;
-        use super::yaml::{FromYAML, YamlParser};
+        use super::setter::{Setter, Value};
+        use super::yaml::YamlParser;
         use super::Config;
 
         let mut file = File::open("sample.yml")?;
         let mut yaml_string = String::new();
         file.read_to_string(&mut yaml_string)?;
-        let mut config = Config::from_yaml(&mut YamlParser::from(yaml_string.as_ref() as &str));
+        let mut config: Config = YamlParser::new(yaml_string.as_str()).parse();
 
-        config.set(&mut "outputs.PWM5.min-angle".split('.'), Some("-80")).unwrap();
-        let expected = Output::Servo(Servo::new(ServoType::AileronLeft, -80, 90, false));
-        assert_eq!(config.outputs.get("PWM5").unwrap(), expected);
+        config.set(&mut "outputs.PWM5.min-angle".split('.'), Value::of("-80")).unwrap();
+        let expected = Output::Servo(Servo::new(ServoType::AileronLeft, -80, 90, true));
+        assert_eq!(config.outputs.get("PWM5").unwrap(), &expected);
         Ok(())
     }
 }

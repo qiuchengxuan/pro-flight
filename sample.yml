@@ -35,16 +35,16 @@ osd:
   refresh-rate: 50
   standard: PAL
 receiver:
-  channels:
-    - channel: 1
-      type: roll
-    - channel: 2
-      type: pitch
-    - channel: 3
-      type: throttle
+  inputs:
+    throttle:
+      channel: 3
       scale: 110
-    - channel: 4
-      type: yaw
+    roll:
+      channel: 1
+    pitch:
+      channel: 2
+    yaw:
+      channel: 4
 serials:
   USART1:
     type: GNSS

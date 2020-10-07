@@ -11,6 +11,7 @@ extern crate embedded_dma;
 extern crate embedded_sdmmc;
 #[macro_use]
 extern crate enum_map;
+extern crate heapless;
 extern crate integer_sqrt;
 extern crate micromath;
 #[macro_use]
@@ -30,9 +31,10 @@ extern crate usbd_serial;
 pub mod sys;
 #[macro_use]
 pub mod components;
+#[macro_use]
+pub mod datastructures;
 pub mod algorithm;
 pub mod config;
-pub mod datastructures;
 pub mod drivers;
 pub mod hal;
 
