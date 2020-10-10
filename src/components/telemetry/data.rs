@@ -1,146 +1,52 @@
-use ascii_osd_hud::telemetry as hud;
-#[allow(unused_imports)] // false warning
-use micromath::F32Ext;
-use nalgebra::{Quaternion, UnitQuaternion};
+use nalgebra::UnitQuaternion;
 
 use crate::datastructures::coordinate::Position;
-use crate::datastructures::input::{ControlInput, RSSI};
-use crate::datastructures::measurement::battery::Battery;
+use crate::datastructures::input::ControlInput;
 use crate::datastructures::measurement::displacement::DistanceVector;
-use crate::datastructures::measurement::euler::Euler;
 use crate::datastructures::measurement::unit::Meter;
-use crate::datastructures::measurement::Course;
-use crate::datastructures::measurement::{Acceleration, Altitude, Gyro, Magnetism, VelocityVector};
+use crate::datastructures::measurement::VelocityVector;
 use crate::datastructures::waypoint::Steerpoint;
 
-#[derive(Debug, Default, Copy, Clone)]
-pub struct Attitude {
-    pub roll: i16,
-    pub pitch: i16,
-}
+use super::sensor::Sensor;
+use super::status::Status;
 
-impl From<Euler> for Attitude {
-    fn from(euler: Euler) -> Self {
-        let roll = (-euler.roll * 10.0) as i16;
-        let pitch = (-euler.pitch * 10.0) as i16;
-        Self { roll, pitch }
-    }
-}
-
-impl Into<hud::Attitude> for Attitude {
-    fn into(self) -> hud::Attitude {
-        hud::Attitude { roll: self.roll / 10, pitch: (self.pitch / 10) as i8 }
-    }
-}
-
-impl sval::value::Value for Attitude {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(2))?;
-        stream.map_key("roll")?;
-        stream.map_value(self.roll / 10)?;
-        stream.map_key("pitch")?;
-        stream.map_value(self.pitch / 10)?;
-        stream.map_end()
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug, Value)]
-pub struct Basic {
-    pub altitude: Altitude,
-    pub attitude: Attitude,
-    pub heading: u16,
-    pub height: Altitude,
-    pub g_force: u8,
-    pub airspeed: u16,
-    pub vario: i16,
-}
-
-#[derive(Copy, Clone, Default, Debug, Value)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Misc {
-    pub rssi: RSSI,
-    pub input: ControlInput,
-
-    pub position: Position,
-    pub steerpoint: Steerpoint,
-
-    pub battery: Battery,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct GNSS {
-    pub fixed: bool,
-    pub course: Course,
-}
-
-impl sval::value::Value for GNSS {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(if self.fixed { 2 } else { 1 }))?;
-        stream.map_key("fixed")?;
-        stream.map_value(self.fixed)?;
-        if self.fixed {
-            stream.map_key("fixed")?;
-            let course: f32 = self.course.into();
-            stream.map_value(course)?;
-        }
-        stream.map_end()
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Raw {
-    pub acceleration: Acceleration,
-    pub gyro: Gyro,
-    pub magnetism: Option<Magnetism>,
-    pub gnss: Option<GNSS>,
-    pub quaternion: UnitQuaternion<f32>,
-    pub speed_vector: VelocityVector<f32, Meter>,
     pub displacement: DistanceVector<i32, Meter>,
+    pub input: ControlInput,
+    pub quaternion: UnitQuaternion<f32>,
 }
 
-impl Default for Raw {
-    fn default() -> Self {
-        Self {
-            quaternion: UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0)),
-            acceleration: Acceleration::default(),
-            gyro: Gyro::default(),
-            magnetism: None,
-            gnss: None,
-            speed_vector: VelocityVector::default(),
-            displacement: DistanceVector::default(),
-        }
-    }
-}
-
-impl sval::value::Value for Raw {
+impl sval::value::Value for Misc {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(
-            6 + self.gnss.is_some() as usize + self.magnetism.is_some() as usize,
-        ))?;
-        stream.map_key("acceleration")?;
-        stream.map_value(&self.acceleration)?;
-        stream.map_key("gyro")?;
-        stream.map_value(&self.gyro)?;
-        if let Some(magnetism) = self.magnetism {
-            stream.map_key("magnetism")?;
-            stream.map_value(magnetism)?;
-        }
-        if let Some(gnss) = self.gnss {
-            stream.map_key("gnss")?;
-            stream.map_value(gnss)?;
-        }
+        stream.map_begin(Some(3))?;
+        stream.map_key("displacement")?;
+        stream.map_value(&self.displacement)?;
+        stream.map_key("input")?;
+        stream.map_value(&self.input)?;
         stream.map_key("quaternion")?;
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         stream.map_value(&value[..])?;
-        stream.map_key("speed-vector")?;
-        stream.map_value(&self.speed_vector)?;
-        stream.map_key("displacement")?;
-        stream.map_value(&self.displacement)?;
         stream.map_end()
     }
 }
 
-impl core::fmt::Display for Raw {
+impl core::fmt::Display for Misc {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        sval_json::to_fmt(f, self).ok();
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, Value)]
+pub struct Navigation {
+    pub position: Position,
+    pub speed_vector: VelocityVector<f32, Meter>,
+    pub steerpoint: Steerpoint,
+}
+
+impl core::fmt::Display for Navigation {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         sval_json::to_fmt(f, self).ok();
         Ok(())
@@ -149,9 +55,10 @@ impl core::fmt::Display for Raw {
 
 #[derive(Copy, Clone, Default, Debug, Value)]
 pub struct TelemetryData {
-    pub basic: Basic,
+    pub status: Status,
+    pub navigation: Navigation,
+    pub sensor: Sensor,
     pub misc: Misc,
-    pub raw: Raw,
 }
 
 impl core::fmt::Display for TelemetryData {

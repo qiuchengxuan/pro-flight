@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use ascii_osd_hud::hud::HUD;
-use ascii_osd_hud::symbol::{Symbol, SymbolTable};
+use ascii_osd_hud::symbol::default_symbol_table;
 use ascii_osd_hud::telemetry::{Notes, Steerpoint, Telemetry, Unit};
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
@@ -39,54 +39,33 @@ impl From<Ratio> for PixelRatio {
 
 impl<T: StaticData<TelemetryData>> AsciiHud<T> {
     pub fn new(telemetry: T, fov: u8, pixel_ratio: PixelRatio, aspect_ratio: AspectRatio) -> Self {
-        let symbol_table: SymbolTable = enum_map! {
-            Symbol::Antenna => 1,
-            Symbol::Battery => 144,
-            Symbol::Degree => 168,
-            Symbol::VeclocityVector => 126,
-            Symbol::Alpha => 154,
-            Symbol::Square => 191,
-            Symbol::LineTop => 128,
-            Symbol::LineUpper1 => 129,
-            Symbol::LineUpper2 => 131,
-            Symbol::LineCenter => 132,
-            Symbol::LineLower1 => 133,
-            Symbol::LineLower2 => 134,
-            Symbol::LineBottom => 136,
-            Symbol::BoxDrawningLightUp => 124,
-            Symbol::ZeroWithTraillingDot => 192,
-            Symbol::LineLeft => 224,
-            Symbol::LineLeft1 => 225,
-            Symbol::LineVerticalCenter => 226,
-            Symbol::LineRight => 227,
-            Symbol::LineRight1 => 228,
-        };
-        let hud = HUD::new(&symbol_table, fov, pixel_ratio, aspect_ratio);
+        let hud = HUD::new(&default_symbol_table(), fov, pixel_ratio, aspect_ratio);
         Self { hud, telemetry, screen: Box::new([[0u8; 29]; 15]) }
     }
 
     pub fn draw(&mut self) -> &Screen {
         let data = self.telemetry.read();
-        let (basic, misc, raw) = (&data.basic, &data.misc, &data.raw);
+        let (status, sensor, nav, misc) =
+            (&data.status, &data.sensor, &data.navigation, &data.misc);
 
-        let altitude = basic.altitude.to_unit(Feet);
-        let height = basic.height.to_unit(Feet);
-        let delta = (misc.steerpoint.waypoint.position - misc.position).convert(|v| v as f32);
-        let vector = raw.quaternion.inverse_transform_vector(&delta.into());
+        let altitude = status.altitude.to_unit(Feet);
+        let height = status.height.to_unit(Feet).value() as i16;
+        let delta = (nav.steerpoint.waypoint.position - nav.position).convert(|v| v as f32);
+        let vector = misc.quaternion.inverse_transform_vector(&delta.into());
         let transformed: DistanceVector<f32, Meter> = vector.into();
         let coordinate: SphericalCoordinate<Meter> = (transformed * 10.0).into();
         let steerpoint = Steerpoint {
-            number: misc.steerpoint.index,
-            name: misc.steerpoint.waypoint.name,
+            number: nav.steerpoint.index,
+            name: nav.steerpoint.waypoint.name,
             heading: delta.azimuth(),
             coordinate: coordinate.to_unit(NauticalMile).into(),
         };
 
-        let vector = raw.quaternion.inverse_transform_vector(&raw.speed_vector.into());
+        let vector = misc.quaternion.inverse_transform_vector(&nav.speed_vector.into());
         let vector: VelocityVector<f32, Meter> = vector.into();
         let speed_vector: SphericalCoordinate<Knot> = vector.to_unit(Knot).into();
 
-        let mut aoa = basic.attitude.pitch.wrapping_sub((speed_vector.phi as i16) * 10);
+        let mut aoa = status.attitude.pitch.wrapping_sub((speed_vector.phi as i16) * 10);
         if aoa > i8::MAX as i16 {
             aoa = i8::MAX as i16;
         } else if aoa < i8::MIN as i16 {
@@ -95,7 +74,7 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
 
         let mut note_buffer = [0u8; 30];
         let mut index = 0;
-        if let Some(gnss) = raw.gnss {
+        if let Some(gnss) = sensor.gnss {
             if !gnss.fixed {
                 note_buffer[index..index + NO_GPS.len()].copy_from_slice(NO_GPS.as_bytes());
                 index += NO_GPS.len();
@@ -105,16 +84,16 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
         let hud_telemetry = Telemetry {
             altitude: altitude.value() as i16,
             aoa: aoa as i8,
-            attitude: basic.attitude.into(),
-            battery: misc.battery.percentage(),
-            heading: basic.heading,
-            g_force: basic.g_force,
-            height: height.value() as i16,
+            attitude: status.attitude.into(),
+            battery: status.battery.percentage(),
+            heading: status.heading,
+            g_force: status.g_force,
+            height: if height > 200 { i16::MIN } else { height },
             notes: Notes { left: note_left, center: "", right: "" },
-            rssi: misc.rssi as u8,
+            rssi: status.rssi as u8,
             unit: Unit::Aviation,
             speed_vector: speed_vector.into(),
-            vario: basic.vario as i16 / 100 * 100,
+            vario: status.vario as i16 / 100 * 100,
             steerpoint: steerpoint,
         };
         self.hud.draw(&hud_telemetry, self.screen.as_mut());

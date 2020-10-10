@@ -1,5 +1,10 @@
 pub mod data;
-pub use data::{Basic, Misc, Raw, TelemetryData};
+pub mod sensor;
+pub mod status;
+
+pub use data::{Misc, Navigation, TelemetryData};
+pub use sensor::Sensor;
+pub use status::Status;
 
 use alloc::boxed::Box;
 use alloc::rc::Rc;
@@ -88,11 +93,11 @@ where
 
         let magnetism = self.magnetometer.as_mut().map(|m| m.read());
 
-        let mut gnss: Option<data::GNSS> = None;
+        let mut gnss: Option<sensor::GNSS> = None;
         if let Some(ref mut _gnss) = self.gnss {
             let fixed = _gnss.fix.read().into();
             let course = _gnss.course.read();
-            gnss = Some(data::GNSS { fixed, course });
+            gnss = Some(sensor::GNSS { fixed, course });
         }
 
         let speed_vector = self.speedometer.read();
@@ -100,7 +105,7 @@ where
 
         let displacement = steerpoint.waypoint.position - position;
 
-        let basic = Basic {
+        let status = Status {
             attitude: euler.into(),
             altitude,
             heading: if heading >= 0 { heading } else { 360 + heading } as u16,
@@ -108,18 +113,14 @@ where
             g_force: acceleration.g_force(),
             airspeed: vector.to_unit(Knot).distance().value() as u16,
             vario: vector.z.to_unit(FTpM).value() as i16,
-        };
-        let misc = Misc {
-            battery: battery / self.battery_cells as u16,
-            position,
-            steerpoint,
             rssi: self.rssi.as_mut().map(|r| r.read(rate)).flatten().unwrap_or_default(),
-            input: input_option.unwrap_or_default(),
+            battery: battery / self.battery_cells as u16,
         };
-        let raw =
-            Raw { acceleration, gyro, quaternion, magnetism, gnss, speed_vector, displacement };
+        let navigation = Navigation { position, speed_vector, steerpoint };
+        let sensor = Sensor { acceleration, gyro, magnetism, gnss };
+        let misc = Misc { displacement, input: input_option.unwrap_or_default(), quaternion };
 
-        let data = TelemetryData { basic, misc, raw };
+        let data = TelemetryData { status, navigation, sensor, misc };
         self.telemetry.write(data);
         true
     }
