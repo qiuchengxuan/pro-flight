@@ -37,10 +37,6 @@ impl From<Ratio> for PixelRatio {
     }
 }
 
-fn round_up(value: i16) -> i16 {
-    (value + 5) / 10 * 10
-}
-
 impl<T: StaticData<TelemetryData>> AsciiHud<T> {
     pub fn new(telemetry: T, fov: u8, pixel_ratio: PixelRatio, aspect_ratio: AspectRatio) -> Self {
         let symbol_table: SymbolTable = enum_map! {
@@ -107,7 +103,7 @@ impl<T: StaticData<TelemetryData>> AsciiHud<T> {
         }
         let note_left = unsafe { core::str::from_utf8_unchecked(&note_buffer[..index]) };
         let hud_telemetry = Telemetry {
-            altitude: round_up(altitude.value() as i16),
+            altitude: altitude.value() as i16,
             aoa: aoa as i8,
             attitude: basic.attitude.into(),
             battery: misc.battery.percentage(),

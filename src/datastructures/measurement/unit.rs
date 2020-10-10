@@ -40,9 +40,9 @@ macro_rules! units {
 units! {
     MilliMeter => (1.0, "mm"),
     CentiMeter => (10.0, "cm"),
+    Feet => (303.0, "ft"),
+    FTpM => (303.0 / 60.0, "ft/min"),
     Meter => (1000.0, "m"),
-    Feet => (3300.0, "ft"),
-    FTpM => (3300.0 / 60.0, "ft/min"),
     KiloMeter => (1000_000.0, "km"),
     KMpH => (1000_000.0 / 3600.0 , "km/h"),
     NauticalMile => (1852_000.0, "nm"),

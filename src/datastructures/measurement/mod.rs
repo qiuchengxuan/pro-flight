@@ -155,7 +155,7 @@ impl Acceleration {
         let square_sum = x * x + y * y + z * z;
         if square_sum > 0 {
             let g_force = square_sum.integer_sqrt();
-            ((g_force * 10 + self.0.sensitive / 2) / self.0.sensitive) as u8
+            (g_force * 10 / self.0.sensitive) as u8
         } else {
             0
         }
@@ -174,3 +174,30 @@ impl Into<Altitude> for Pressure {
 }
 
 pub type Magnetism = Measurement;
+
+mod test {
+    #[test]
+    fn test_distance_unit_convert() {
+        use super::{Altitude, Distance};
+        use crate::datastructures::measurement::unit::{CentiMeter, Feet, Meter, NauticalMile};
+
+        let altitude = Altitude::new(1000, CentiMeter);
+        assert_eq!(altitude.to_unit(Meter), Distance::new(10, Meter));
+        assert_eq!(altitude.to_unit(Feet), Distance::new(33, Feet));
+
+        let distance = Distance::new(1, NauticalMile);
+        assert_eq!(distance.to_unit(Meter), Distance::new(1852, Meter));
+    }
+
+    #[test]
+    fn test_speed_unit_convert() {
+        use super::Velocity;
+        use crate::datastructures::measurement::unit::{FTpM, KMpH, Knot, Meter};
+
+        let knot = Velocity::new(186, KMpH);
+        assert_eq!(knot.to_unit(Knot), Velocity::new(100, Knot));
+
+        let meter = Velocity::new(1800, FTpM);
+        assert_eq!(meter.to_unit(Meter), Velocity::new(9, Meter));
+    }
+}
