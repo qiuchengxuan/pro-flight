@@ -1,4 +1,4 @@
-pub mod airplane;
+pub mod fixed_wing;
 pub mod pwm;
 
-pub use airplane::Airplane;
+pub use fixed_wing::FixedWing;

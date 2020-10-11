@@ -51,7 +51,8 @@ use pro_flight::{
     components::{
         altimeter::Altimeter,
         cli::{memory, CLI},
-        configuration::Airplane,
+        configuration::FixedWing,
+        event::OnEvent,
         event::SchedulableEvent,
         imu::IMU,
         logger::{self, Level},
@@ -256,8 +257,10 @@ fn main() -> ! {
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = pwm::init(tims, pins, clocks, &config.outputs);
     let mixer = ControlMixer::new(control_input, SERVO_SCHEDULE_RATE, NoDataSource::new());
-    let control_surface = match config.aircraft.configuration {
-        Configuration::Airplane => Airplane::new(mixer, pwms),
+    let control_surface: Box<dyn OnEvent> = match config.aircraft.configuration {
+        Configuration::Airplane | Configuration::FlyingWing | Configuration::VTail => {
+            Box::new(FixedWing::new(mixer, pwms))
+        }
     };
 
     let altimeter = Altimeter::new(barometer, barometer::bmp280::SAMPLE_RATE);
@@ -312,7 +315,7 @@ fn main() -> ! {
     );
     let (baro, osd) = result.ok().unwrap();
 
-    let trigger = exti0_softirq::init(&mut peripherals.EXTI, Box::new(control_surface));
+    let trigger = exti0_softirq::init(&mut peripherals.EXTI, control_surface);
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
         sbus.set_notify(Box::new(trigger.clone()));
     }

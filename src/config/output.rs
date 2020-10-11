@@ -62,6 +62,8 @@ pub enum ServoType {
     AileronRight,
     Elevator,
     Rudder,
+    ElevonLeft,
+    ElevonRight,
 }
 
 impl Into<&str> for ServoType {
@@ -71,6 +73,8 @@ impl Into<&str> for ServoType {
             Self::AileronRight => "aileron-right",
             Self::Elevator => "elevator",
             Self::Rudder => "rudder",
+            Self::ElevonLeft => "elevon-left",
+            Self::ElevonRight => "elevon-right",
         }
     }
 }
@@ -112,14 +116,16 @@ impl Setter for Output {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
         if key == "type" {
-            *self = match value.0 {
-                Some("motor") => Self::Motor(Motor::default()),
-                Some("aileron-left") => Self::Servo(Servo::of(ServoType::AileronLeft)),
-                Some("aileron-right") => Self::Servo(Servo::of(ServoType::AileronRight)),
-                Some("elevator") => Self::Servo(Servo::of(ServoType::Elevator)),
-                Some("rudder") => Self::Servo(Servo::of(ServoType::Rudder)),
-                Some(_) => return Err(Error::UnexpectedValue),
-                _ => return Err(Error::ExpectValue),
+            let output_type = value.0.ok_or(Error::ExpectValue)?;
+            *self = match output_type {
+                "motor" => Self::Motor(Motor::default()),
+                "aileron-left" => Self::Servo(Servo::of(ServoType::AileronLeft)),
+                "aileron-right" => Self::Servo(Servo::of(ServoType::AileronRight)),
+                "elevator" => Self::Servo(Servo::of(ServoType::Elevator)),
+                "rudder" => Self::Servo(Servo::of(ServoType::Rudder)),
+                "elevon-left" => Self::Servo(Servo::of(ServoType::ElevonLeft)),
+                "elevon-right" => Self::Servo(Servo::of(ServoType::ElevonRight)),
+                _ => return Err(Error::UnexpectedValue),
             };
             return Ok(());
         }

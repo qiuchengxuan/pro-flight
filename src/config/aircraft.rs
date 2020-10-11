@@ -8,6 +8,8 @@ use super::yaml::ToYAML;
 #[derive(Copy, Clone)]
 pub enum Configuration {
     Airplane,
+    FlyingWing,
+    VTail,
 }
 
 impl FromStr for Configuration {
@@ -16,6 +18,8 @@ impl FromStr for Configuration {
     fn from_str(string: &str) -> Result<Self, ()> {
         match string {
             "airplane" => Ok(Self::Airplane),
+            "flying-wing" => Ok(Self::FlyingWing),
+            "v-tail" => Ok(Self::VTail),
             _ => Err(()),
         }
     }
@@ -25,6 +29,8 @@ impl Into<&str> for Configuration {
     fn into(self) -> &'static str {
         match self {
             Self::Airplane => "airplane",
+            Self::FlyingWing => "flying-wing",
+            Self::VTail => "v-tail",
         }
     }
 }
