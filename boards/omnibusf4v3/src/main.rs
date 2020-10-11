@@ -17,7 +17,7 @@ extern crate max7456;
 extern crate mpu6000;
 extern crate nb;
 #[macro_use]
-extern crate rs_flight;
+extern crate pro_flight;
 extern crate sbus_parser;
 extern crate stm32f4xx_hal;
 
@@ -47,7 +47,7 @@ use chips::{
     stm32f4::valid_memory_address,
 };
 use cortex_m_rt::ExceptionFrame;
-use rs_flight::{
+use pro_flight::{
     components::{
         altimeter::Altimeter,
         cli::{memory, CLI},

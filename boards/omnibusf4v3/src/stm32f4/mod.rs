@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use rs_flight::config::SerialConfig;
+use pro_flight::config::SerialConfig;
 use stm32f4xx_hal::prelude::*;
 use stm32f4xx_hal::serial::config::{Config, DmaConfig, Parity, StopBits, WordLength};
 

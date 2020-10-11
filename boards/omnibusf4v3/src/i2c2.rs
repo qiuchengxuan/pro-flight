@@ -4,8 +4,8 @@ use stm32f4xx_hal::i2c::{Error, I2c};
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::{prelude::*, stm32};
 
-use rs_flight::components::schedule::Schedulable;
-use rs_flight::drivers::magnetometer::qmc5883l;
+use pro_flight::components::schedule::Schedulable;
+use pro_flight::drivers::magnetometer::qmc5883l;
 
 type PB10 = gpiob::PB10<Input<Floating>>;
 type PB11 = gpiob::PB11<Input<Floating>>;

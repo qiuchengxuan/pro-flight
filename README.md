@@ -1,4 +1,4 @@
-rs-flight
+pro-flight
 =========
 
 Flight controller written in Rust, working in progress

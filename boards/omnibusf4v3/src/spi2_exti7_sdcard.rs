@@ -2,8 +2,8 @@ use core::mem::MaybeUninit;
 
 use embedded_hal::spi::MODE_3;
 use embedded_sdmmc::{Controller, SdMmcSpi, TimeSource, Timestamp};
-use rs_flight::drivers::sdcard::Sdcard;
-use rs_flight::sys::fs::{set_media, NoMedia, Schema};
+use pro_flight::drivers::sdcard::Sdcard;
+use pro_flight::sys::fs::{set_media, NoMedia, Schema};
 use stm32f4xx_hal::gpio::gpiob::{PB12, PB13, PB14, PB15, PB7};
 use stm32f4xx_hal::gpio::ExtiPin;
 use stm32f4xx_hal::gpio::{Alternate, Floating, Input, Output, PullUp, PushPull, AF5};

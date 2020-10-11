@@ -1,7 +1,7 @@
 use core::cmp::min;
 
-use rs_flight::config::Outputs;
-use rs_flight::drivers::pwm::PwmByIdentifier;
+use pro_flight::config::Outputs;
+use pro_flight::drivers::pwm::PwmByIdentifier;
 use stm32f4xx_hal::gpio::gpioa::{PA1, PA2, PA3, PA8};
 use stm32f4xx_hal::gpio::gpiob::{PB0, PB1};
 use stm32f4xx_hal::gpio::{Floating, Input};

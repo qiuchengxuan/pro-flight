@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::mem::MaybeUninit;
 
-use rs_flight::components::schedule::Schedulable;
+use pro_flight::components::schedule::Schedulable;
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::timer::{Event, Timer};

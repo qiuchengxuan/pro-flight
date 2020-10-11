@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
 
-use rs_flight::config::SerialConfig;
-use rs_flight::drivers::gnss::GNSS;
-use rs_flight::drivers::uart::Device;
+use pro_flight::config::SerialConfig;
+use pro_flight::drivers::gnss::GNSS;
+use pro_flight::drivers::uart::Device;
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::{Floating, Input};
 use stm32f4xx_hal::interrupt;

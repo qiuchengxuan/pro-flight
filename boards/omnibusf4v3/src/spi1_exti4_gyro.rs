@@ -4,7 +4,7 @@ use core::mem::MaybeUninit;
 use mpu6000::bus::{self, DelayNs, SpiBus};
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
-use rs_flight::drivers::mpu6000::{init as mpu6000_init, on_dma_receive};
+use pro_flight::drivers::mpu6000::{init as mpu6000_init, on_dma_receive};
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::gpioc;
 use stm32f4xx_hal::gpio::ExtiPin;

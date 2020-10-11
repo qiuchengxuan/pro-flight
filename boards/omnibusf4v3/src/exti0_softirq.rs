@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use rs_flight::components::event::{Notify, OnEvent};
+use pro_flight::components::event::{Notify, OnEvent};
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::stm32;
 

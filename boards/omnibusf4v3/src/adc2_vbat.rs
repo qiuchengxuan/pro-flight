@@ -9,10 +9,10 @@ use stm32f4xx_hal::gpio::Input;
 use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::stm32;
 
-use rs_flight::algorithm::lpf::LPF;
-use rs_flight::datastructures::data_source::u16_source::{U16Data, U16DataSource};
-use rs_flight::datastructures::data_source::DataWriter;
-use rs_flight::datastructures::measurement::battery::Battery;
+use pro_flight::algorithm::lpf::LPF;
+use pro_flight::datastructures::data_source::u16_source::{U16Data, U16DataSource};
+use pro_flight::datastructures::data_source::DataWriter;
+use pro_flight::datastructures::measurement::battery::Battery;
 
 const VOLTAGE_SCALE_X100: usize = 1100;
 const SAMPLE_SIZE: usize = 16;
