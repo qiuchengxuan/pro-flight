@@ -16,7 +16,7 @@ cortex-m = "0.6"
 cortex-m-rt = "0.6"
 crc = { version = "1.8", default-features = false }
 embedded-hal = "0.2"
-embedded-sdmmc = "0.3"
+embedded-sdmmc = { git = "https://github.com/qiuchengxuan/embedded-sdmmc-rs", branch = "master" }
 # prevent compile log module referenced in embedded-sdmmc
 log = { version = "0.4", features = ["max_level_off"] }
 mpu6000 = { git = "https://github.com/qiuchengxuan/mpu6000" }

@@ -78,21 +78,7 @@ pub fn init(
     let stub_rtc = StubRTC {};
     let controller = Controller::new(SdMmcSpi::new(spi2, cs), stub_rtc);
     let sdcard = Sdcard::new(controller);
-
-    let freq: stm32f4xx_hal::time::Hertz = 20.mhz().into();
-    let br = match clocks.pclk2().0 / freq.0 {
-        0 => unreachable!(),
-        1..=2 => 0b000,
-        3..=5 => 0b001,
-        6..=11 => 0b010,
-        12..=23 => 0b011,
-        24..=47 => 0b100,
-        48..=95 => 0b101,
-        96..=191 => 0b110,
-        _ => 0b011,
-    };
-    let spi2 = unsafe { &(*stm32::SPI2::ptr()) };
-    spi2.cr1.modify(|_, w| w.br().bits(br));
+    unsafe { &(*stm32::SPI2::ptr()) }.cr1.modify(|_, w| w.br().bits(0));
 
     int.clear_interrupt_pending_bit();
     cortex_m::peripheral::NVIC::unpend(stm32::Interrupt::EXTI9_5);
