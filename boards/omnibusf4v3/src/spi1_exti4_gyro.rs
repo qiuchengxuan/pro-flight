@@ -4,6 +4,7 @@ use core::mem::MaybeUninit;
 use mpu6000::bus::{self, DelayNs, SpiBus};
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
+use pro_flight::config;
 use pro_flight::drivers::mpu6000::{init as mpu6000_init, on_dma_receive};
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::gpioc;
@@ -64,7 +65,7 @@ unsafe fn DMA2_STREAM0() {
         dma2.lifcr.write(|w| w.bits(0x3D << 22 | 0x3D));
     });
 
-    on_dma_receive(core::mem::transmute(&DMA_BUFFER));
+    on_dma_receive(core::mem::transmute(&DMA_BUFFER), config::get().board.rotation);
     { &mut *CS.as_mut_ptr() }.set_high().ok();
 }
 

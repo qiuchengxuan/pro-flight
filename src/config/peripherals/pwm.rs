@@ -9,16 +9,14 @@ use crate::config::setter::{Error, Setter, Value};
 use crate::config::yaml::ToYAML;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Identifier {
-    PWM(u8),
-}
+pub struct Identifier(pub u8);
 
 impl FromStr for Identifier {
     type Err = ();
 
     fn from_str(name: &str) -> Result<Identifier, ()> {
         if name.starts_with("PWM") {
-            return Ok(Identifier::PWM(name[3..].parse::<u8>().map_err(|_| ())? - 1));
+            return Ok(Identifier(name[3..].parse::<u8>().map_err(|_| ())? - 1));
         }
         Err(())
     }
@@ -26,9 +24,7 @@ impl FromStr for Identifier {
 
 impl core::fmt::Display for Identifier {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match self {
-            Self::PWM(index) => write!(f, "PWM{}", index + 1),
-        }
+        write!(f, "PWM{}", self.0 + 1)
     }
 }
 
@@ -198,10 +194,7 @@ pub struct PWMs(pub LinearMap<Identifier, PWM, U8>);
 
 impl PWMs {
     pub fn get(&self, name: &str) -> Option<&PWM> {
-        match Identifier::from_str(name) {
-            Ok(id) => self.0.get(&id),
-            Err(_) => None,
-        }
+        Identifier::from_str(name).ok().map(|id| self.0.get(&id)).flatten()
     }
 
     pub fn len(&self) -> usize {

@@ -5,6 +5,8 @@ battery:
   min-cell-voltage: 3.3
   max-cell-voltage: 4.2
   warning-cell-voltage: 3.5
+board:
+  rotation: 270
 imu:
   accelerometer:
     bias:

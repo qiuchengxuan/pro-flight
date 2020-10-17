@@ -1,3 +1,5 @@
+use core::str::FromStr;
+
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
@@ -42,6 +44,46 @@ impl Default for HeadingOrCourse {
     }
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum Rotation {
+    NoRotation,
+    Degree90,
+    Degree180,
+    Degree270,
+}
+
+impl Default for Rotation {
+    fn default() -> Self {
+        Self::NoRotation
+    }
+}
+
+impl FromStr for Rotation {
+    type Err = ();
+
+    fn from_str(name: &str) -> Result<Rotation, ()> {
+        match name {
+            "0" => Ok(Rotation::NoRotation),
+            "90" => Ok(Rotation::Degree90),
+            "180" => Ok(Rotation::Degree180),
+            "270" => Ok(Rotation::Degree270),
+            _ => Err(()),
+        }
+    }
+}
+
+impl core::fmt::Display for Rotation {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let s = match self {
+            Self::NoRotation => "0",
+            Self::Degree90 => "90",
+            Self::Degree180 => "180",
+            Self::Degree270 => "270",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
 pub struct Axes {
     pub x: i32,
@@ -52,6 +94,17 @@ pub struct Axes {
 impl Axes {
     pub const MAX: Axes = Axes { x: i32::MAX, y: i32::MAX, z: i32::MAX };
     pub const MIN: Axes = Axes { x: i32::MIN, y: i32::MIN, z: i32::MIN };
+
+    pub fn rotate(self, rotation: Rotation) -> Self {
+        let (x, y, z) = (self.x, self.y, self.z);
+        let (x, y, z) = match rotation {
+            Rotation::NoRotation => (x, y, z),
+            Rotation::Degree90 => (y, x, z),
+            Rotation::Degree180 => (-x, -y, z),
+            Rotation::Degree270 => (-y, x, z),
+        };
+        Self { x, y, z }
+    }
 }
 
 impl core::ops::Add for Axes {
@@ -105,6 +158,10 @@ pub struct Measurement {
 impl Measurement {
     pub fn calibrated(self, axes: &Axes) -> Self {
         Self { axes: self.axes - axes, sensitive: self.sensitive }
+    }
+
+    pub fn rotate(self, rotation: Rotation) -> Self {
+        Self { axes: self.axes.rotate(rotation), sensitive: self.sensitive }
     }
 }
 

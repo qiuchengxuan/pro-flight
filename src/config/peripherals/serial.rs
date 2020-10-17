@@ -170,10 +170,7 @@ pub struct Serials(LinearMap<Identifier, Config, U8>);
 
 impl Serials {
     pub fn get(&self, name: &str) -> Option<&Config> {
-        match Identifier::from_str(name) {
-            Ok(id) => self.0.get(&id),
-            Err(_) => None,
-        }
+        Identifier::from_str(name).ok().map(|id| self.0.get(&id)).flatten()
     }
 
     pub fn len(&self) -> usize {

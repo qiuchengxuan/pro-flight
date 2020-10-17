@@ -1,5 +1,6 @@
 pub mod aircraft;
 pub mod battery;
+pub mod board;
 pub mod imu;
 pub mod osd;
 pub mod peripherals;
@@ -16,6 +17,7 @@ use crate::hal::io::Read;
 
 pub use aircraft::Aircraft;
 pub use battery::Battery;
+pub use board::Board;
 pub use imu::IMU;
 pub use osd::{Offset, Standard, OSD};
 pub use peripherals::pwm::{PWMs, Protocol, PWM};
@@ -84,6 +86,7 @@ impl ToYAML for Speedometer {
 pub struct Config {
     pub aircraft: Aircraft,
     pub battery: Battery,
+    pub board: Board,
     pub imu: IMU,
     pub osd: OSD,
     pub receiver: Receiver,
@@ -96,6 +99,7 @@ impl Setter for Config {
         match path.next().ok_or(Error::MalformedPath)? {
             "aircraft" => self.aircraft.set(path, value),
             "battery" => self.battery.set(path, value),
+            "board" => self.board.set(path, value),
             "imu" => self.imu.set(path, value),
             "osd" => self.osd.set(path, value),
             "receiver" => self.receiver.set(path, value),
@@ -115,6 +119,10 @@ impl ToYAML for Config {
         self.write_indent(indent, w)?;
         writeln!(w, "battery:")?;
         self.battery.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "board:")?;
+        self.board.write_to(indent + 1, w)?;
 
         self.write_indent(indent, w)?;
         writeln!(w, "imu:")?;

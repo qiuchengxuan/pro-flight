@@ -5,7 +5,7 @@ use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
 
 use crate::config;
 use crate::datastructures::data_source::DataWriter;
-use crate::datastructures::measurement::{Acceleration, Axes, Measurement};
+use crate::datastructures::measurement::{Acceleration, Axes, Measurement, Rotation};
 use crate::drivers::{accelerometer, gyroscope};
 use crate::sys::timer::SysTimer;
 
@@ -30,15 +30,17 @@ impl Into<Measurement> for mpu6000::Gyro {
     }
 }
 
-pub unsafe fn on_dma_receive(dma_buffer: &[u8; 16]) {
+pub unsafe fn on_dma_receive(dma_buffer: &[u8; 16], rotation: Rotation) {
     let buf: &[i16; 8] = core::mem::transmute(dma_buffer);
     let acceleration: mpu6000::Acceleration = buf[1..4].into();
     let gyro: mpu6000::Gyro = buf[5..].into();
     if let Some(ref mut accelerometer) = accelerometer::ACCELEROMETER {
-        accelerometer.write(Acceleration(acceleration.into()));
+        let acceleration: Measurement = acceleration.into();
+        accelerometer.write(Acceleration(acceleration.rotate(rotation)));
     }
     if let Some(ref mut gyroscope) = gyroscope::GYROSCOPE {
-        gyroscope.write(gyro.into());
+        let gyro: Measurement = gyro.into();
+        gyroscope.write(gyro.rotate(rotation));
     }
 }
 
