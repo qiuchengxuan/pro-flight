@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import time
 from pathlib import Path
@@ -22,10 +23,14 @@ def main():
     bias = get_bias(cli, 'magnetometer')
     sensitive = get_sensitive(cli, 'magnetism')
     while True:
-        raw = read_sensor(cli, 'magnetism') - bias
+        raw = read_sensor(cli, 'magnetism')
+        calibrated = raw - bias
         vector = raw / sensitive
         normalized = vector / numpy.linalg.norm(vector)
-        print('raw %s, normalized: %s' % (raw, normalized) , end='\r')
+        os.system('clear')
+        print('raw %s' % raw)
+        print('calibrated %s' % calibrated)
+        print('normalized %s' % normalized)
         time.sleep(0.02)
     cli.close()
 

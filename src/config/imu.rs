@@ -44,6 +44,7 @@ impl ToYAML for Accelerometer {
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Magnetometer {
     pub bias: Axes,
+    pub gain: Gain,
     pub declination: IntegerDecimal,
 }
 
@@ -51,6 +52,7 @@ impl Setter for Magnetometer {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         match path.next().ok_or(Error::MalformedPath)? {
             "bias" => return self.bias.set(path, value),
+            "gain" => return self.gain.set(path, value),
             "declination" => self.declination = value.parse()?.unwrap_or_default(),
             _ => return Err(Error::MalformedPath),
         }
@@ -63,6 +65,10 @@ impl ToYAML for Magnetometer {
         self.write_indent(indent, w)?;
         writeln!(w, "bias:")?;
         self.bias.write_to(indent + 1, w)?;
+
+        self.write_indent(indent, w)?;
+        writeln!(w, "gain:")?;
+        self.gain.write_to(indent + 1, w)?;
 
         self.write_indent(indent, w)?;
         writeln!(w, "declination: {}", self.declination)

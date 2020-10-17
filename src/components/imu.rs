@@ -27,6 +27,7 @@ pub struct IMU<A, G> {
     accel_gain: Axes,
     gyro_bias: Axes,
     magnetometer_bias: Axes,
+    magnetometer_gain: Axes,
     calibration_loop: u16,
     counter: usize,
     calibrated: bool,
@@ -53,6 +54,7 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
             accel_gain: config.accelerometer.gain.into(),
             gyro_bias: Default::default(),
             magnetometer_bias: config.magnetometer.bias.into(),
+            magnetometer_gain: config.magnetometer.gain.into(),
             calibration_loop: 50,
             counter: 0,
             calibrated: false,
@@ -107,8 +109,8 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> IMU<A, G> 
     }
 
     pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro, heading: Option<Heading>) {
-        let acceleration = accel.calibrated(&self.accel_bias, &self.accel_gain);
-        let raw_gyro = gyro.calibrated(&self.gyro_bias);
+        let acceleration = Acceleration(accel.0.zero(&self.accel_bias).gain(&self.accel_gain));
+        let raw_gyro = gyro.zero(&self.gyro_bias);
 
         let acceleration: Vector3<f32> = acceleration.0.into();
         let mut gyro: Vector3<f32> = raw_gyro.into();
@@ -133,7 +135,8 @@ impl<A: OptionData<Acceleration> + WithCapacity, G: OptionData<Gyro>> Schedulabl
         }
         let rate = self.rate();
         let heading = if let Some(mag) = self.magnetometer.as_mut() {
-            Some(Heading::Magnetism(mag.read().calibrated(&self.magnetometer_bias).into()))
+            let (bias, gain) = (&self.magnetometer_bias, &self.magnetometer_gain);
+            Some(Heading::Magnetism(mag.read().zero(bias).gain(gain).into()))
         } else if let Some(gnss) = self.gnss.as_mut() {
             gnss.read(rate).map(|h| Heading::Heading(h.or_course().into()))
         } else {

@@ -12,7 +12,7 @@ bmp280-core = "0.1"
 crc = { version = "1.8", default-features = false }
 embedded-dma = "0.1"
 embedded-hal = "0.2"
-embedded-sdmmc = { git = "https://github.com/qiuchengxuan/embedded-sdmmc-rs", branch = "develop" }
+embedded-sdmmc = { git = "https://github.com/qiuchengxuan/embedded-sdmmc-rs", branch = "master" }
 enum-map = { version = "0.6", default-features = false }
 git-version = "0.3.4"
 heapless = "0.5"

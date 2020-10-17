@@ -175,8 +175,12 @@ pub struct Measurement {
 }
 
 impl Measurement {
-    pub fn calibrated(self, axes: &Axes) -> Self {
+    pub fn zero(self, axes: &Axes) -> Self {
         Self { axes: self.axes - axes, sensitive: self.sensitive }
+    }
+
+    pub fn gain(self, gain: &Axes) -> Self {
+        return Self { axes: self.axes * gain / self.sensitive, sensitive: self.sensitive };
     }
 
     pub fn rotate(self, rotation: Rotation) -> Self {
@@ -214,13 +218,6 @@ pub struct Acceleration(pub Measurement);
 impl sval::Value for Acceleration {
     fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
         self.0.stream(stream)
-    }
-}
-
-impl Acceleration {
-    pub fn calibrated(self, zero: &Axes, gain: &Axes) -> Self {
-        let axes = (self.0.axes - zero) * gain / self.0.sensitive;
-        return Self(Measurement { axes, sensitive: self.0.sensitive });
     }
 }
 

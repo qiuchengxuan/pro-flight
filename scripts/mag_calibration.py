@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy
 from cli import CLI
-from telemetry import read_sensor
+from telemetry import get_sensitive, read_sensor
 
 
 def main():
@@ -20,9 +20,10 @@ def main():
 
     cli = CLI(path)
 
+    sensitive = get_sensitive(cli, 'magnetism')
+    min_value = numpy.array([sys.maxsize, sys.maxsize, sys.maxsize])
+    max_value = -min_value
     try:
-        min_value = numpy.array([sys.maxsize, sys.maxsize, sys.maxsize])
-        max_value = -min_value
         for _ in range(30 * 50):
             data = read_sensor(cli, 'magnetism')
             for axis in range(3):
@@ -30,13 +31,15 @@ def main():
                 max_value[axis] = max(max_value[axis], data[axis])
             print('min: %s, max: %s' % (str(min_value), str(max_value)), end='\r')
             time.sleep(0.02)
-        offset = [(min_value[axis] + max_value[axis]) // 2 for axis in range(3)]
-        print('')
-        print('offset: ', offset)
-    except EOFError:
+    except (EOFError, KeyboardInterrupt):
         pass
-
     cli.close()
+    bias = ((min_value + max_value) / 2).astype(int)
+    interval = max_value - min_value
+    reference = max(interval[0], interval[1], interval[2])
+    gain = [sensitive // (interval[axis] / reference) for axis in range(3)]
+    print('')
+    print('bias: %s, gain: %s' % (bias, gain))
 
 
 if __name__ == '__main__':

@@ -23,6 +23,10 @@ imu:
       x: -78
       y: 289
       z: -33
+    gain:
+      x: 3058
+      y: 3000
+      z: 3443
     declination: 5.8
   mahony:
     kp: 0.25

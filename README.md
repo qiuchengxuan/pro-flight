@@ -30,6 +30,7 @@ Progress
 * WIP
   - [ ] Stabilizer
   - [ ] DMA based I2C
+  - [ ] DMA buffer descriptor
 * Future
   - [ ] INS calibration
   - [ ] Replace JSON with Mavlink
