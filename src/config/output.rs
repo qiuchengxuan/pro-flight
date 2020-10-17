@@ -58,8 +58,7 @@ impl Default for Motor {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ServoType {
-    AileronLeft,
-    AileronRight,
+    Aileron,
     Elevator,
     Rudder,
     ElevonLeft,
@@ -69,8 +68,7 @@ pub enum ServoType {
 impl Into<&str> for ServoType {
     fn into(self) -> &'static str {
         match self {
-            Self::AileronLeft => "aileron-left",
-            Self::AileronRight => "aileron-right",
+            Self::Aileron => "aileron",
             Self::Elevator => "elevator",
             Self::Rudder => "rudder",
             Self::ElevonLeft => "elevon-left",
@@ -119,8 +117,7 @@ impl Setter for Output {
             let output_type = value.0.ok_or(Error::ExpectValue)?;
             *self = match output_type {
                 "motor" => Self::Motor(Motor::default()),
-                "aileron-left" => Self::Servo(Servo::of(ServoType::AileronLeft)),
-                "aileron-right" => Self::Servo(Servo::of(ServoType::AileronRight)),
+                "aileron" => Self::Servo(Servo::of(ServoType::Aileron)),
                 "elevator" => Self::Servo(Servo::of(ServoType::Elevator)),
                 "rudder" => Self::Servo(Servo::of(ServoType::Rudder)),
                 "elevon-left" => Self::Servo(Servo::of(ServoType::ElevonLeft)),

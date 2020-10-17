@@ -64,17 +64,10 @@ outputs:
     protocol: PWM
     rate: 400
   PWM2:
-    type: motor
-    index: 1
-    protocol: PWM
-    rate: 400
+    type: aileron
   PWM3:
     type: elevator
   PWM4:
-    type: aileron-right
-  PWM5:
-    type: aileron-left
-  PWM6:
     type: rudder
     min-angle: -80
     max-angle: 80

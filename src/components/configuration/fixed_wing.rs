@@ -36,8 +36,7 @@ impl<PWMS: PwmByIdentifier, S: StaticData<ControlInput>> OnEvent for FixedWing<S
                     Output::Motor(_) => to_motor_pwm_duty(max_duty, output.rate(), input.throttle),
                     Output::Servo(servo) => {
                         let axis = match servo.servo_type {
-                            ServoType::AileronLeft => -input.roll,
-                            ServoType::AileronRight => input.roll,
+                            ServoType::Aileron => input.roll,
                             ServoType::Elevator => input.pitch,
                             ServoType::Rudder => input.yaw,
                             ServoType::ElevonLeft => left,

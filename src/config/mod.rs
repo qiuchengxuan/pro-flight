@@ -207,26 +207,4 @@ mod test {
         assert_eq!(yaml_string.trim(), buf.to_string().trim());
         Ok(())
     }
-
-    #[test]
-    fn test_set_config() -> std::io::Result<()> {
-        use std::fs::File;
-        use std::io::Read;
-        use std::string::String;
-
-        use super::output::{Output, Servo, ServoType};
-        use super::setter::{Setter, Value};
-        use super::yaml::YamlParser;
-        use super::Config;
-
-        let mut file = File::open("sample.yml")?;
-        let mut yaml_string = String::new();
-        file.read_to_string(&mut yaml_string)?;
-        let mut config: Config = YamlParser::new(yaml_string.as_str()).parse();
-
-        config.set(&mut "outputs.PWM5.min-angle".split('.'), Value::of("-80")).unwrap();
-        let expected = Output::Servo(Servo::new(ServoType::AileronLeft, -80, 90, true));
-        assert_eq!(config.outputs.get("PWM5").unwrap(), &expected);
-        Ok(())
-    }
 }
