@@ -209,7 +209,7 @@ fn main() -> ! {
     let mut gnss: Option<&'static mut Device> = None;
     let mut receiver: Option<&'static mut Device> = None;
 
-    if let Some(config) = config.serials.get("USART1") {
+    if let Some(config) = config.peripherals.serials.get("USART1") {
         info!("Initialize USART1");
         let pins = (gpio_a.pa9, gpio_a.pa10);
         if let Some(device) = usart1::init(peripherals.USART1, pins, &config, clocks) {
@@ -226,7 +226,7 @@ fn main() -> ! {
         Err(_) => None,
     };
 
-    if let Some(serial_config) = config.serials.get("USART6") {
+    if let Some(serial_config) = config.peripherals.serials.get("USART6") {
         info!("Initialize USART6");
         if let SerialConfig::SBUS(sbus_config) = serial_config {
             if sbus_config.rx_inverted {
@@ -255,7 +255,7 @@ fn main() -> ! {
     info!("Initialize PWMs");
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    let pwms = pwm::init(tims, pins, clocks, &config.outputs);
+    let pwms = pwm::init(tims, pins, clocks, &config.peripherals.pwms);
     let mixer = ControlMixer::new(control_input, SERVO_SCHEDULE_RATE, NoDataSource::new());
     let control_surface: Box<dyn OnEvent> = match config.aircraft.configuration {
         Configuration::Airplane | Configuration::FlyingWing | Configuration::VTail => {

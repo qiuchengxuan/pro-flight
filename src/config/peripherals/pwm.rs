@@ -5,8 +5,8 @@ use core::str::{FromStr, Split};
 use heapless::consts::U8;
 use heapless::LinearMap;
 
-use super::setter::{Error, Setter, Value};
-use super::yaml::ToYAML;
+use crate::config::setter::{Error, Setter, Value};
+use crate::config::yaml::ToYAML;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Identifier {
@@ -96,12 +96,12 @@ impl Servo {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Output {
+pub enum PWM {
     Motor(Motor),
     Servo(Servo),
 }
 
-impl Output {
+impl PWM {
     pub fn rate(self) -> u16 {
         match self {
             Self::Motor(motor) => motor.rate,
@@ -110,7 +110,7 @@ impl Output {
     }
 }
 
-impl Setter for Output {
+impl Setter for PWM {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
         if key == "type" {
@@ -154,8 +154,8 @@ impl Setter for Output {
     }
 }
 
-impl ToYAML for Output {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+impl ToYAML for PWM {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         match self {
             Self::Motor(motor) => {
                 self.write_indent(indent, w)?;
@@ -194,10 +194,10 @@ impl ToYAML for Output {
 }
 
 #[derive(Clone, Default)]
-pub struct Outputs(pub LinearMap<Identifier, Output, U8>);
+pub struct PWMs(pub LinearMap<Identifier, PWM, U8>);
 
-impl Outputs {
-    pub fn get(&self, name: &str) -> Option<&Output> {
+impl PWMs {
+    pub fn get(&self, name: &str) -> Option<&PWM> {
         match Identifier::from_str(name) {
             Ok(id) => self.0.get(&id),
             Err(_) => None,
@@ -209,8 +209,8 @@ impl Outputs {
     }
 }
 
-impl ToYAML for Outputs {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+impl ToYAML for PWMs {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         for (id, config) in self.0.iter() {
             self.write_indent(indent, w)?;
             writeln!(w, "{}:", id)?;
@@ -220,7 +220,7 @@ impl ToYAML for Outputs {
     }
 }
 
-impl Setter for Outputs {
+impl Setter for PWMs {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let id_string = path.next().ok_or(Error::MalformedPath)?;
         if !id_string.starts_with("PWM") {
@@ -230,7 +230,7 @@ impl Setter for Outputs {
         if self.0.contains_key(&id) {
             return self.0[&id].set(path, value);
         }
-        let mut config = Output::Motor(Motor::default());
+        let mut config = PWM::Motor(Motor::default());
         config.set(path, value)?;
         self.0.insert(id, config).ok();
         Ok(())

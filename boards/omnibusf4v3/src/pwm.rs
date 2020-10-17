@@ -1,6 +1,6 @@
 use core::cmp::min;
 
-use pro_flight::config::Outputs;
+use pro_flight::config::peripherals::pwm::PWMs as Config;
 use pro_flight::drivers::pwm::PwmByIdentifier;
 use stm32f4xx_hal::gpio::gpioa::{PA1, PA2, PA3, PA8};
 use stm32f4xx_hal::gpio::gpiob::{PB0, PB1};
@@ -13,7 +13,7 @@ type Default = Input<Floating>;
 type PWMs = (stm32::TIM1, stm32::TIM2, stm32::TIM3, stm32::TIM5);
 type PINs = (PB0<Default>, PB1<Default>, PA2<Default>, PA3<Default>, PA1<Default>, PA8<Default>);
 
-pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Outputs) -> impl PwmByIdentifier {
+pub fn init(pwms: PWMs, pins: PINs, clocks: Clocks, cfg: &Config) -> impl PwmByIdentifier {
     let rate1 = cfg.get("PWM1").map(|o| o.rate()).unwrap_or(50) as u32;
     let rate2 = cfg.get("PWM2").map(|o| o.rate()).unwrap_or(50) as u32;
 

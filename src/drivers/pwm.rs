@@ -1,6 +1,6 @@
 use embedded_hal::PwmPin;
 
-use crate::config::output::Identifier;
+use crate::config::peripherals::pwm::Identifier;
 
 pub trait PwmByIdentifier {
     fn with(&mut self, identifier: Identifier, f: impl FnMut(&mut dyn PwmPin<Duty = u16>));

@@ -27,7 +27,7 @@ impl Setter for Accelerometer {
 }
 
 impl ToYAML for Accelerometer {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "bias:")?;
         self.bias.write_to(indent + 1, w)?;
@@ -59,7 +59,7 @@ impl Setter for Magnetometer {
 }
 
 impl ToYAML for Magnetometer {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "bias:")?;
         self.bias.write_to(indent + 1, w)?;
@@ -96,7 +96,7 @@ impl Setter for Mahony {
 }
 
 impl ToYAML for Mahony {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "kp: {}", self.kp)?;
 
@@ -124,7 +124,7 @@ impl Setter for IMU {
 }
 
 impl ToYAML for IMU {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "accelerometer:")?;
         self.accelerometer.write_to(indent + 1, w)?;

@@ -2,9 +2,8 @@ pub mod aircraft;
 pub mod battery;
 pub mod imu;
 pub mod osd;
-pub mod output;
+pub mod peripherals;
 pub mod receiver;
-pub mod serial;
 pub mod setter;
 pub mod yaml;
 
@@ -19,9 +18,10 @@ pub use aircraft::Aircraft;
 pub use battery::Battery;
 pub use imu::IMU;
 pub use osd::{Offset, Standard, OSD};
-pub use output::{Output, Outputs, Protocol};
+pub use peripherals::pwm::{PWMs, Protocol, PWM};
+pub use peripherals::serial::{Config as SerialConfig, Serials};
+pub use peripherals::Peripherals;
 pub use receiver::Receiver;
-pub use serial::{Config as SerialConfig, Serials};
 use setter::{Error, Setter, Value};
 use yaml::{ToYAML, YamlParser};
 
@@ -40,7 +40,7 @@ impl Setter for Axes {
 }
 
 impl ToYAML for Axes {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "x: {}", self.x)?;
         self.write_indent(indent, w)?;
@@ -74,7 +74,7 @@ impl Setter for Speedometer {
 }
 
 impl ToYAML for Speedometer {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "kp: {}", self.kp)
     }
@@ -87,9 +87,8 @@ pub struct Config {
     pub imu: IMU,
     pub osd: OSD,
     pub receiver: Receiver,
-    pub serials: Serials,
     pub speedometer: Speedometer,
-    pub outputs: Outputs,
+    pub peripherals: Peripherals,
 }
 
 impl Setter for Config {
@@ -100,16 +99,15 @@ impl Setter for Config {
             "imu" => self.imu.set(path, value),
             "osd" => self.osd.set(path, value),
             "receiver" => self.receiver.set(path, value),
-            "serials" => self.serials.set(path, value),
             "speedometer" => self.speedometer.set(path, value),
-            "outputs" => self.outputs.set(path, value),
+            "peripherals" => self.peripherals.set(path, value),
             _ => Err(Error::MalformedPath),
         }
     }
 }
 
 impl ToYAML for Config {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "aircraft:")?;
         self.aircraft.write_to(indent + 1, w)?;
@@ -130,25 +128,13 @@ impl ToYAML for Config {
         writeln!(w, "receiver:")?;
         self.receiver.write_to(indent + 1, w)?;
 
-        if self.serials.len() > 0 {
-            self.write_indent(indent, w)?;
-            writeln!(w, "serials:")?;
-            self.serials.write_to(indent + 1, w)?;
-        } else {
-            self.write_indent(indent, w)?;
-            writeln!(w, "serials: []")?;
-        }
-
         self.write_indent(indent, w)?;
         writeln!(w, "speedometer:")?;
         self.speedometer.write_to(indent + 1, w)?;
 
-        self.write_indent(indent, w)?;
-        if self.outputs.len() > 0 {
-            writeln!(w, "outputs:")?;
-            self.outputs.write_to(indent + 1, w)?;
-        } else {
-            writeln!(w, "outputs: null")?;
+        if self.peripherals.any() {
+            writeln!(w, "peripherals:")?;
+            self.peripherals.write_to(indent + 1, w)?;
         }
         Ok(())
     }

@@ -49,7 +49,7 @@ impl Setter for Battery {
 }
 
 impl ToYAML for Battery {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "cells: {}", self.cells)?;
         self.write_indent(indent, w)?;

@@ -131,9 +131,9 @@ impl<'a> YamlParser<'a> {
 }
 
 pub trait ToYAML {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> Result;
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> Result;
 
-    fn write_indent<W: Write>(&self, indent: usize, w: &mut W) -> Result {
+    fn write_indent(&self, indent: usize, w: &mut impl Write) -> Result {
         write!(w, "{:indent$}", "", indent = indent * 2 as usize)
     }
 }

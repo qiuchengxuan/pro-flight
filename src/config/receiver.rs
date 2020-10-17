@@ -47,7 +47,7 @@ impl Setter for Inputs {
 }
 
 impl ToYAML for Inputs {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         for (input_type, config) in self.0.iter() {
             self.write_indent(indent, w)?;
             writeln!(w, "{}:", input_type)?;
@@ -68,7 +68,7 @@ pub struct Receiver {
 }
 
 impl ToYAML for Receiver {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "inputs:")?;
         self.inputs.write_to(indent + 1, w)

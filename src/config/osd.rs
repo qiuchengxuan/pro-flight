@@ -68,7 +68,7 @@ impl Setter for Offset {
 }
 
 impl ToYAML for Offset {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "horizental: {}", self.horizental)?;
         self.write_indent(indent, w)?;
@@ -116,7 +116,7 @@ impl Setter for OSD {
 }
 
 impl ToYAML for OSD {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "aspect-ratio: '{}'", self.aspect_ratio)?;
 

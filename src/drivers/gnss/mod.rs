@@ -1,7 +1,7 @@
 pub mod nmea;
 pub mod ubx;
 
-use crate::config::serial::GNSSProtocol;
+use crate::config::peripherals::serial::GNSSProtocol;
 use crate::datastructures::coordinate::Position;
 use crate::datastructures::data_source::singular::SingularDataSource;
 use crate::datastructures::data_source::u16_source::U16DataSource;

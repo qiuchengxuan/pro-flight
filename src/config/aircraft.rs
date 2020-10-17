@@ -59,7 +59,7 @@ impl Setter for Aircraft {
 }
 
 impl ToYAML for Aircraft {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         let configuration: &str = self.configuration.into();
         writeln!(w, "configuration: {}", configuration)

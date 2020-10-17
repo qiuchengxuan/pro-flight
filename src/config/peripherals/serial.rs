@@ -4,8 +4,8 @@ use core::str::{FromStr, Split};
 use heapless::consts::U8;
 use heapless::LinearMap;
 
-use super::setter::{Error, Setter, Value};
-use super::yaml::ToYAML;
+use crate::config::setter::{Error, Setter, Value};
+use crate::config::yaml::ToYAML;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Identifier {
@@ -142,7 +142,7 @@ impl Setter for Config {
 }
 
 impl ToYAML for Config {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         match self {
             Self::GNSS(gnss) => {
@@ -196,7 +196,7 @@ impl Setter for Serials {
 }
 
 impl ToYAML for Serials {
-    fn write_to<W: Write>(&self, indent: usize, w: &mut W) -> core::fmt::Result {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         for (&id, config) in self.0.iter() {
             if id.into() {
                 self.write_indent(indent, w)?;
