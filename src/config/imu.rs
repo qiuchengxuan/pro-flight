@@ -2,15 +2,15 @@ use core::fmt::Write;
 use core::str::Split;
 
 use crate::datastructures::decimal::IntegerDecimal;
-use crate::datastructures::measurement::Axes;
+use crate::datastructures::measurement::{Axes, Gain};
 
 use super::setter::{Error, Setter, Value};
 use super::yaml::ToYAML;
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Accelerometer {
     pub bias: Axes,
-    pub gain: Axes,
+    pub gain: Gain,
     pub sensitive: IntegerDecimal,
 }
 

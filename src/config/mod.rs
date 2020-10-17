@@ -12,7 +12,7 @@ use core::fmt::Write;
 use core::str::Split;
 
 use crate::datastructures::decimal::IntegerDecimal;
-use crate::datastructures::measurement::Axes;
+use crate::datastructures::measurement::{Axes, Gain};
 use crate::hal::io::Read;
 
 pub use aircraft::Aircraft;
@@ -49,6 +49,27 @@ impl ToYAML for Axes {
         writeln!(w, "y: {}", self.y)?;
         self.write_indent(indent, w)?;
         writeln!(w, "z: {}", self.z)
+    }
+}
+
+impl Setter for Gain {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let key = path.next().ok_or(Error::MalformedPath)?;
+        let value = value.parse()?.unwrap_or_default();
+        match key {
+            "x" => self.x = value,
+            "y" => self.y = value,
+            "z" => self.z = value,
+            _ => return Err(Error::MalformedPath),
+        }
+        Ok(())
+    }
+}
+
+impl ToYAML for Gain {
+    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
+        let axes: Axes = (*self).into();
+        axes.write_to(indent, w)
     }
 }
 

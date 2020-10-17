@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import sys
-import time
 from pathlib import Path
+import time
 
-import numpy
+
 from cli import CLI
 from telemetry import read_sensor
 
@@ -21,16 +21,16 @@ def main():
     cli = CLI(path)
 
     try:
-        min_value = numpy.array([sys.maxsize, sys.maxsize, sys.maxsize])
-        max_value = -min_value
+        _min = [0, 0, 0]
+        _max = [0, 0, 0]
         for _ in range(30 * 50):
             data = read_sensor(cli, 'magnetism')
             for axis in range(3):
-                min_value[axis] = min(min_value[axis], data[axis])
-                max_value[axis] = max(max_value[axis], data[axis])
-            print('min: %s, max: %s' % (str(min_value), str(max_value)), end='\r')
+                _min[axis] = min(_min[axis], data[axis])
+                _max[axis] = max(_max[axis], data[axis])
+            print('min: %s, max: %s' % (str(_min), str(_max)), end='\r')
             time.sleep(0.02)
-        offset = [(min_value[axis] + max_value[axis]) // 2 for axis in range(3)]
+        offset = [(_min[axis] + _max[axis]) // 2 for axis in range(3)]
         print('')
         print('offset: ', offset)
     except EOFError:

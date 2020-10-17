@@ -149,6 +149,25 @@ impl PartialOrd for Axes {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct Gain {
+    pub x: u16,
+    pub y: u16,
+    pub z: u16,
+}
+
+impl Default for Gain {
+    fn default() -> Self {
+        Self { x: u16::MAX / 2, y: u16::MAX / 2, z: u16::MAX / 2 }
+    }
+}
+
+impl Into<Axes> for Gain {
+    fn into(self) -> Axes {
+        Axes { x: self.x as i32, y: self.y as i32, z: self.z as i32 }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Value)]
 pub struct Measurement {
     pub axes: Axes,
