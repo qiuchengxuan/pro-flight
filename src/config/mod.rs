@@ -105,6 +105,7 @@ impl ToYAML for Speedometer {
 
 #[derive(Default, Clone)]
 pub struct Config {
+    version: u8,
     pub aircraft: Aircraft,
     pub battery: Battery,
     pub board: Board,
@@ -115,8 +116,15 @@ pub struct Config {
     pub peripherals: Peripherals,
 }
 
+impl Config {
+    pub fn version(&self) -> u8 {
+        self.version
+    }
+}
+
 impl Setter for Config {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        self.version += 1;
         match path.next().ok_or(Error::MalformedPath)? {
             "aircraft" => self.aircraft.set(path, value),
             "battery" => self.battery.set(path, value),
@@ -194,7 +202,8 @@ pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     get()
 }
 
-pub fn replace(config: Config) {
+pub fn replace(mut config: Config) {
+    config.version += 1;
     unsafe { CONFIG = Some(config) }
 }
 

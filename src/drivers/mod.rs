@@ -5,7 +5,6 @@ pub mod gyroscope;
 pub mod magnetometer;
 pub mod max7456;
 pub mod mpu6000;
-pub mod pwm;
 pub mod sbus;
 pub mod sdcard;
 pub mod serial;

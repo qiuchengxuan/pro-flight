@@ -246,6 +246,7 @@ fn main() -> ! {
     }
 
     let mut led = gpio_b.pb5.into_push_pull_output();
+    led.set_low().ok();
 
     let mut control_input: Box<dyn AgingStaticData<ControlInput>> = Box::new(NoDataSource::new());
     if let Some(Device::SBUS(ref mut sbus)) = receiver {
@@ -341,10 +342,17 @@ fn main() -> ! {
 
     let mut cli = CLI::new(telemetry_source, reboot, bootloader, free);
     let mut timer = SysTimer::new();
+    let mut led_on = false;
+    led.set_high().ok();
     loop {
         if timer.wait().is_ok() {
-            timer.start(Duration::from_millis(100));
+            if led_on {
+                timer.start(Duration::from_millis(980));
+            } else {
+                timer.start(Duration::from_millis(20));
+            }
             led.toggle().ok();
+            led_on = !led_on;
         }
 
         if !device.poll(&mut [&mut serial.0]) {
