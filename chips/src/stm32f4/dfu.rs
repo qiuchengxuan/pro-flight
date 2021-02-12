@@ -12,9 +12,7 @@ impl Dfu {
         unsafe {
             peripherals.SYSCFG.memrm.modify(|_, w| w.mem_mode().bits(1));
             cortex_m::interrupt::disable();
-            cortex_m::register::msp::write(0x1FFF0000);
-            let reset_handler: fn() -> ! = core::mem::transmute(0x1FFF0004);
-            reset_handler()
+            cortex_m::asm::bootstrap(0x1FFF0000 as *const u32, 0x1FFF0004 as *const u32)
         }
     }
 

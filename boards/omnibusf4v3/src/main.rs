@@ -159,8 +159,10 @@ fn main() -> ! {
     let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
     let (mut serial, mut device) = usb_serial::init(&allocator);
 
+    let mut syscfg = peripherals.SYSCFG.constrain();
+
     let mut int = gpio_b.pb7.into_pull_up_input();
-    int.make_interrupt_source(&mut peripherals.SYSCFG);
+    int.make_interrupt_source(&mut syscfg);
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::RISING_FALLING);
     spi2_exti7_sdcard::init(
@@ -190,7 +192,7 @@ fn main() -> ! {
 
     info!("Initialize MPU6000");
     let mut int = gpio_c.pc4.into_pull_up_input();
-    int.make_interrupt_source(&mut peripherals.SYSCFG);
+    int.make_interrupt_source(&mut syscfg);
     int.enable_interrupt(&mut peripherals.EXTI);
     int.trigger_on_edge(&mut peripherals.EXTI, Edge::FALLING);
     spi1_exti4_gyro::init(
