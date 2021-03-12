@@ -5,7 +5,7 @@ pub use drone_stm32_map::thr::*;
 
 use drone_cortexm::thr;
 
-thr! {
+thr::nvic! {
     /// The thread data.
     thread => pub Thr {};
 
@@ -33,6 +33,8 @@ thr! {
             35: pub spi1;
             36: pub spi2;
             51: pub spi3;
+            56: pub dma2_stream0;
+            59: pub dma2_stream3;
         }
     };
 }

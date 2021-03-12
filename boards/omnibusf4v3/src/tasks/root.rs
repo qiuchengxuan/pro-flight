@@ -5,6 +5,7 @@ use core::mem::MaybeUninit;
 use chips::stm32f4::{
     clock,
     dfu::Dfu,
+    dma::{RxDMA, TRxDMA, TxDMA},
     flash::{Flash, Sector},
     rtc,
     spi::BaudrateControl,
@@ -13,7 +14,11 @@ use chips::stm32f4::{
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
-    flash::periph_flash, rtc::periph_rtc, spi::periph_spi1, sys_tick::periph_sys_tick,
+    dma::{periph_dma2_ch0, periph_dma2_ch3},
+    flash::periph_flash,
+    rtc::periph_rtc,
+    spi::periph_spi1,
+    sys_tick::periph_sys_tick,
 };
 use futures::prelude::*;
 use pro_flight::{
@@ -56,6 +61,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     thread.rcc.enable_int();
     let rcc_cir = reg.rcc_cir.into_copy();
 
+    reg.rcc_ahb1enr.modify(|r| r.set_dma2en());
     reg.rcc_apb1enr.pwren.set_bit();
     reg.rcc_apb2enr.modify(|r| r.set_spi1en());
 
@@ -94,8 +100,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
     let spi1 = Spi1::new(periph_spi1!(reg), pins, thread.spi_1, baudrate, mpu6000::SPI_MODE);
-    into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    mpu6000::init(spi1, gpio_a.pa4.into_push_pull_output(), thread.exti_4);
+    let pc4 = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
+    let tx = TxDMA::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3);
+    let rx = RxDMA::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0);
+    mpu6000::init(spi1, gpio_a.pa4.into_push_pull_output(), pc4, TRxDMA { tx, rx }, thread.exti_4);
 
     let mut commands = [
         Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),

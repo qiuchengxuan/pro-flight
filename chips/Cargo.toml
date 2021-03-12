@@ -25,7 +25,7 @@ optional = true
 
 [dependencies.drone-stm32-map]
 path = "../../../../src/drone-os/drone-stm32-map"
-features = ["exti", "flash", "rtc", "spi"]
+features = ["dma", "exti", "flash", "rtc", "spi"]
 optional = true
 
 [features]

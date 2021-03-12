@@ -31,10 +31,10 @@ pub struct NVRAM<F> {
 impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
     pub fn new(mut flash: F, sectors: [&'static mut [u32]; 2]) -> Result<Self, E> {
         if sectors[0][0] != ACTIVE && sectors[0][0] != EMPTY {
-            flash.erase(&sectors[0][0] as *const _ as usize)?;
+            flash.erase(sectors[0].as_ptr() as *const _ as usize)?;
         }
         if sectors[1][0] != ACTIVE && sectors[1][0] != EMPTY {
-            flash.erase(&sectors[1][0] as *const _ as usize)?;
+            flash.erase(sectors[1].as_ptr() as *const _ as usize)?;
         }
         let active_sector = match (sectors[0][0], sectors[1][0]) {
             (ACTIVE, ACTIVE) => {
@@ -93,8 +93,9 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
     }
 
     pub fn reset(&mut self) -> Result<(), E> {
-        self.flash.erase(&self.sectors[self.active_sector][0] as *const _ as usize)?;
-        self.flash.program(&self.sectors[self.active_sector][0] as *const _ as usize, &[ACTIVE])?;
+        let address = self.sectors[self.active_sector].as_ptr() as *const _ as usize;
+        self.flash.erase(address)?;
+        self.flash.program(address, &[ACTIVE])?;
         self.offset = None;
         Ok(())
     }

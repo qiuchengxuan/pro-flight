@@ -28,6 +28,7 @@ macro_rules! __define_spi {
         pub struct $spi<INT, SPI: SpiMap> {
             sr: SPI::CSpiSr,
             dr: SPI::CSpiDr,
+            cr2: SPI::SSpiCr2,
             int: INT,
             sclk: gpio::$gpio::$sclk<Alternate<gpio::$af>>,
             miso: gpio::$gpio::$miso<Alternate<gpio::$af>>,
@@ -53,10 +54,10 @@ macro_rules! __define_spi {
                     }
                     r.write_br(baudrate.0).set_ssm().set_ssi().set_mstr().set_spe()
                 });
-                regs.spi_cr2.store(|r| r.set_rxneie().set_errie().set_txdmaen().set_rxdmaen());
+                regs.spi_cr2.store(|r| r.set_rxneie().set_errie());
                 let (sclk, miso, mosi) = (sclk.$into_af(), miso.$into_af(), mosi.$into_af());
                 let (sr, dr) = (regs.spi_sr.into_copy(), regs.spi_dr.into_copy());
-                Self { sr, dr, int, sclk, miso, mosi }
+                Self { sr, dr, cr2: regs.spi_cr2, int, sclk, miso, mosi }
             }
 
             fn new_fn(&mut self) -> FiberFn<impl FnMut() -> FiberState<(), R>, (), R> {
@@ -106,6 +107,16 @@ macro_rules! __define_spi {
                 Ok(())
             }
         }
+
+        impl<INT> dma::Peripheral for $spi<INT, spi::$spi> {
+            fn enable_dma(&mut self) {
+                self.cr2.modify(|r| r.set_txdmaen().set_rxdmaen());
+            }
+
+            fn address(&self) -> u32 {
+                self.dr.as_mut_ptr() as u32
+            }
+        }
     };
 }
 
@@ -136,6 +147,8 @@ macro_rules! define_spis {
         use drone_stm32_map::periph::spi::{self, traits::*, SpiPeriph, SpiMap};
         use embedded_hal::spi::{Mode, Phase, Polarity};
         use stm32f4xx_hal::gpio::{self, Alternate, Floating, Input, Output, PullUp, PushPull};
+
+        use $crate::stm32f4::dma;
 
         #[derive(Copy, Clone, Debug)]
         pub enum Error {
