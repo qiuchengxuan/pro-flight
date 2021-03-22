@@ -1,0 +1,20 @@
+[submodule "drone-os/drone"]
+	path = drone-os/drone
+	url = https://github.com/qiuchengxuan/drone.git
+	shallow = true
+[submodule "drone-os/drone-stm32-map"]
+	path = drone-os/drone-stm32-map
+	url = https://github.com/qiuchengxuan/drone-stm32-map.git
+	shallow = true
+[submodule "drone-os/drone-core"]
+	path = drone-os/drone-core
+	url = https://github.com/drone-os/drone-core.git
+	shallow = true
+[submodule "drone-os/drone-cortexm"]
+	path = drone-os/drone-cortexm
+	url = https://github.com/drone-os/drone-cortexm.git
+	shallow = true
+[submodule "drone-os/drone-svd"]
+	path = drone-os/drone-svd
+	url = https://github.com/drone-os/drone-svd.git
+	shallow = true

@@ -1,0 +1,21 @@
+[package]
+authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+name = "pro-flight"
+version = "0.1.0"
+
+[dependencies]
+embedded-hal = "0.2"
+git-version = "0.3.4"
+nb = "0.1"
+stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }
+void = { version = "1", default-features = false }
+
+[lib]
+name = "pro_flight"
+
+[dev-dependencies]
+hex-literal = "0.3"
+pretty_assertions = "0.4"
+serial_test = "*"

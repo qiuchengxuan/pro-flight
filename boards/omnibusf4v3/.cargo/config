@@ -1,0 +1,13 @@
+[build]
+target = 'thumbv7em-none-eabihf'
+rustflags = [
+    '--cfg', 'cortexm_core="cortexm4f_r0p1"',
+    '--cfg', 'stm32_mcu="stm32f405"',
+]
+
+[target.thumbv7em-none-eabihf]
+rustflags = [
+    '--cfg', 'cortexm_core="cortexm4f_r0p1"',
+    '--cfg', 'stm32_mcu="stm32f405"',
+    '-C', 'linker=drone-ld',
+]

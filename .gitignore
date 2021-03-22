@@ -1,0 +1,7 @@
+**/*.rs.bk
+.#*
+.gdb_history
+Cargo.lock
+target/
+__pycache__
+/*.dfu

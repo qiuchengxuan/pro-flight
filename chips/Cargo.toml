@@ -1,0 +1,35 @@
+[package]
+authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+name = "chips"
+version = "0.0.1"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false }
+cortex-m = "0.6"
+cortex-m-rt = "0.6"
+drone-core = { path = "../drone-os/drone-core" }
+embedded-hal = "0.2"
+futures = { version = "0.3.0", default-features = false }
+nb = "0.1"
+stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", optional = true }
+
+[dependencies.drone-cortexm]
+path = "../drone-os/drone-cortexm"
+features = ["bit-band", "floating-point-unit", "memory-protection-unit"]
+optional = true
+
+[dependencies.drone-stm32-map]
+path = "../drone-os/drone-stm32-map"
+features = ["dma", "exti", "flash", "rtc", "spi"]
+optional = true
+
+[features]
+default = []
+stm32 = ["drone-cortexm", "drone-stm32-map", "stm32f4xx-hal"]
+
+[lib]
+name = "chips"
+test = false
+bench = false
