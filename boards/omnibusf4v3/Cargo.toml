@@ -22,12 +22,15 @@ std = [
 ]
 
 [dependencies]
+chrono = { version = "0.4", default-features = false }
 chips = { path = "../../chips", features = ["stm32"] }
 drone-core = { path = "../../drone-os/drone-core" }
 embedded-hal = "0.2"
 futures = { version = "0.3.0", default-features = false }
 pro-flight = { path = "../.." }
 stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }
+usb-device = "0.2"
+usbd-serial = "0.1"
 
 [dependencies.drone-cortexm]
 path = "../../drone-os/drone-cortexm"

@@ -12,14 +12,14 @@ extern crate pro_flight;
 pub mod tasks;
 pub mod thread;
 
+use drone_core::heap;
 #[prelude_import]
 #[allow(unused_imports)]
 use drone_core::prelude::*;
-
-use drone_core::heap;
 use drone_stm32_map::stm32_reg_tokens;
+use pro_flight::fake_rtc;
 
-drone_cortexm::swo::set_log!();
+fake_rtc!();
 
 stm32_reg_tokens! {
     /// A set of tokens for all memory-mapped registers.

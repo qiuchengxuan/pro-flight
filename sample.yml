@@ -1,0 +1,80 @@
+aircraft:
+  configuration: airplane
+battery:
+  cells: 3
+  min-cell-voltage: 3.3
+  max-cell-voltage: 4.2
+  warning-cell-voltage: 3.5
+board:
+  rotation: 270
+imu:
+  accelerometer:
+    bias:
+      x: -236
+      y: 22
+      z: -713
+    gain:
+      x: 8222
+      y: 8142
+      z: 8188
+    sensitive: 2.0
+  magnetometer:
+    bias:
+      x: -78
+      y: 289
+      z: -33
+    gain:
+      x: 3058
+      y: 3000
+      z: 3443
+    declination: 5.8
+  mahony:
+    kp: 0.25
+    ki: 0.005
+osd:
+  aspect-ratio: '16:9'
+  font: sdcard://font.bin
+  fov: 145
+  offset:
+    horizental: 8
+    vertical: 0
+  refresh-rate: 50
+  standard: PAL
+receiver:
+  inputs:
+    throttle:
+      channel: 3
+      scale: 110
+    roll:
+      channel: 1
+    pitch:
+      channel: 2
+    yaw:
+      channel: 4
+speedometer:
+  kp: 0.1
+peripherals:
+  serial:
+    USART1:
+      type: GNSS
+      baudrate: 9600
+      protocol: NMEA
+    USART6:
+      type: SBUS
+      fast: false
+      rx-inverted: true
+      half-duplex: false
+  pwm:
+    PWM1:
+      type: motor
+      index: 0
+      protocol: PWM
+      rate: 400
+    PWM2:
+      type: aileron
+    PWM3:
+      type: elevator
+    PWM4:
+      type: rudder
+      min-angle: -80
+      max-angle: 80

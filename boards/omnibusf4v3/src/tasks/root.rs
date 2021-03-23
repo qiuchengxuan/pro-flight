@@ -1,12 +1,16 @@
 //! The root task.
 
-use chips::stm32f4::{clock, systick};
+use chips::stm32f4::{clock, systick, usb_serial};
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::sys_tick::periph_sys_tick;
 use futures::prelude::*;
-use pro_flight::{drivers::led::LED, sys::timer};
-use stm32f4xx_hal::{prelude::*, stm32};
+use pro_flight::{components::cli::CLI, drivers::led::LED, sys::timer};
+use stm32f4xx_hal::{
+    otg_fs::{UsbBus, USB},
+    prelude::*,
+    stm32,
+};
 
 use crate::{thread, thread::ThrsInit, Regs};
 
@@ -27,14 +31,24 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
 
     let peripherals = stm32::Peripherals::take().unwrap();
-    let gpio_b = peripherals.GPIOB.split();
+    let (gpio_a, gpio_b) = (peripherals.GPIOA.split(), peripherals.GPIOB.split());
+
     let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), timer::SysTimer::new());
 
     reg.pwr_cr.modify(|r| r.set_dbp());
     reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
 
+    let (usb_global, usb_device, usb_pwrclk) =
+        (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
+    let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
+    let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
+    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
+    let mut poller = usb_serial::init(allocator);
+
+    let mut cli = CLI::new(&mut []);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {
+        poller.poll(|bytes| cli.receive(bytes));
         led.check_toggle();
     }
 

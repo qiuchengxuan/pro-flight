@@ -15,7 +15,7 @@ steps:
       - export HOME=$DRONE_CI_HOME
       - export PATH=$DRONE_CI_HOME/.cargo/bin:$PATH
       - rustup default nightly
-      - git diff-tree --no-commit-id --name-only --diff-filter=AM -r HEAD | xargs -i rustfmt --edition 2018 --check {}
+      - git diff-tree --no-commit-id --name-only --diff-filter=AM -r HEAD | grep '\.rs$' | xargs -i rustfmt --edition 2018 --check {}
   - name: build
     commands:
       - export HOME=$DRONE_CI_HOME
