@@ -1,6 +1,3 @@
-use alloc::borrow::ToOwned;
-use alloc::rc::Rc;
-use alloc::string::String;
 use core::fmt::{Display, Formatter, Write};
 use core::str::Split;
 
@@ -80,7 +77,6 @@ impl ToYAML for Offset {
 #[derive(Clone, Debug, PartialEq)]
 pub struct OSD {
     pub aspect_ratio: Ratio,
-    pub font: Rc<String>,
     pub fov: u8,
     pub offset: Offset,
     pub refresh_rate: u8,
@@ -92,7 +88,6 @@ impl Default for OSD {
         Self {
             aspect_ratio: Ratio::default(),
             fov: 120,
-            font: Rc::new(String::default()),
             offset: Offset::default(),
             refresh_rate: 50,
             standard: Standard::default(),
@@ -104,7 +99,6 @@ impl Setter for OSD {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         match path.next().ok_or(Error::MalformedPath)? {
             "aspect-ratio" => self.aspect_ratio = value.parse()?.unwrap_or_default(),
-            "font" => self.font = Rc::new(value.0.unwrap_or_default().to_owned()),
             "fov" => self.fov = value.parse()?.unwrap_or_default(),
             "offset" => return self.offset.set(path, value),
             "refresh-rate" => self.refresh_rate = value.parse()?.unwrap_or_default(),
@@ -119,11 +113,6 @@ impl ToYAML for OSD {
     fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
         self.write_indent(indent, w)?;
         writeln!(w, "aspect-ratio: '{}'", self.aspect_ratio)?;
-
-        if self.font.as_str() != "" {
-            self.write_indent(indent, w)?;
-            writeln!(w, "font: {}", self.font.as_str())?;
-        }
 
         self.write_indent(indent, w)?;
         writeln!(w, "fov: {}", self.fov)?;

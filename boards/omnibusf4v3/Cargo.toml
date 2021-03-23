@@ -23,6 +23,7 @@ std = [
 
 [dependencies]
 chrono = { version = "0.4", default-features = false }
+cortex-m = "0.6"
 chips = { path = "../../chips", features = ["stm32"] }
 drone-core = { path = "../../drone-os/drone-core" }
 embedded-hal = "0.2"

@@ -271,6 +271,7 @@ mod test {
         let bytes: &[u8; mem::size_of::<Config>()] = unsafe { mem::transmute(&config) };
         let mut new_bytes = [0u8; mem::size_of::<Config>()];
         new_bytes[..].copy_from_slice(bytes);
+        drop(config);
         let config: &Config = unsafe { mem::transmute(&new_bytes) };
 
         let mut buf = String::new();

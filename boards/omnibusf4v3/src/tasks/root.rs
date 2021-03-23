@@ -1,16 +1,22 @@
 //! The root task.
 
-use chips::stm32f4::{clock, rtc, systick, usb_serial};
+use chips::stm32f4::{
+    clock,
+    flash::{Flash, Sector},
+    rtc, systick, usb_serial,
+};
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
-use drone_stm32_map::periph::{rtc::periph_rtc, sys_tick::periph_sys_tick};
+use drone_stm32_map::periph::{flash::periph_flash, rtc::periph_rtc, sys_tick::periph_sys_tick};
 use futures::prelude::*;
 use pro_flight::{
     components::{
         cli::{Command, CLI},
         logger,
     },
+    config,
     drivers::led::LED,
+    drivers::nvram::NVRAM,
     sys::timer,
 };
 use stm32f4xx_hal::{
@@ -19,7 +25,7 @@ use stm32f4xx_hal::{
     stm32,
 };
 
-use crate::{thread, thread::ThrsInit, Regs};
+use crate::{flash::FlashWrapper, thread, thread::ThrsInit, Regs};
 
 /// The root task handler.
 #[inline(never)]
@@ -54,7 +60,24 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
     let mut poller = usb_serial::init(allocator);
 
-    let mut commands = [Command::new("logread", "Show log", |_| println!("{}", logger::get()))];
+    let flash = FlashWrapper::new(Flash::new(periph_flash!(reg)));
+    let sector1 = unsafe { Sector::new(1).unwrap().as_slice() };
+    let sector2 = unsafe { Sector::new(2).unwrap().as_slice() };
+    let mut nvram = NVRAM::new(flash, [sector1, sector2]).unwrap();
+    match nvram.load() {
+        Ok(config) => config::replace(config),
+        Err(error) => error!("Load config failed: {:?}", error),
+    }
+    let mut commands = [
+        Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),
+        Command::new("logread", "Show log", |_| println!("{}", logger::get())),
+        Command::new("save", "Save configuration", move |_| {
+            if let Some(err) = nvram.store(config::get()).err() {
+                println!("Save configuration failed: {:?}", err);
+                nvram.reset().ok();
+            }
+        }),
+    ];
     let mut cli = CLI::new(&mut commands);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {

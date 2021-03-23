@@ -33,7 +33,6 @@ imu:
     ki: 0.005
 osd:
   aspect-ratio: '16:9'
-  font: sdcard://font.bin
   fov: 145
   offset:
     horizental: 8

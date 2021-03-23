@@ -7,8 +7,10 @@
 
 extern crate alloc;
 extern crate chips;
+#[macro_use]
 extern crate pro_flight;
 
+mod flash;
 pub mod tasks;
 pub mod thread;
 
