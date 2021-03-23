@@ -21,7 +21,9 @@ use pro_flight::{
     components::{
         cli::{Command, CLI},
         flight_data::FlightDataHUB,
+        imu::IMU,
         logger,
+        speedometer::Speedometer,
     },
     config,
     drivers::led::LED,
@@ -98,6 +100,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let hub = Box::leak(Box::new(FlightDataHUB::default()));
     let mut reader = hub.reader();
 
+    let (heading, course) = (reader.gnss_heading, reader.gnss_course);
+    let mut imu = IMU::new(reader.magnetometer, heading, course, 1000, 1000 / 10);
+    let mut speedometer = Speedometer::new(reader.altimeter, reader.gnss_velocity, 1000, 10);
+
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
     let mpu6000 = DmaSpiMPU6000 {
@@ -109,9 +115,14 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         thread: thread.exti_4,
     };
     let (accelerometer, gyroscope) = (&hub.accelerometer, &hub.gyroscope);
+    let (speed, quat) = (&hub.speedometer, &hub.imu);
     mpu6000.init(move |accel, gyro| {
         accelerometer.write(accel);
         gyroscope.write(gyro);
+        if imu.update_imu(&accel, &gyro) {
+            quat.write(imu.quaternion());
+            speed.write(speedometer.update(imu.acceleration()));
+        }
     });
     let mut commands = [
         Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),

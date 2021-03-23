@@ -13,7 +13,7 @@ use crate::datastructures::{
         battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
         unit::{Meter, MilliMeter},
-        Acceleration, Altitude, Course, Gyro, HeadingOrCourse, Magnetism, VelocityVector,
+        Acceleration, Altitude, Course, Gyro, Heading, Magnetism, VelocityVector,
     },
     waypoint::Steerpoint,
     GNSSFixed,
@@ -61,7 +61,7 @@ flight_data! {
     magnetometer: Magnetism,
 
     gnss_fixed: GNSSFixed,
-    gnss_heading: HeadingOrCourse,
+    gnss_heading: Heading,
     gnss_course: Course,
     gnss_velocity: VelocityVector<i32, MilliMeter>
 }

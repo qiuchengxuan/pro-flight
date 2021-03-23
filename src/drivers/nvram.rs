@@ -143,12 +143,10 @@ mod test {
 
     #[test]
     fn test_nvram() {
-        let sectors = [
-            &mut Box::leak(Box::new([super::EMPTY; 8]))[..],
-            &mut Box::leak(Box::new([super::EMPTY; 8]))[..],
-        ];
+        let sector0 = Box::leak(Box::new([super::EMPTY; 8]));
+        let sector1 = Box::leak(Box::new([super::EMPTY; 8]));
         let flash = DummyFlash::default();
-        let mut nvram = super::NVRAM::new(flash, sectors).unwrap();
+        let mut nvram = super::NVRAM::new(flash, [&mut sector0[..], &mut sector1[..]]).unwrap();
         assert_eq!(nvram.sectors[0][0], super::ACTIVE);
         let expected: Option<&[u32]> = None;
         assert_eq!(expected, nvram.load().expect("load"));

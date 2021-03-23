@@ -23,27 +23,6 @@ pub type Altitude = Distance<i32, CentiMeter>;
 pub type Heading = IntegerDecimal;
 pub type Course = IntegerDecimal;
 
-#[derive(Copy, Clone)]
-pub enum HeadingOrCourse {
-    Heading(Heading),
-    Course(Course),
-}
-
-impl HeadingOrCourse {
-    pub fn or_course(self) -> Heading {
-        match self {
-            Self::Heading(h) => h,
-            Self::Course(c) => c,
-        }
-    }
-}
-
-impl Default for HeadingOrCourse {
-    fn default() -> Self {
-        Self::Course(IntegerDecimal::default())
-    }
-}
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Rotation {
     NoRotation,
@@ -108,33 +87,41 @@ impl Axes {
 }
 
 impl core::ops::Add for Axes {
-    type Output = Axes;
+    type Output = Self;
 
-    fn add(self, other: Axes) -> Self {
+    fn add(self, other: Self) -> Self {
         Self { x: (self.x + other.x), y: (self.y + other.y), z: (self.z + other.z) }
     }
 }
 
-impl core::ops::Sub<&Axes> for Axes {
-    type Output = Axes;
+impl core::ops::Sub<Self> for Axes {
+    type Output = Self;
 
-    fn sub(self, other: &Axes) -> Self {
+    fn sub(self, other: Self) -> Self {
+        Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
+    }
+}
+
+impl core::ops::Sub<&Self> for Axes {
+    type Output = Self;
+
+    fn sub(self, other: &Self) -> Self {
         Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
     }
 }
 
 impl core::ops::Div<i32> for Axes {
-    type Output = Axes;
+    type Output = Self;
 
     fn div(self, div: i32) -> Self {
         Self { x: self.x / div, y: self.y / div, z: self.z / div }
     }
 }
 
-impl core::ops::Mul<&Axes> for Axes {
-    type Output = Axes;
+impl core::ops::Mul<&Self> for Axes {
+    type Output = Self;
 
-    fn mul(self, other: &Axes) -> Self {
+    fn mul(self, other: &Self) -> Self {
         Self { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 }

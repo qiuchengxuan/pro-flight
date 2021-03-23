@@ -25,6 +25,7 @@ pub mod sys;
 pub mod components;
 #[macro_use]
 pub mod datastructures;
+pub mod algorithm;
 pub mod config;
 pub mod drivers;
 pub mod hal;

@@ -107,6 +107,7 @@ impl Flash {
         match () {
             _ if status.pgserr() => Err(Error::ProgrammingSequence),
             _ if status.pgperr() => Err(Error::ProgrammingParallelism),
+            _ if status.pgaerr() => Err(Error::ProgrammingAlignment),
             _ if status.wrperr() => Err(Error::WriteProtection),
             _ if status.operr() => Err(Error::Operation),
             _ => Ok(()),
