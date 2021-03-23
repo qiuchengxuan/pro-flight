@@ -17,9 +17,6 @@ use drone_core::heap;
 #[allow(unused_imports)]
 use drone_core::prelude::*;
 use drone_stm32_map::stm32_reg_tokens;
-use pro_flight::fake_rtc;
-
-fake_rtc!();
 
 stm32_reg_tokens! {
     /// A set of tokens for all memory-mapped registers.

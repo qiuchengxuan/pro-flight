@@ -1,5 +1,6 @@
 pub mod clock;
 pub mod delay;
+pub mod rtc;
 pub mod systick;
 pub mod usb_serial;
 

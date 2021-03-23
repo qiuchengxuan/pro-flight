@@ -1,11 +1,18 @@
 //! The root task.
 
-use chips::stm32f4::{clock, systick, usb_serial};
+use chips::stm32f4::{clock, rtc, systick, usb_serial};
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
-use drone_stm32_map::periph::sys_tick::periph_sys_tick;
+use drone_stm32_map::periph::{rtc::periph_rtc, sys_tick::periph_sys_tick};
 use futures::prelude::*;
-use pro_flight::{components::cli::CLI, drivers::led::LED, sys::timer};
+use pro_flight::{
+    components::{
+        cli::{Command, CLI},
+        logger,
+    },
+    drivers::led::LED,
+    sys::timer,
+};
 use stm32f4xx_hal::{
     otg_fs::{UsbBus, USB},
     prelude::*,
@@ -37,6 +44,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     reg.pwr_cr.modify(|r| r.set_dbp());
     reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
+    rtc::init(periph_rtc!(reg));
+    logger::init(Box::leak(Box::new([0u8; 1024])));
 
     let (usb_global, usb_device, usb_pwrclk) =
         (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
@@ -45,7 +54,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
     let mut poller = usb_serial::init(allocator);
 
-    let mut cli = CLI::new(&mut []);
+    let mut commands = [Command::new("logread", "Show log", |_| println!("{}", logger::get()))];
+    let mut cli = CLI::new(&mut commands);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {
         poller.poll(|bytes| cli.receive(bytes));
