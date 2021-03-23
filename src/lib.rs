@@ -1,6 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(trait_alias)]
 
+#[macro_use]
 extern crate alloc;
 extern crate ascii;
 #[cfg(not(test))]
@@ -27,6 +28,8 @@ pub mod datastructures;
 pub mod config;
 pub mod drivers;
 pub mod hal;
+pub mod sync;
+
 #[cfg(test)]
 extern crate std;
 
