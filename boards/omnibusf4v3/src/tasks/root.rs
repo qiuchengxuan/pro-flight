@@ -20,11 +20,13 @@ use futures::prelude::*;
 use pro_flight::{
     components::{
         cli::{Command, CLI},
+        flight_data::FlightDataHUB,
         logger,
     },
     config,
     drivers::led::LED,
     drivers::nvram::NVRAM,
+    sync::DataWriter,
     sys::timer,
 };
 use stm32f4xx_hal::{
@@ -92,6 +94,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Err(error) => error!("Load config failed: {:?}", error),
     }
 
+    let hub = Box::leak(Box::new(FlightDataHUB::default()));
+    let mut reader = hub.reader();
+
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
     let mpu6000 = DmaSpiMPU6000 {
@@ -102,10 +107,15 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         tx: dma::Channel::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3),
         thread: thread.exti_4,
     };
-    mpu6000.init(move |_accel, _gyro| {});
+    let (accelerometer, gyroscope) = (&hub.accelerometer, &hub.gyroscope);
+    mpu6000.init(move |accel, gyro| {
+        accelerometer.write(accel);
+        gyroscope.write(gyro);
+    });
     let mut commands = [
         Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),
         Command::new("logread", "Show log", |_| println!("{}", logger::get())),
+        Command::new("telemetry", "Show flight data", move |_| println!("{}", reader.read())),
         Command::new("save", "Save configuration", move |_| {
             if let Some(err) = nvram.store(config::get()).err() {
                 println!("Save configuration failed: {:?}", err);
