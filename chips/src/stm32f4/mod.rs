@@ -1,5 +1,6 @@
 pub mod clock;
 pub mod delay;
+pub mod dma;
 pub mod flash;
 pub mod rtc;
 pub mod spi;
