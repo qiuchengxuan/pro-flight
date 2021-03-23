@@ -9,6 +9,8 @@ extern crate drone_core;
 extern crate heapless;
 extern crate integer_sqrt;
 extern crate micromath;
+#[macro_use]
+extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 #[macro_use]

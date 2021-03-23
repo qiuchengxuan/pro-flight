@@ -107,6 +107,20 @@ macro_rules! __define_spi {
                 Ok(())
             }
         }
+
+        impl<INT> dma::Peripheral for $spi<INT, spi::$spi> {
+            fn enable_dma(&mut self) {
+                self.cr2.modify(|r| r.set_txdmaen().set_rxdmaen());
+            }
+
+            fn address(&mut self) -> u32 {
+                self.dr.as_mut_ptr() as u32
+            }
+
+            fn word_size(&self) -> usize {
+                core::mem::size_of::<u8>()
+            }
+        }
     };
 }
 
@@ -137,6 +151,8 @@ macro_rules! define_spis {
         use drone_stm32_map::periph::spi::{self, traits::*, SpiPeriph, SpiMap};
         use embedded_hal::spi::{Mode, Phase, Polarity};
         use stm32f4xx_hal::gpio::{self, Alternate, Floating, Input, Output, PullUp, PushPull};
+
+        use $crate::stm32f4::dma;
 
         #[derive(Copy, Clone, Debug)]
         pub enum Error {

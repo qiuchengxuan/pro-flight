@@ -12,6 +12,7 @@ extern crate chips;
 extern crate pro_flight;
 
 mod flash;
+mod mpu6000;
 mod spi;
 pub mod tasks;
 pub mod thread;
