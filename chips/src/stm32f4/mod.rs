@@ -2,6 +2,7 @@ pub mod clock;
 pub mod delay;
 pub mod flash;
 pub mod rtc;
+pub mod spi;
 pub mod systick;
 pub mod usb_serial;
 

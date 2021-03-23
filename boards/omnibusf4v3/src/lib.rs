@@ -6,11 +6,13 @@
 #![no_std]
 
 extern crate alloc;
+#[macro_use]
 extern crate chips;
 #[macro_use]
 extern crate pro_flight;
 
 mod flash;
+mod spi;
 pub mod tasks;
 pub mod thread;
 
