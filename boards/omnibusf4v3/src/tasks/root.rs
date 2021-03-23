@@ -1,7 +1,7 @@
 //! The root task.
 
 use chips::stm32f4::{
-    clock, dma,
+    clock, dfu, dma,
     flash::{Flash, Sector},
     rtc,
     spi::BaudrateControl,
@@ -79,6 +79,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         RebootReason::Bootloader => {
             sysinfo.reboot_reason = RebootReason::Normal;
             persist.save(&sysinfo);
+            dfu::enter();
         }
         _ => (),
     };
