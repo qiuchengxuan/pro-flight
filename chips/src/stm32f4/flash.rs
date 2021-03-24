@@ -127,12 +127,19 @@ impl Flash {
         self.status()
     }
 
-    pub fn program(&mut self, address: usize, words: &[u32]) -> Result<(), Error> {
+    pub fn program<W: Copy>(&mut self, address: usize, words: &[W]) -> Result<(), Error> {
         let mut result = Ok(());
+        let size = match core::mem::size_of::<W>() {
+            1 => 0b00,
+            2 => 0b01,
+            4 => 0b10,
+            8 => 0b11,
+            _ => unreachable!(),
+        };
         self.unlock();
         cortex_m::interrupt::free(|_| {
-            self.0.flash_cr.store(|r| r.write_psize(0b10).set_pg());
-            let dest = unsafe { slice::from_raw_parts_mut(address as *mut u32, words.len()) };
+            self.0.flash_cr.store(|r| r.write_psize(size as u32).set_pg());
+            let dest = unsafe { slice::from_raw_parts_mut(address as *mut W, words.len()) };
             for i in 0..words.len() {
                 dest[i] = words[i];
                 self.wait_busy();

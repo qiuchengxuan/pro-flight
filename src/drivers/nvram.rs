@@ -3,29 +3,29 @@ use crate::hal::flash::Flash;
 const ACTIVE: u32 = 0x4E565241;
 const EMPTY: u32 = 0xFFFFFFFF;
 
-fn offset(sector: &[u32]) -> Option<usize> {
+fn locate(sector: &[u32]) -> (usize, usize) {
     if sector[1] == EMPTY {
-        return None;
+        return (0, 1);
     }
+    let mut read = 1;
     let mut index = 1;
-    loop {
+    while index < sector.len() && sector[index] != EMPTY {
         let length = sector[index] as usize;
-        if sector[index + length - 1] == EMPTY {
-            break; // possibly partial write
+        let bytes = &sector[index + 1..];
+        if bytes[length - 1] != EMPTY {
+            read = index;
         }
-        if sector[index + length] == EMPTY {
-            break;
-        }
-        index += length;
+        index += 1 + length;
     }
-    Some(index)
+    (read, index)
 }
 
 pub struct NVRAM<F> {
     flash: F,
     sectors: [&'static mut [u32]; 2],
     active_sector: usize,
-    offset: Option<usize>,
+    read_offset: usize, // 0 means empty
+    write_offset: usize,
 }
 
 impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
@@ -55,39 +55,39 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         if sectors[active_sector][0] != ACTIVE {
             flash.program(&sectors[active_sector][0] as *const _ as usize, &[ACTIVE])?;
         }
-        let offset = offset(sectors[active_sector]);
-        Ok(Self { flash, sectors, active_sector, offset })
+        let (read_offset, write_offset) = locate(sectors[active_sector]);
+        Ok(Self { flash, sectors, active_sector, read_offset, write_offset })
     }
 
-    pub fn load<'a, T: From<&'a [u32]> + Default>(&'a self) -> Result<T, E> {
-        let offset = match self.offset {
-            Some(offset) => offset,
-            None => return Ok(T::default()),
-        };
+    pub fn load<'a, T: From<&'a [u32]> + Default>(&'a self) -> Result<Option<T>, E> {
+        if self.read_offset == 0 {
+            return Ok(None);
+        }
         let sector = &self.sectors[self.active_sector];
-        let length = sector[offset];
-        Ok(T::from(&sector[offset + 1..offset + 1 + length as usize]))
+        let length = sector[self.read_offset];
+        let sector = &sector[self.read_offset + 1..];
+        Ok(Some(T::from(&sector[..length as usize])))
     }
 
     pub fn store<'a, T: AsRef<[u32]>>(&mut self, t: T) -> Result<(), E> {
         let sector = &self.sectors[self.active_sector];
-        let mut offset = self.offset.unwrap_or(1);
-        while offset < sector.len() && sector[offset] != EMPTY {
-            offset += sector[offset] as usize + 1;
-        }
         let words = t.as_ref();
+        let offset = self.write_offset;
         if offset + 1 + words.len() > sector.len() {
             self.active_sector = self.active_sector ^ 1;
-            let next_sector = &self.sectors[self.active_sector];
-            self.flash.program(&next_sector[0] as *const _ as usize, &[ACTIVE])?;
-            self.flash.program(&next_sector[1] as *const _ as usize, &[words.len() as u32])?;
-            self.flash.program(&next_sector[2] as *const _ as usize, words)?;
+            let new_sector = &self.sectors[self.active_sector];
+            self.flash.program(&new_sector[0] as *const _ as usize, &[ACTIVE])?;
+            self.flash.program(&new_sector[1] as *const _ as usize, &[words.len() as u32])?;
+            self.flash.program(&new_sector[2] as *const _ as usize, words)?;
             self.flash.erase(&sector[0] as *const _ as usize)?;
-            self.offset = Some(1);
+            self.read_offset = 1;
+            self.write_offset = 1 + words.len();
         } else {
-            self.flash.program(&sector[offset] as *const _ as usize, &[words.len() as u32])?;
-            self.flash.program(&sector[offset + 1] as *const _ as usize, words)?;
-            self.offset = Some(offset);
+            let buffer = &sector[offset..];
+            self.flash.program(buffer.as_ptr() as *const _ as usize, &[words.len() as u32])?;
+            self.flash.program(&buffer[1] as *const _ as usize, words)?;
+            self.read_offset = self.write_offset;
+            self.write_offset += 1 + words.len();
         }
         Ok(())
     }
@@ -96,7 +96,8 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         let address = self.sectors[self.active_sector].as_ptr() as *const _ as usize;
         self.flash.erase(address)?;
         self.flash.program(address, &[ACTIVE])?;
-        self.offset = None;
+        self.read_offset = 0;
+        self.write_offset = 1;
         Ok(())
     }
 }
@@ -149,23 +150,35 @@ mod test {
         let flash = DummyFlash::default();
         let mut nvram = super::NVRAM::new(flash, sectors).unwrap();
         assert_eq!(nvram.sectors[0][0], super::ACTIVE);
-        assert_eq!(nvram.load(), Ok(&[][..]));
+        let expected: Option<&[u32]> = None;
+        assert_eq!(expected, nvram.load().expect("load"));
         let expect = Data([3, 4]);
         nvram.store(expect).expect("store");
-        assert_eq!(expect, nvram.load().expect("load"));
+        assert_eq!(Some(expect), nvram.load().expect("load"));
         let expect = Data([5, 6]);
         nvram.store(expect).expect("store");
-        assert_eq!(expect, nvram.load().expect("load"));
+        assert_eq!(Some(expect), nvram.load().expect("load"));
         let expect = Data([7, 8]);
         nvram.store(expect).expect("store");
-        assert_eq!(expect, nvram.load().expect("load"));
+        assert_eq!(Some(expect), nvram.load().expect("load"));
         assert_eq!(nvram.sectors[0][0], super::EMPTY);
         let expect = Data([9, 10]);
         nvram.store(expect).expect("store");
-        assert_eq!(expect, nvram.load().expect("load"));
+        assert_eq!(Some(expect), nvram.load().expect("load"));
         nvram.sectors[0][1] = super::EMPTY;
         let expect = Data([11, 12]);
         nvram.store(expect).expect("store");
-        assert_eq!(expect, nvram.load().expect("load"));
+        assert_eq!(Some(expect), nvram.load().expect("load"));
+    }
+
+    #[test]
+    fn test_load_from_existing() {
+        let sector0 = Box::leak(Box::new([super::ACTIVE, 2, 1, 2]));
+        let sector1 = Box::leak(Box::new([super::EMPTY; 4]));
+        let flash = DummyFlash::default();
+        let nvram = super::NVRAM::new(flash, [&mut sector0[..], &mut sector1[..]]).unwrap();
+        assert_eq!(nvram.active_sector, 0);
+        let actual: Option<&[u32]> = nvram.load().expect("load");
+        assert_eq!(Some(&[1, 2][..]), actual);
     }
 }

@@ -21,7 +21,7 @@ $(BOARD).dfu: $(TARGET)
 
 .PHONY: test
 test:
-	cargo test
+	@cargo test
 
 .PHONY: clean
 clean:

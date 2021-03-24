@@ -105,6 +105,7 @@ impl ToYAML for Speedometer {
     }
 }
 
+#[repr(C, align(4))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Config {
     version: u8,
@@ -188,12 +189,8 @@ impl core::fmt::Display for Config {
 
 impl From<&[u32]> for Config {
     fn from(words: &[u32]) -> Self {
-        let mut config = Self::default();
-        let length = mem::size_of::<Self>() / mem::size_of::<u32>();
-        let dest = &mut config as *mut _ as *mut u32;
-        let src = &words[0] as *const _ as *const u32;
-        unsafe { core::ptr::copy_nonoverlapping(src, dest, core::cmp::min(length, words.len())) };
-        config
+        let config: &Config = unsafe { mem::transmute(words.as_ptr() as *const Self) };
+        config.clone()
     }
 }
 

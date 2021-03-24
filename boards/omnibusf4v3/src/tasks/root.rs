@@ -90,7 +90,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let sector2 = unsafe { Sector::new(2).unwrap().as_slice() };
     let mut nvram = NVRAM::new(flash, [sector1, sector2]).unwrap();
     match nvram.load() {
-        Ok(config) => config::replace(config),
+        Ok(Some(config)) => config::replace(config),
+        Ok(None) => (),
         Err(error) => error!("Load config failed: {:?}", error),
     }
 
