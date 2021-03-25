@@ -1,7 +1,9 @@
+#!/usr/bin/python3
+
 import json
-import yaml
 
 import numpy
+import yaml
 from cli import CLI
 from jsonpath import jsonpath
 

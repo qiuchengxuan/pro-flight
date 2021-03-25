@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+
 import sys
 from pathlib import Path
 
@@ -18,6 +19,7 @@ def main():
     cli = CLI(path)
     print(cli.tx('telemetry'))
     cli.close()
+
 
 if __name__ == '__main__':
     main()

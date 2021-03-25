@@ -12,6 +12,10 @@ steps:
       - git submodule update --init --recursive
   - name: codestyle
     commands:
+      - python3 -m pip install -r requirements3.txt
+      - python3 -m flake8 --exclude dfuse-pack.py scripts
+      - isort --diff -c -j $(nproc --all) scripts
+      - yapf -p -d -r scripts
       - export HOME=$DRONE_CI_HOME
       - export PATH=$DRONE_CI_HOME/.cargo/bin:$PATH
       - rustup default nightly

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict
 
 import numpy
-
 from cli import CLI
 from telemetry import get_sensitive, read_sensor
 
