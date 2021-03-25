@@ -18,6 +18,7 @@ mod mpu6000;
 mod spi;
 pub mod tasks;
 pub mod thread;
+mod voltage_adc;
 
 use drone_core::heap;
 #[prelude_import]

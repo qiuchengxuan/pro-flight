@@ -11,7 +11,7 @@ use drivers::{led::LED, nvram::NVRAM};
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
-    dma::{periph_dma2_ch0, periph_dma2_ch3},
+    dma::{periph_dma2_ch0, periph_dma2_ch2, periph_dma2_ch3},
     flash::periph_flash,
     rtc::periph_rtc,
     spi::periph_spi1,
@@ -39,7 +39,8 @@ use stm32f4xx_hal::{
 };
 
 use crate::{
-    flash::FlashWrapper, mpu6000::DmaSpiMPU6000, spi::Spi1, thread, thread::ThrsInit, Regs,
+    flash::FlashWrapper, mpu6000::DmaSpiMPU6000, spi::Spi1, thread, thread::ThrsInit, voltage_adc,
+    Regs,
 };
 
 macro_rules! into_interrupt {
@@ -130,6 +131,11 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
             displacement.write(d)
         }
     });
+
+    let dma_rx = dma::Channel::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
+    let battery = &hub.battery;
+    voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
+
     let mut commands = [
         Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),
         Command::new("logread", "Show log", |_| println!("{}", logger::get())),
