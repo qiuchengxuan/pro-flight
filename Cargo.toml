@@ -14,7 +14,7 @@ git-version = "0.3.4"
 heapless = "0.6"
 integer-sqrt = "0.1"
 micromath = "1.0"
-mpu6000 = "0.2.0"
+mpu6000 = "0.2.1"
 nalgebra = { version = "0.21", default-features = false }
 nb = "0.1"
 stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }

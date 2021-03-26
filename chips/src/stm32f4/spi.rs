@@ -113,8 +113,8 @@ macro_rules! __define_spi {
                 self.cr2.modify(|r| r.set_txdmaen().set_rxdmaen());
             }
 
-            fn address(&mut self) -> u32 {
-                self.dr.as_mut_ptr() as u32
+            fn address(&mut self) -> usize {
+                self.dr.as_mut_ptr() as usize
             }
 
             fn word_size(&self) -> usize {
@@ -152,7 +152,7 @@ macro_rules! define_spis {
         use embedded_hal::spi::{Mode, Phase, Polarity};
         use stm32f4xx_hal::gpio::{self, Alternate, Floating, Input, Output, PullUp, PushPull};
 
-        use $crate::stm32f4::dma;
+        use $crate::hal::dma;
 
         #[derive(Copy, Clone, Debug)]
         pub enum Error {

@@ -1,8 +1,7 @@
 use core::fmt::Debug;
-use core::slice;
 
+use chips::hal::dma::{Buffer, BufferDescriptor, Peripheral, DMA};
 use chips::stm32f4::delay::TickDelay;
-use chips::stm32f4::dma::{self, EmptyDMA, RxDMA, TxDMA, DMA};
 use drone_core::fib::{new_fn, Yielded};
 use drone_cortexm::thr::ThrNvic;
 use embedded_hal::blocking::spi::{Transfer, Write};
@@ -34,11 +33,11 @@ pub struct DmaSpiMPU6000<SPI, CS, INT, RX, TX, THR> {
 
 impl<E: Debug, PE: Debug, SPI, CS, INT, RX, TX, THR> DmaSpiMPU6000<SPI, CS, INT, RX, TX, THR>
 where
-    SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + dma::Peripheral + Send + 'static,
+    SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + Peripheral + Send + 'static,
     CS: OutputPin<Error = PE> + Send + 'static + Unpin,
     INT: ExtiPin + Send + 'static,
-    RX: EmptyDMA<u8, &'static mut [u8], &'static [u8]> + Send + 'static,
-    TX: EmptyDMA<u8, &'static mut [u8], &'static [u8]> + Send + 'static,
+    RX: DMA,
+    TX: DMA,
     THR: ThrNvic,
 {
     pub fn init(self, mut handler: impl FnMut(Acceleration, Measurement) + 'static + Send) {
@@ -59,32 +58,33 @@ where
 
         let (mut spi, mut cs, _) = mpu6000.free().free();
 
-        let rx_buffer = Box::leak(Box::new([0u8; 2 + NUM_MEASUREMENT_REGS]));
-        info!("MPU6000 detected, Init DMA address at {:x}", rx_buffer.as_ptr() as usize);
-
-        let mut rx = self.rx.into_rx(&mut rx_buffer[1..], false);
-        rx.setup_peripheral(3, &mut spi);
-
-        static READ_REG: u8 = Register::AccelerometerXHigh as u8 | 0x80;
-        let mut tx = self.tx.into_tx(slice::from_ref(&READ_REG), Some(1 + NUM_MEASUREMENT_REGS));
-        tx.setup_peripheral(3, &mut spi);
-
+        let mut buffer = Buffer::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default();
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
         let convertor = Convertor::default();
         let rotation = config::get().board.rotation;
-        rx.on_transfer_complete(move |bytes| {
+        buffer.set_transfer_done(Box::leak(Box::new(move |bytes| {
             cs_.set_high().ok();
-            let data = unsafe { &*(&bytes[1] as *const _ as *const [i16; 7]) };
-            let (acceleration, gyro) = convertor.convert(data, rotation);
+            let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);
             handler(acceleration, gyro);
-        });
+        })));
+        let mut rx_bd: BufferDescriptor<u8> = Box::leak(Box::new(buffer)).into();
+        let buffer = rx_bd.borrow_mut().unwrap();
+        info!("MPU6000 detected, Init DMA address at {:x}", buffer.as_ptr() as usize);
 
+        let buffer = Buffer::<u8, 1>::new([Register::AccelerometerXHigh as u8 | 0x80]);
+        let tx_bd: BufferDescriptor<u8> = Box::leak(Box::new(buffer)).into();
+
+        let mut rx = self.rx;
+        rx.setup_peripheral(3, &mut spi);
+        let mut tx = self.tx;
+        tx.setup_peripheral(3, &mut spi);
         let mut int = self.int;
+
         self.thread.add_fib(new_fn(move || {
             int.clear_interrupt_pending_bit();
             cs.set_low().ok();
-            rx.start();
-            tx.start();
+            rx.rx(&rx_bd, false);
+            tx.tx(&tx_bd, Some(1 + NUM_MEASUREMENT_REGS));
             Yielded::<(), ()>(())
         }));
         self.thread.enable_int()

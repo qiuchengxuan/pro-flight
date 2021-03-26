@@ -45,9 +45,9 @@ impl Convertor {
         Measurement { axes, sensitive: (sensitive * 256.0) as i32 }
     }
 
-    pub fn convert(&self, data: &[i16; 7], rotation: Rotation) -> (Acceleration, Measurement) {
-        let acceleration: mpu6000::Acceleration = data[..3].into();
-        let gyro: mpu6000::Gyro = data[4..].into();
+    pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> (Acceleration, Measurement) {
+        let acceleration: mpu6000::Acceleration = bytes[..6].into();
+        let gyro: mpu6000::Gyro = bytes[8..].into();
         let acceleration = Acceleration(self.convert_acceleration(&acceleration).rotate(rotation));
         let gyro = self.convert_gyro(&gyro).rotate(rotation);
         (acceleration, gyro)
