@@ -1,3 +1,5 @@
+use alloc::boxed::Box;
+use core::future::Future;
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::{mem, slice};
 
@@ -20,7 +22,7 @@ impl Into<bool> for Owner {
 pub struct Meta {
     pub size: usize,
     pub owner: AtomicBool,
-    pub transfer_done: Option<&'static mut dyn FnMut(&[u8])>,
+    pub transfer_done: Option<Box<dyn FnMut(&[u8]) + Send + 'static>>,
 }
 
 impl Meta {
@@ -40,49 +42,36 @@ impl Meta {
 }
 
 #[repr(C)]
-pub struct Buffer<W: Default + Copy, const N: usize> {
+pub struct BufferDescriptor<W: Default + Copy, const N: usize> {
     meta: Meta,
     buffer: [W; N],
 }
 
-impl<W: Default + Copy, const N: usize> Default for Buffer<W, N> {
+impl<W: Default + Copy, const N: usize> Default for BufferDescriptor<W, N> {
     fn default() -> Self {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: [W::default(); N] }
     }
 }
 
-impl<W: Copy + Default, const N: usize> Buffer<W, N> {
+impl<W: Copy + Default, const N: usize> BufferDescriptor<W, N> {
     pub fn new(array: [W; N]) -> Self {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub fn set_transfer_done(&mut self, closure: &'static mut (dyn FnMut(&[u8]) + Send + 'static)) {
-        self.meta.transfer_done = Some(closure)
+    pub fn set_transfer_done(&mut self, closure: impl FnMut(&[u8]) + Send + 'static) {
+        self.meta.transfer_done = Some(Box::new(closure));
     }
-}
 
-pub struct BufferDescriptor<'a, W> {
-    buffer: &'a mut [W],
-    owner: &'a AtomicBool,
-}
-
-impl<'a, W: Copy + Default, const N: usize> From<&'a mut Buffer<W, N>> for BufferDescriptor<'a, W> {
-    fn from(buffer: &'a mut Buffer<W, N>) -> Self {
-        Self { buffer: &mut buffer.buffer[..], owner: &buffer.meta.owner }
-    }
-}
-
-impl<'a, W> BufferDescriptor<'a, W> {
-    pub fn borrow_mut(&mut self) -> Option<&mut [W]> {
-        if self.owner.load(Ordering::Relaxed) == Owner::CPU.into() {
-            return Some(self.buffer);
+    pub fn try_get_buffer(&mut self) -> Option<&mut [W]> {
+        if self.meta.owner.load(Ordering::Relaxed) == Owner::CPU.into() {
+            return Some(&mut self.buffer[..]);
         }
         None
     }
 
     pub fn take(&self) -> &[W] {
-        self.owner.store(Owner::DMA.into(), Ordering::Relaxed);
-        self.buffer
+        self.meta.owner.store(Owner::DMA.into(), Ordering::Relaxed);
+        &self.buffer[..]
     }
 }
 
@@ -92,8 +81,23 @@ pub trait Peripheral {
     fn word_size(&self) -> usize;
 }
 
+pub trait DMAFuture: Future<Output = ()> {}
+
+/// Whenever tx or rx with buffer-descriptor, DMA does not take ownership of BD,
+/// but requires BD lifetime lives no less than DMA lifetime,
+/// when DMA lifetime ends, it should immediately stop and drop reference to BD
+/// if any to ensure BD memory safety.
 pub trait DMA: Send + 'static {
+    type Future;
+
     fn setup_peripheral(&mut self, channel: u8, periph: &mut dyn Peripheral);
-    fn tx<W>(&mut self, buffer: &BufferDescriptor<W>, repeat: Option<usize>);
-    fn rx<W>(&mut self, buffer: &BufferDescriptor<W>, circle: bool);
+    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, repeat: Option<usize>) -> Self::Future
+    where
+        W: Copy + Default,
+        BD: AsRef<BufferDescriptor<W, N>> + 'a;
+    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, circle: bool) -> Self::Future
+    where
+        W: Copy + Default,
+        BD: AsRef<BufferDescriptor<W, N>> + 'a;
+    fn stop(&self);
 }

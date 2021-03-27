@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use chips::hal::dma::{Buffer, BufferDescriptor, Peripheral, DMA};
+use chips::hal::dma::{BufferDescriptor, Peripheral, DMA};
 use chips::stm32f4::delay::TickDelay;
 use drone_core::fib::{new_fn, Yielded};
 use drone_cortexm::thr::ThrNvic;
@@ -31,13 +31,14 @@ pub struct DmaSpiMPU6000<SPI, CS, INT, RX, TX, THR> {
     pub thread: THR,
 }
 
-impl<E: Debug, PE: Debug, SPI, CS, INT, RX, TX, THR> DmaSpiMPU6000<SPI, CS, INT, RX, TX, THR>
+impl<E: Debug, PE: Debug, SPI, CS, INT, RXF, TXF, RX, TX, THR>
+    DmaSpiMPU6000<SPI, CS, INT, RX, TX, THR>
 where
     SPI: Transfer<u8, Error = E> + Write<u8, Error = E> + Peripheral + Send + 'static,
     CS: OutputPin<Error = PE> + Send + 'static + Unpin,
     INT: ExtiPin + Send + 'static,
-    RX: DMA,
-    TX: DMA,
+    RX: DMA<Future = RXF>,
+    TX: DMA<Future = TXF>,
     THR: ThrNvic,
 {
     pub fn init(self, mut handler: impl FnMut(Acceleration, Measurement) + 'static + Send) {
@@ -58,21 +59,20 @@ where
 
         let (mut spi, mut cs, _) = mpu6000.free().free();
 
-        let mut buffer = Buffer::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default();
+        let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
+        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+        info!("MPU6000 detected, Init DMA address at {:x}", address as usize);
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
         let convertor = Convertor::default();
         let rotation = config::get().board.rotation;
-        buffer.set_transfer_done(Box::leak(Box::new(move |bytes| {
+        rx_bd.set_transfer_done(move |bytes| {
             cs_.set_high().ok();
             let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);
             handler(acceleration, gyro);
-        })));
-        let mut rx_bd: BufferDescriptor<u8> = Box::leak(Box::new(buffer)).into();
-        let buffer = rx_bd.borrow_mut().unwrap();
-        info!("MPU6000 detected, Init DMA address at {:x}", buffer.as_ptr() as usize);
+        });
 
-        let buffer = Buffer::<u8, 1>::new([Register::AccelerometerXHigh as u8 | 0x80]);
-        let tx_bd: BufferDescriptor<u8> = Box::leak(Box::new(buffer)).into();
+        let bytes = [Register::AccelerometerXHigh as u8 | 0x80];
+        let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new(bytes));
 
         let mut rx = self.rx;
         rx.setup_peripheral(3, &mut spi);

@@ -1,5 +1,6 @@
 #![no_std]
 
+extern crate alloc;
 extern crate cortex_m;
 extern crate cortex_m_rt;
 #[cfg(feature = "stm32")]
