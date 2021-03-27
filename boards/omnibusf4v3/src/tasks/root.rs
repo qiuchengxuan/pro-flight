@@ -4,6 +4,7 @@ use core::time::Duration;
 
 use chips::stm32f4::{
     clock,
+    crc::CRC,
     delay::TickDelay,
     dfu, dma,
     flash::{Flash, Sector},
@@ -15,7 +16,7 @@ use chips::stm32f4::{
 use drivers::{
     barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
     led::LED,
-    max7456::{self, DmaMAX7456},
+    max7456::{self, DmaMAX7456, HashFont},
     nvram::NVRAM,
     stm32::voltage_adc,
 };
@@ -98,7 +99,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
-    reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en());
+    reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en().set_crcen());
     reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
     reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
 
@@ -143,7 +144,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
     let mpu6000 = DmaSpiMPU6000 {
-        spi: Spi1::new(periph_spi1!(reg), pins, thread.spi_1, baudrate, mpu6000::SPI_MODE),
+        spi: Spi1::new(periph_spi1!(reg), pins, baudrate, mpu6000::SPI_MODE),
         cs: gpio_a.pa4.into_push_pull_output(),
         int: into_interrupt!(syscfg, peripherals, gpio_c.pc4),
         rx: dma::Stream::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0),
@@ -172,7 +173,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
-    let spi3 = Spi3::new(periph_spi3!(reg), pins, thread.spi_3, baudrate, bmp280::SPI_MODE);
+    let spi3 = Spi3::new(periph_spi3!(reg), pins, baudrate, bmp280::SPI_MODE);
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
     cs_osd.set_high().ok();
     let cs_baro = gpio_b.pb3.into_push_pull_output();
@@ -188,13 +189,20 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         vertical_speed.write(vs.update(v.into()));
     });
 
-    let (mut spi, cs_osd) = max7456::init(spi, cs_osd).unwrap().free();
+    let mut max7456 = max7456::init(spi, cs_osd).unwrap();
+    let mut crc32 = CRC(peripherals.CRC);
+    match max7456.hash_font_crc32(&mut crc32) {
+        Ok(crc32) => info!("MAX7456 font crc32 = {:x}", crc32),
+        Err(e) => warn!("Hash MAX7456 font fail: {:?}", e),
+    }
+
+    let (mut spi, cs_osd) = max7456.free();
     let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), thread.dma_1_stream_0);
     rx.setup_peripheral(0, &mut spi);
     let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma_1_stream_5);
     tx.setup_peripheral(0, &mut spi);
 
-    let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader).run(Box::leak(Box::new(tx.clone()))));
+    let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader).run(rx.clone(), tx.clone()));
     let int = make_soft_int(thread.exti_3, periph_exti3!(reg), move || future.try_poll());
     let mut max7456 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(20));
     let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));

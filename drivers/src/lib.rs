@@ -2,6 +2,7 @@
 
 extern crate alloc;
 extern crate bmp280_core as bmp280;
+extern crate crc;
 extern crate hal;
 extern crate max7456 as _;
 #[macro_use]

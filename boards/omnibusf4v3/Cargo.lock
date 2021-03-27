@@ -233,6 +233,7 @@ name = "drivers"
 version = "0.0.1"
 dependencies = [
  "bmp280-core",
+ "crc",
  "embedded-hal",
  "hal",
  "max7456",
@@ -945,6 +946,7 @@ dependencies = [
  "hal",
  "heapless",
  "integer-sqrt",
+ "max7456",
  "micromath",
  "nalgebra",
  "nb 1.0.0",

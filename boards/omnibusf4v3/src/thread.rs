@@ -33,8 +33,6 @@ thr::nvic! {
             10: pub exti4;
             11: pub dma1_stream0;
             16: pub dma1_stream5;
-            35: pub spi1;
-            51: pub spi3;
             56: pub dma2_stream0;
             58: pub dma2_stream2;
             59: pub dma2_stream3;

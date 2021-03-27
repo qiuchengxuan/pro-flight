@@ -17,7 +17,8 @@ fn write_bytes(mut bytes: &[u8]) {
         Some(port) => port,
         None => return,
     };
-    while bytes.len() > 0 && POLL_OK.load(Ordering::Relaxed) {
+
+    while bytes.len() > 0 && POLL_OK.fetch_and(false, Ordering::Relaxed) {
         match cortex_m::interrupt::free(|_| serial_port.write(bytes)) {
             Ok(size) => bytes = &bytes[size..],
             Err(UsbError::WouldBlock) => TickDelay.delay_us(1u32),

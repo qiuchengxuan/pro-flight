@@ -1,4 +1,5 @@
 pub mod clock;
+pub mod crc;
 pub mod delay;
 pub mod dfu;
 pub mod dma;
