@@ -1,13 +1,13 @@
 mod config;
 mod datetime;
 pub mod memory;
+mod terminal;
 
 use alloc::boxed::Box;
 
 use git_version::git_version;
 
 use crate::components::logger;
-use crate::drivers::terminal::Terminal;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const REVISION: &'static str = git_version!();
@@ -53,7 +53,7 @@ impl Command {
 }
 
 pub struct CLI<'a> {
-    terminal: Terminal,
+    terminal: terminal::Terminal,
     commands: &'a mut [Command],
 }
 
@@ -63,7 +63,7 @@ fn prompt() {
 
 impl<'a> CLI<'a> {
     pub fn new(commands: &'a mut [Command]) -> Self {
-        CLI { terminal: Terminal::new(), commands }
+        CLI { terminal: terminal::Terminal::new(), commands }
     }
 
     pub fn receive(&mut self, bytes: &[u8]) {

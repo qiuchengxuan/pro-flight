@@ -1,5 +1,5 @@
 use chips::stm32f4::flash::{Error, Flash, Sector};
-use pro_flight::hal;
+use hal;
 
 pub struct FlashWrapper(Flash);
 

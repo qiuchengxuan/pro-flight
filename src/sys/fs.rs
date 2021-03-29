@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::hal::io::{Read, Write};
+use crate::io::{Read, Write};
 
 #[derive(Copy, Clone, Debug)]
 pub struct OpenOptions {

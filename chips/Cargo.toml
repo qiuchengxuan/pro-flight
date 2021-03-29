@@ -12,6 +12,7 @@ cortex-m-rt = "0.6"
 drone-core = { path = "../drone-os/drone-core" }
 embedded-hal = "0.2"
 futures = { version = "0.3.0", default-features = false }
+hal = { path = "../hal" }
 nb = "0.1"
 stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", optional = true }
 usb-device = "0.2"

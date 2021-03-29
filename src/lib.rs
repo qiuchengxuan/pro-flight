@@ -10,26 +10,21 @@ extern crate drone_core;
 extern crate heapless;
 extern crate integer_sqrt;
 extern crate micromath;
-#[macro_use]
-extern crate mpu6000;
 extern crate nalgebra;
 extern crate nb;
 #[macro_use]
 extern crate sval;
 extern crate sval_json;
-extern crate usb_device;
-extern crate usbd_serial;
 
-#[macro_use]
-pub mod sys;
 pub mod components;
 #[macro_use]
 pub mod datastructures;
 pub mod algorithm;
 pub mod config;
-pub mod drivers;
-pub mod hal;
+pub mod io;
 pub mod sync;
+#[macro_use]
+pub mod sys;
 
 #[cfg(test)]
 extern crate std;

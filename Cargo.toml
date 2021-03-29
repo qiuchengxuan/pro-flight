@@ -8,20 +8,16 @@ version = "0.1.0"
 [dependencies]
 ascii = { version = "1.0", default-features = false }
 chrono = { version = "0.4", default-features = false }
-embedded-hal = "0.2"
 drone-core = { path = "drone-os/drone-core" }
+embedded-hal = "0.2"
 git-version = "0.3.4"
 heapless = "0.6"
 integer-sqrt = "0.1"
 micromath = "1.0"
-mpu6000 = "0.2.1"
 nalgebra = { version = "0.21", default-features = false }
 nb = "0.1"
-stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }
 sval = { version = "0.5", features = ["derive"] }
 sval_json = "0.5"
-usb-device = "0.2"
-usbd-serial = "0.1"
 void = { version = "1", default-features = false }
 
 [lib]

@@ -1,0 +1,17 @@
+[package]
+authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+name = "drivers"
+version = "0.0.1"
+
+[dependencies]
+embedded-hal = "0.2"
+hal = { path = "../hal" }
+mpu6000 = "0.2.1"
+pro-flight = { path = "../", default-features = false }
+
+[lib]
+name = "drivers"
+test = false
+bench = false

@@ -7,6 +7,7 @@ use chips::stm32f4::{
     spi::BaudrateControl,
     systick, usb_serial,
 };
+use drivers::{led::LED, nvram::NVRAM};
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
@@ -26,8 +27,6 @@ use pro_flight::{
         speedometer::Speedometer,
     },
     config,
-    drivers::led::LED,
-    drivers::nvram::NVRAM,
     sync::DataWriter,
     sys::timer,
 };

@@ -8,6 +8,8 @@
 extern crate alloc;
 #[macro_use]
 extern crate chips;
+extern crate drivers;
+extern crate hal;
 #[macro_use]
 extern crate pro_flight;
 

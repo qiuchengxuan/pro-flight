@@ -1,4 +1,4 @@
-use crate::hal::flash::Flash;
+use hal::flash::Flash;
 
 const ACTIVE: u32 = 0x4E565241;
 const EMPTY: u32 = 0xFFFFFFFF;

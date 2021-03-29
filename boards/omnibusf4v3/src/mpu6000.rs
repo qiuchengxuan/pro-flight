@@ -1,11 +1,12 @@
 use core::fmt::Debug;
 
-use chips::hal::dma::{BufferDescriptor, Peripheral, DMA};
 use chips::stm32f4::delay::TickDelay;
+use drivers::mpu6000::{Convertor, MPU6000Init, NUM_MEASUREMENT_REGS};
 use drone_core::fib::{new_fn, Yielded};
 use drone_cortexm::thr::ThrNvic;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
+use hal::dma::{BufferDescriptor, Peripheral, DMA};
 pub use mpu6000::SPI_MODE;
 use mpu6000::{
     bus::{SpiBus, SpiError},
@@ -15,7 +16,6 @@ use mpu6000::{
 use pro_flight::{
     config,
     datastructures::measurement::{Acceleration, Measurement},
-    drivers::mpu6000::{Convertor, MPU6000Init, NUM_MEASUREMENT_REGS},
     sys::timer::SysTimer,
 };
 use stm32f4xx_hal::gpio::ExtiPin;

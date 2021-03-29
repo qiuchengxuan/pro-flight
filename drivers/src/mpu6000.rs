@@ -3,9 +3,9 @@ use mpu6000::bus::Bus;
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive};
 use mpu6000::{self, ClockSource, IntPinConfig, Interrupt, MPU6000};
 
-use crate::config;
-use crate::datastructures::measurement::{Acceleration, Axes, Measurement, Rotation};
-use crate::sys::timer::SysTimer;
+use pro_flight::config;
+use pro_flight::datastructures::measurement::{Acceleration, Axes, Measurement, Rotation};
+use pro_flight::sys::timer::SysTimer;
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 pub const NUM_MEASUREMENT_REGS: usize = 14;

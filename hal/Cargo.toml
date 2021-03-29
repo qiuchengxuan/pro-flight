@@ -1,0 +1,11 @@
+[package]
+authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
+edition = "2018"
+readme = "README.md"
+name = "hal"
+version = "0.0.1"
+
+[lib]
+name = "hal"
+test = false
+bench = false

@@ -15,8 +15,7 @@ use core::str::Split;
 
 use crate::datastructures::decimal::IntegerDecimal;
 use crate::datastructures::measurement::{Axes, Gain};
-use crate::hal::io::Read;
-
+use crate::io::Read;
 pub use aircraft::Aircraft;
 pub use battery::Battery;
 pub use board::Board;

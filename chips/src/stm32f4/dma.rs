@@ -7,7 +7,7 @@ use drone_core::fib::{new_fn, Yielded};
 use drone_cortexm::{reg::prelude::*, reg::Reg as _, thr::ThrNvic};
 use drone_stm32_map::periph::dma::ch::*;
 
-use crate::hal::dma::{BufferDescriptor, DMAFuture, Meta, Peripheral, DMA};
+use hal::dma::{BufferDescriptor, DMAFuture, Meta, Peripheral, DMA};
 
 pub enum Direction {
     PeripheralToMemory = 0b00,

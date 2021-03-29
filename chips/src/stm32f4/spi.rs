@@ -152,7 +152,7 @@ macro_rules! define_spis {
         use embedded_hal::spi::{Mode, Phase, Polarity};
         use stm32f4xx_hal::gpio::{self, Alternate, Floating, Input, Output, PullUp, PushPull};
 
-        use $crate::hal::dma;
+        use hal::dma;
 
         #[derive(Copy, Clone, Debug)]
         pub enum Error {
