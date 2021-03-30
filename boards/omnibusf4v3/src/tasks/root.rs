@@ -102,7 +102,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let (heading, course) = (reader.gnss_heading, reader.gnss_course);
     let mut imu = IMU::new(reader.magnetometer, heading, course, 1000, 1000 / 10);
-    let mut speedometer = Speedometer::new(reader.altimeter, reader.gnss_velocity, 1000, 10);
+    let mut speedometer = Speedometer::new(reader.vertical_speed, reader.gnss_velocity, 1000, 10);
     let mut positioning = Positioning::new(reader.altimeter, reader.gnss_position, 1000);
 
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);

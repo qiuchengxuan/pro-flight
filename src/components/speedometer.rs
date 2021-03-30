@@ -2,9 +2,8 @@ use nalgebra::Vector3;
 
 use crate::algorithm::ComplementaryFilter;
 use crate::config;
-use crate::datastructures::measurement::distance::Distance;
 use crate::datastructures::measurement::unit::{Meter, MilliMeter};
-use crate::datastructures::measurement::{Altitude, VelocityVector, GRAVITY};
+use crate::datastructures::measurement::{Velocity, VelocityVector, GRAVITY};
 use crate::sync::{AgingDataReader, DataReader};
 
 pub struct Speedometer<A, GNSS> {
@@ -12,16 +11,14 @@ pub struct Speedometer<A, GNSS> {
     gnss: GNSS,
     gnss_aging: usize,
     interval: f32,
-    altitude_delta: Distance<f32, Meter>,
     filters: [ComplementaryFilter<f32>; 3],
     acceleration: Vector3<f32>,
-    altitude: Altitude,
-    vector: (f32, f32, f32),
+    velocity: VelocityVector<f32, Meter>,
 }
 
 impl<A, GNSS> Speedometer<A, GNSS>
 where
-    A: DataReader<Altitude>,
+    A: DataReader<Velocity<f32, Meter>>,
     GNSS: AgingDataReader<VelocityVector<i32, MilliMeter>>,
 {
     pub fn new(altimeter: A, gnss: GNSS, sample_rate: usize, gnss_rate: usize) -> Self {
@@ -31,33 +28,29 @@ where
             gnss,
             gnss_aging: sample_rate / gnss_rate,
             interval: 1.0 / sample_rate as f32,
-            acceleration: Vector3::new(0.0, 0.0, 0.0),
-            altitude_delta: Default::default(),
             filters: [ComplementaryFilter::new(config.kp.into(), 1.0 / sample_rate as f32); 3],
-            altitude: Altitude::default(),
-            vector: (0.0, 0.0, 0.0),
+            acceleration: Vector3::new(0.0, 0.0, 0.0),
+            velocity: Default::default(),
         }
     }
 
-    pub fn update(&mut self, a: Vector3<f32>) -> VelocityVector<f32, Meter> {
-        if let Some(altitude) = self.altimeter.get() {
-            self.altitude_delta = (altitude - self.altitude).convert(|v| v as f32).to_unit(Meter);
-            self.altitude = altitude;
-        }
-        #[rustfmt::skip]
-        let gnss = self.gnss.get_aging_last(self.gnss_aging)
-            .map(|velocity| velocity.convert(|v| v as f32).to_unit(Meter));
-
-        let a = a * GRAVITY;
-        self.acceleration = a;
-        if let Some(vector) = gnss {
-            self.vector.0 = self.filters[0].filter(vector.x.value(), a[0]);
-            self.vector.1 = self.filters[1].filter(vector.y.value(), a[1]);
+    pub fn update(&mut self, acceleration: Vector3<f32>) -> VelocityVector<f32, Meter> {
+        let mut a = acceleration * GRAVITY;
+        a[2] += GRAVITY;
+        if let Some(velocity) = self.gnss.get_aging_last(self.gnss_aging) {
+            let v = velocity.convert(|v| v as f32).to_unit(Meter);
+            self.velocity.x.value = self.filters[0].filter(v.x.value(), a[0]);
+            self.velocity.y.value = self.filters[1].filter(v.y.value(), a[1]);
+            self.velocity.z.value = self.filters[2].filter(v.z.value(), a[2]);
+        } else if let Some(velocity) = self.altimeter.get_last() {
+            self.velocity.x.value += (a[0] + (a[0] - self.acceleration[0]) / 2.0) * self.interval;
+            self.velocity.y.value += (a[1] + (a[1] - self.acceleration[1]) / 2.0) * self.interval;
+            self.velocity.z.value = self.filters[2].filter(velocity.value(), a[2]);
         } else {
-            self.vector.0 += (a[0] + (a[0] - self.acceleration[0]) / 2.0) * self.interval;
-            self.vector.1 += (a[1] + (a[1] - self.acceleration[1]) / 2.0) * self.interval;
+            let v = (a + (a - self.acceleration) / 2.0) * self.interval;
+            self.velocity += VelocityVector::new(v[0], v[1], v[2], Meter);
         }
-        self.vector.2 = self.filters[2].filter(self.altitude_delta.value(), a[2] + GRAVITY);
-        VelocityVector::new(self.vector.0, self.vector.1, self.vector.2, Meter)
+        self.acceleration = a;
+        self.velocity
     }
 }

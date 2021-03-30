@@ -13,7 +13,7 @@ use crate::datastructures::{
         battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
         unit::{CentiMeter, Meter, MilliMeter},
-        Acceleration, Altitude, Course, Gyro, Heading, Magnetism, VelocityVector,
+        Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
     GNSSFixed,
 };
@@ -48,6 +48,7 @@ macro_rules! flight_data {
 
 flight_data! {
     altimeter: Altitude,
+    vertical_speed: Velocity<f32, Meter>,
     battery: Battery,
     accelerometer: Acceleration,
     gyroscope: Gyro,
