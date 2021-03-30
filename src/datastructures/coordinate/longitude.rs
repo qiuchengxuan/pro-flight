@@ -22,18 +22,23 @@ impl Longitude {
             None => return None,
         };
         let mut split = match split.next() {
-            Some(remain) => remain.split('.'),
+            Some(remain) => remain.split('\''),
             None => return None,
         };
         let minute: i32 = match split.next().map(|m| m.parse().ok()).flatten() {
             Some(m) => m,
             None => return None,
         };
-        let sub_second: i32 = match split.next().map(|s| s.parse().ok()).flatten() {
+        let mut split = match split.next() {
+            Some(remain) => remain.split('.'),
+            None => return None,
+        };
+        let second: i32 = match split.next().map(|s| s.parse().ok()).flatten() {
             Some(s) => s,
             None => return None,
         };
-        let value = (degree * 3600 + minute * 60) * SUB_SECOND + sub_second;
+        let sub_second: i32 = split.next().map(|s| s.parse().ok()).flatten().unwrap_or(0);
+        let value = (degree * 3600 + minute * 60 + second) * SUB_SECOND + sub_second;
         Some(Self(if positive { value } else { -value }))
     }
 }
@@ -77,9 +82,10 @@ impl core::fmt::Display for Longitude {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let direction = if self.0 >= 0 { "E" } else { "W" };
         let sub_second = self.0.abs();
-        let degree = sub_second / SUB_SECOND / 3600;
-        let minute = (sub_second / SUB_SECOND / 60) % 60;
-        write!(f, "{}{:03}°{:02}.{:03}", direction, degree, minute, sub_second % SUB_SECOND)
+        let second = sub_second / SUB_SECOND;
+        let (degree, minute, second) = (second / 3600, (second / 60) % 60, second % 60);
+        let sub_second = sub_second % SUB_SECOND;
+        write!(f, "{}{:03}°{:02}'{:02}.{:03}", direction, degree, minute, second, sub_second)
     }
 }
 
@@ -96,12 +102,12 @@ mod test {
         use crate::datastructures::measurement::distance::Distance;
         use crate::datastructures::measurement::unit::CentiMeter;
 
-        let longitude = Longitude::from_str("E116°44.540").unwrap();
-        assert_eq!("E116°44.540", format!("{}", longitude));
+        let longitude = Longitude::from_str("E116°44'54").unwrap();
+        assert_eq!("E116°44'54.000", format!("{}", longitude));
 
-        assert_eq!("E116°44.538", format!("{}", longitude + Distance::new(-7, CentiMeter)));
+        assert_eq!("E116°44'53.998", format!("{}", longitude + Distance::new(-7, CentiMeter)));
 
-        let distance = longitude - Longitude::from_str("E116°43.540").unwrap();
+        let distance = longitude - Longitude::from_str("E116°43'54").unwrap();
         assert_eq!("1842m", format!("{}", distance));
     }
 }
