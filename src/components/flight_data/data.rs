@@ -4,7 +4,12 @@ use crate::datastructures::{
     coordinate::Position,
     input::ControlInput,
     input::RSSI,
-    measurement::{battery::Battery, displacement::DistanceVector, unit::Meter, VelocityVector},
+    measurement::{
+        battery::Battery,
+        displacement::DistanceVector,
+        unit::{CentiMeter, Meter},
+        VelocityVector,
+    },
     waypoint::Steerpoint,
 };
 
@@ -14,7 +19,7 @@ use super::sensor::Sensor;
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Misc {
     pub battery: Battery,
-    pub displacement: DistanceVector<i32, Meter>,
+    pub displacement: DistanceVector<i32, CentiMeter>,
     pub input: ControlInput,
     pub quaternion: UnitQuaternion<f32>,
     pub rssi: RSSI,

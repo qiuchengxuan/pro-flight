@@ -1,4 +1,4 @@
-use core::ops::{Div, Mul, Sub};
+use core::ops::{Add, AddAssign, Div, Mul, Sub};
 
 use integer_sqrt::IntegerSquareRoot as SquareRoot;
 #[allow(unused_imports)] // false warning
@@ -101,9 +101,29 @@ impl<U: Copy + Default> DistanceVector<f32, U> {
     }
 }
 
+impl<T, U: Copy> Add for DistanceVector<T, U>
+where
+    T: Copy + Default + PartialEq + Add<Output = T>,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
+    }
+}
+
+impl<T, U: Copy> AddAssign for DistanceVector<T, U>
+where
+    T: Copy + Default + PartialEq + Add<Output = T>,
+{
+    fn add_assign(&mut self, other: Self) {
+        *self = Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
+    }
+}
+
 impl<T, U: Copy> Sub for DistanceVector<T, U>
 where
-    T: Copy + Default + PartialEq + Sub<Output = T> + sval::Value,
+    T: Copy + Default + PartialEq + Sub<Output = T>,
 {
     type Output = Self;
 
@@ -114,11 +134,22 @@ where
 
 impl<T, U: Copy> Mul<T> for DistanceVector<T, U>
 where
-    T: Copy + Default + PartialEq + Mul<Output = T> + sval::Value,
+    T: Copy + Default + PartialEq + Mul<Output = T>,
 {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self {
         Self { x: self.x * rhs, y: self.y * rhs, z: self.z * rhs }
+    }
+}
+
+impl<T, U: Copy> Div<T> for DistanceVector<T, U>
+where
+    T: Copy + Default + PartialEq + Div<Output = T>,
+{
+    type Output = Self;
+
+    fn div(self, rhs: T) -> Self {
+        Self { x: self.x / rhs, y: self.y / rhs, z: self.z / rhs }
     }
 }

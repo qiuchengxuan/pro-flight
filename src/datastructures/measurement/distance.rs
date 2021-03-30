@@ -1,6 +1,6 @@
 use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
-use core::ops::{Add, Div, Mul, Sub};
+use core::ops::{Add, AddAssign, Div, Mul, Sub};
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Distance<T, U> {
@@ -45,6 +45,12 @@ impl<T: Add<Output = T> + Copy + Default + PartialEq, U: Copy> Add for Distance<
     type Output = Distance<T::Output, U>;
     fn add(self, other: Self) -> Self::Output {
         Self { value: self.value + other.value, unit: PhantomData }
+    }
+}
+
+impl<T: AddAssign + Copy + Default + PartialEq, U: Copy> AddAssign for Distance<T, U> {
+    fn add_assign(&mut self, other: Self) {
+        self.value += other.value
     }
 }
 

@@ -7,15 +7,14 @@ use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
 
 use crate::datastructures::{
-    coordinate::Position,
+    coordinate::{Displacement, Position},
     input::{ControlInput, RSSI},
     measurement::{
         battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
-        unit::{Meter, MilliMeter},
+        unit::{CentiMeter, Meter, MilliMeter},
         Acceleration, Altitude, Course, Gyro, Heading, Magnetism, VelocityVector,
     },
-    waypoint::Steerpoint,
     GNSSFixed,
 };
 use crate::sync::singular::{SingularData, SingularDataSource};
@@ -54,7 +53,8 @@ flight_data! {
     gyroscope: Gyro,
     imu: UnitQuaternion<f32>,
     speedometer: VelocityVector<f32, Meter>,
-    navigation: (Position, Steerpoint),
+    positioning: Position,
+    displacement: Displacement<CentiMeter>,
 
     rssi: RSSI,
     control_input: ControlInput,
@@ -63,6 +63,7 @@ flight_data! {
     gnss_fixed: GNSSFixed,
     gnss_heading: Heading,
     gnss_course: Course,
+    gnss_position: Position,
     gnss_velocity: VelocityVector<i32, MilliMeter>
 }
 
@@ -82,16 +83,16 @@ impl<'a> FlightDataReader<'a> {
             ..Default::default()
         };
 
-        let (position, steerpoint) = self.navigation.get().unwrap_or_default();
+        let position = self.positioning.get().unwrap_or_default();
         let speed_vector = self.speedometer.get().unwrap_or_default();
-        let navigation = Navigation { position, speed_vector, steerpoint };
+        let navigation = Navigation { position, speed_vector, ..Default::default() };
 
         let acceleration = self.accelerometer.get().unwrap_or_default();
         let gyro = self.gyroscope.get().unwrap_or_default();
         let magnetism = self.magnetometer.get();
         let sensor = Sensor { acceleration, gyro, magnetism, ..Default::default() };
 
-        let displacement = steerpoint.waypoint.position - position;
+        let displacement = self.displacement.get().unwrap_or_default();
         let input = self.control_input.get().unwrap_or_default();
         let misc = Misc {
             battery: battery / battery_cells as u16,
