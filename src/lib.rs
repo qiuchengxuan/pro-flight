@@ -25,6 +25,7 @@ pub mod io;
 pub mod sync;
 #[macro_use]
 pub mod sys;
+pub mod sysinfo;
 
 #[cfg(test)]
 extern crate std;

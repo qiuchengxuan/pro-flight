@@ -3,7 +3,7 @@
 use chips::stm32f4::{
     clock, dma,
     flash::{Flash, Sector},
-    rtc::RTC,
+    rtc,
     spi::BaudrateControl,
     systick, usb_serial,
 };
@@ -18,6 +18,7 @@ use drone_stm32_map::periph::{
     sys_tick::periph_sys_tick,
 };
 use futures::prelude::*;
+use hal::persist::PersistDatastore;
 use pro_flight::{
     components::{
         cli::{Command, CLI},
@@ -29,8 +30,8 @@ use pro_flight::{
     },
     config,
     sync::DataWriter,
-    sys::time,
-    sys::timer,
+    sys::{time, timer},
+    sysinfo::{RebootReason, SystemInfo},
 };
 use stm32f4xx_hal::{
     gpio::{Edge, ExtiPin},
@@ -70,6 +71,18 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
 
+    reg.pwr_cr.modify(|r| r.set_dbp());
+    reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
+    let (rtc, mut persist) = rtc::init(periph_rtc!(reg));
+    let mut sysinfo: SystemInfo = persist.load();
+    match sysinfo.reboot_reason {
+        RebootReason::Bootloader => {
+            sysinfo.reboot_reason = RebootReason::Normal;
+            persist.save(&sysinfo);
+        }
+        _ => (),
+    };
+
     let mut peripherals = stm32::Peripherals::take().unwrap();
     let mut syscfg = peripherals.SYSCFG.constrain();
     let (gpio_a, gpio_b, gpio_c) =
@@ -77,9 +90,6 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), timer::SysTimer::new());
 
-    reg.pwr_cr.modify(|r| r.set_dbp());
-    reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
-    let rtc = RTC::new(periph_rtc!(reg));
     let reader = rtc.reader();
     time::init(reader, rtc);
     logger::init(Box::leak(Box::new([0u8; 1024])));
@@ -140,6 +150,11 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
 
     let mut commands = [
+        Command::new("bootloader", "Enter bootloader", move |_| {
+            sysinfo.reboot_reason = RebootReason::Bootloader;
+            persist.save(&sysinfo);
+            cortex_m::peripheral::SCB::sys_reset();
+        }),
         Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),
         Command::new("logread", "Show log", |_| println!("{}", logger::get())),
         Command::new("telemetry", "Show flight data", move |_| println!("{}", reader.read())),

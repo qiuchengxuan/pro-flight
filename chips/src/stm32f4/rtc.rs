@@ -3,7 +3,7 @@ use chrono::{Datelike, Timelike};
 use drone_cortexm::reg::prelude::*;
 use drone_stm32_map::periph::rtc::RtcPeriph;
 use drone_stm32_map::reg;
-use hal::rtc as hal;
+use hal::{self, persist::PersistDatastore};
 
 const PREDIV_A: u32 = 0x7F;
 const PREDIV_S: u32 = 0x1FFF;
@@ -39,7 +39,7 @@ pub struct RTCReader {
     ssr: reg::rtc::Ssr<Crt>,
 }
 
-impl hal::RTCReader for RTCReader {
+impl hal::rtc::RTCReader for RTCReader {
     fn date(&self) -> NaiveDate {
         let reg = self.dr.load();
         let year: BCD = (reg.yt(), reg.yu()).into();
@@ -61,6 +61,21 @@ impl hal::RTCReader for RTCReader {
 unsafe impl Send for RTCReader {}
 unsafe impl Sync for RTCReader {}
 
+pub struct BackupRegisters(reg::rtc::Bkp0R<Srt>);
+
+impl PersistDatastore for BackupRegisters {
+    fn load<'a, T: From<&'a [u32]>>(&'a self) -> T {
+        let array: &[u32; 20] = unsafe { core::mem::transmute(self.0.as_ptr()) };
+        T::from(&array[..])
+    }
+
+    fn save<T: AsRef<[u32]>>(&mut self, t: &T) {
+        let slice = t.as_ref();
+        let array: &mut [u32; 20] = unsafe { core::mem::transmute(self.0.as_ptr()) };
+        array[..slice.len()].copy_from_slice(slice)
+    }
+}
+
 pub struct RTC {
     tr: reg::rtc::Tr<Crt>,
     dr: reg::rtc::Dr<Crt>,
@@ -70,6 +85,15 @@ pub struct RTC {
 }
 
 impl RTC {
+    fn init(&mut self, prer: reg::rtc::Prer<Srt>) {
+        self.disable_write_protect();
+        self.enter_init();
+        prer.modify(|r| r.write_prediv_s(PREDIV_S)); // 1MHz / 128 / 8192 = 1Hz
+        prer.modify(|r| r.write_prediv_a(PREDIV_A)); // NOTE: two sperate accesses must be performed
+        self.exit_init();
+        self.enable_write_protect();
+    }
+
     pub fn new(regs: RtcPeriph) -> Self {
         let mut rtc = Self {
             tr: regs.rtc_tr.into_copy(),
@@ -78,12 +102,7 @@ impl RTC {
             isr: regs.rtc_isr,
             ssr: regs.rtc_ssr.into_copy(),
         };
-        rtc.disable_write_protect();
-        rtc.enter_init();
-        regs.rtc_prer.modify(|r| r.write_prediv_s(PREDIV_S)); // 1MHz / 128 / 8192 = 1Hz
-        regs.rtc_prer.modify(|r| r.write_prediv_a(PREDIV_A)); // NOTE: two sperate accesses must be performed
-        rtc.exit_init();
-        rtc.enable_write_protect();
+        rtc.init(regs.rtc_prer);
         rtc
     }
 
@@ -134,7 +153,7 @@ impl RTC {
     }
 }
 
-impl hal::RTCWriter for RTC {
+impl hal::rtc::RTCWriter for RTC {
     fn set_time(&self, time: &NaiveTime) {
         cortex_m::interrupt::free(|_cs| {
             self.enter_init();
@@ -159,4 +178,16 @@ impl hal::RTCWriter for RTC {
             self.exit_init();
         })
     }
+}
+
+pub fn init(regs: RtcPeriph) -> (RTC, BackupRegisters) {
+    let mut rtc = RTC {
+        tr: regs.rtc_tr.into_copy(),
+        dr: regs.rtc_dr.into_copy(),
+        wpr: regs.rtc_wpr,
+        isr: regs.rtc_isr,
+        ssr: regs.rtc_ssr.into_copy(),
+    };
+    rtc.init(regs.rtc_prer);
+    (rtc, BackupRegisters(regs.rtc_bkp0r))
 }
