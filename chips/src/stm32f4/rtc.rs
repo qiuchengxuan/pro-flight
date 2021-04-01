@@ -61,58 +61,70 @@ impl hal::rtc::RTCReader for RTCReader {
 unsafe impl Send for RTCReader {}
 unsafe impl Sync for RTCReader {}
 
-pub struct BackupRegisters(reg::rtc::Bkp0R<Srt>);
+#[derive(Copy, Clone)]
+struct WriteProtect(reg::rtc::Wpr<Crt>);
+
+impl WriteProtect {
+    fn disable(&self) {
+        self.0.store(|r| r.write_key(0xCA));
+        self.0.store(|r| r.write_key(0x53));
+    }
+
+    fn enable(&self) {
+        self.0.store(|r| r.write_key(0xFF));
+    }
+}
+
+pub struct BackupRegisters {
+    backup: reg::rtc::Bkp0R<Srt>,
+    write_protect: WriteProtect,
+}
 
 impl PersistDatastore for BackupRegisters {
     fn load<'a, T: From<&'a [u32]>>(&'a self) -> T {
-        let array: &[u32; 20] = unsafe { core::mem::transmute(self.0.as_ptr()) };
+        let array: &[u32; 20] = unsafe { core::mem::transmute(self.backup.as_ptr()) };
         T::from(&array[..])
     }
 
     fn save<T: AsRef<[u32]>>(&mut self, t: &T) {
         let slice = t.as_ref();
-        let array: &mut [u32; 20] = unsafe { core::mem::transmute(self.0.as_ptr()) };
-        array[..slice.len()].copy_from_slice(slice)
+        let array: &mut [u32; 20] = unsafe { core::mem::transmute(self.backup.as_ptr()) };
+        cortex_m::interrupt::free(|_cs| {
+            self.write_protect.disable();
+            array[..slice.len()].copy_from_slice(slice);
+            self.write_protect.enable();
+        })
     }
 }
 
 pub struct RTC {
     tr: reg::rtc::Tr<Crt>,
     dr: reg::rtc::Dr<Crt>,
-    wpr: reg::rtc::Wpr<Srt>,
     isr: reg::rtc::Isr<Srt>,
     ssr: reg::rtc::Ssr<Crt>,
+    write_protect: WriteProtect,
 }
 
 impl RTC {
     fn init(&mut self, prer: reg::rtc::Prer<Srt>) {
-        self.disable_write_protect();
+        self.write_protect.disable();
         self.enter_init();
         prer.modify(|r| r.write_prediv_s(PREDIV_S)); // 1MHz / 128 / 8192 = 1Hz
         prer.modify(|r| r.write_prediv_a(PREDIV_A)); // NOTE: two sperate accesses must be performed
         self.exit_init();
-        self.enable_write_protect();
+        self.write_protect.enable();
     }
 
     pub fn new(regs: RtcPeriph) -> Self {
         let mut rtc = Self {
             tr: regs.rtc_tr.into_copy(),
             dr: regs.rtc_dr.into_copy(),
-            wpr: regs.rtc_wpr,
             isr: regs.rtc_isr,
             ssr: regs.rtc_ssr.into_copy(),
+            write_protect: WriteProtect(regs.rtc_wpr.into_copy()),
         };
         rtc.init(regs.rtc_prer);
         rtc
-    }
-
-    pub fn disable_write_protect(&mut self) {
-        self.wpr.store(|r| r.write_key(0xCA));
-        self.wpr.store(|r| r.write_key(0x53));
-    }
-
-    pub fn enable_write_protect(&mut self) {
-        self.wpr.store(|r| r.write_key(0xFF));
     }
 
     fn enter_init(&self) {
@@ -156,38 +168,45 @@ impl RTC {
 impl hal::rtc::RTCWriter for RTC {
     fn set_time(&self, time: &NaiveTime) {
         cortex_m::interrupt::free(|_cs| {
+            self.write_protect.disable();
             self.enter_init();
             self._set_time(time);
             self.exit_init();
+            self.write_protect.enable();
         })
     }
 
     fn set_date(&self, date: &NaiveDate) {
         cortex_m::interrupt::free(|_cs| {
+            self.write_protect.disable();
             self.enter_init();
             self._set_date(date);
             self.exit_init();
+            self.write_protect.enable();
         })
     }
 
     fn set_datetime(&self, datetime: &NaiveDateTime) {
         cortex_m::interrupt::free(|_cs| {
+            self.write_protect.disable();
             self.enter_init();
             self._set_date(&datetime.date());
             self._set_time(&datetime.time());
             self.exit_init();
+            self.write_protect.enable();
         })
     }
 }
 
 pub fn init(regs: RtcPeriph) -> (RTC, BackupRegisters) {
+    let write_protect = WriteProtect(regs.rtc_wpr.into_copy());
     let mut rtc = RTC {
         tr: regs.rtc_tr.into_copy(),
         dr: regs.rtc_dr.into_copy(),
-        wpr: regs.rtc_wpr,
         isr: regs.rtc_isr,
         ssr: regs.rtc_ssr.into_copy(),
+        write_protect,
     };
     rtc.init(regs.rtc_prer);
-    (rtc, BackupRegisters(regs.rtc_bkp0r))
+    (rtc, BackupRegisters { backup: regs.rtc_bkp0r, write_protect })
 }

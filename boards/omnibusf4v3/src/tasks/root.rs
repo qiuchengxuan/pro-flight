@@ -70,6 +70,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let regs = (reg.rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
     clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
+    logger::init(Box::leak(Box::new([0u8; 1024])));
 
     reg.pwr_cr.modify(|r| r.set_dbp());
     reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
@@ -93,7 +94,6 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let reader = rtc.reader();
     time::init(reader, rtc);
-    logger::init(Box::leak(Box::new([0u8; 1024])));
 
     let (usb_global, usb_device, usb_pwrclk) =
         (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
