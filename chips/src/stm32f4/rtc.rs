@@ -1,10 +1,9 @@
-use core::mem::MaybeUninit;
-
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
 use chrono::{Datelike, Timelike};
 use drone_cortexm::reg::prelude::*;
 use drone_stm32_map::periph::rtc::RtcPeriph;
 use drone_stm32_map::reg;
+use hal::rtc as hal;
 
 const PREDIV_A: u32 = 0x7F;
 const PREDIV_S: u32 = 0x1FFF;
@@ -40,8 +39,8 @@ pub struct RTCReader {
     ssr: reg::rtc::Ssr<Crt>,
 }
 
-impl RTCReader {
-    pub fn date(&self) -> NaiveDate {
+impl hal::RTCReader for RTCReader {
+    fn date(&self) -> NaiveDate {
         let reg = self.dr.load();
         let year: BCD = (reg.yt(), reg.yu()).into();
         let month: BCD = (reg.mt() as u32, reg.mu()).into();
@@ -49,7 +48,7 @@ impl RTCReader {
         NaiveDate::from_ymd(year.0 as i32 + 1970, month.0, day.0)
     }
 
-    pub fn time(&self) -> NaiveTime {
+    fn time(&self) -> NaiveTime {
         let reg = self.tr.load();
         let hour: BCD = (reg.ht(), reg.hu()).into();
         let minute: BCD = (reg.mnt(), reg.mnu()).into();
@@ -97,17 +96,17 @@ impl RTC {
         self.wpr.store(|r| r.write_key(0xFF));
     }
 
-    fn enter_init(&mut self) {
+    fn enter_init(&self) {
         self.isr.modify(|r| r.set_init());
         while !self.isr.initf.read_bit() {}
     }
 
-    fn exit_init(&mut self) {
+    fn exit_init(&self) {
         self.isr.modify(|r| r.clear_init());
         while self.isr.initf.read_bit() {}
     }
 
-    fn _set_time(&mut self, time: &NaiveTime) {
+    fn _set_time(&self, time: &NaiveTime) {
         let hour = BCD(time.hour());
         let minute = BCD(time.minute());
         let second = BCD(time.second());
@@ -118,13 +117,7 @@ impl RTC {
         });
     }
 
-    pub fn set_time(&mut self, time: &NaiveTime) {
-        self.enter_init();
-        self._set_time(time);
-        self.exit_init();
-    }
-
-    fn _set_date(&mut self, date: &NaiveDate) {
+    fn _set_date(&self, date: &NaiveDate) {
         let year = BCD(core::cmp::max(date.year() as u32, 1970) - 1970);
         let month = BCD(date.month());
         let day = BCD(date.day());
@@ -136,55 +129,34 @@ impl RTC {
         });
     }
 
-    pub fn set_date(&mut self, date: &NaiveDate) {
-        self.enter_init();
-        self._set_date(date);
-        self.exit_init();
-    }
-
-    pub fn set_datetime(&mut self, datetime: &NaiveDateTime) {
-        self.enter_init();
-        self._set_date(&datetime.date());
-        self._set_time(&datetime.time());
-        self.exit_init();
-    }
-
     pub fn reader(&self) -> RTCReader {
         RTCReader { tr: self.tr, dr: self.dr, ssr: self.ssr }
     }
 }
 
-static mut RTC: Option<RTC> = None;
+impl hal::RTCWriter for RTC {
+    fn set_time(&self, time: &NaiveTime) {
+        cortex_m::interrupt::free(|_cs| {
+            self.enter_init();
+            self._set_time(time);
+            self.exit_init();
+        })
+    }
 
-#[no_mangle]
-fn time_update(datetime: &NaiveDateTime) -> Result<(), &'static str> {
-    cortex_m::interrupt::free(|_cs| {
-        let rtc = match unsafe { RTC.as_mut() } {
-            Some(rtc) => rtc,
-            None => return Err("RTC not initialized yet"),
-        };
-        rtc.set_datetime(datetime);
-        Ok(())
-    })
-}
+    fn set_date(&self, date: &NaiveDate) {
+        cortex_m::interrupt::free(|_cs| {
+            self.enter_init();
+            self._set_date(date);
+            self.exit_init();
+        })
+    }
 
-static mut RTC_READER: MaybeUninit<RTCReader> = MaybeUninit::uninit();
-
-#[no_mangle]
-fn time_time() -> NaiveTime {
-    unsafe { &*RTC_READER.as_ptr() }.time()
-}
-
-#[no_mangle]
-fn time_date() -> NaiveDate {
-    unsafe { &*RTC_READER.as_ptr() }.date()
-}
-
-pub fn init(regs: RtcPeriph) {
-    let mut rtc = RTC::new(regs);
-    rtc.disable_write_protect();
-    cortex_m::interrupt::free(|_cs| unsafe {
-        RTC_READER = MaybeUninit::new(rtc.reader());
-        RTC = Some(rtc);
-    })
+    fn set_datetime(&self, datetime: &NaiveDateTime) {
+        cortex_m::interrupt::free(|_cs| {
+            self.enter_init();
+            self._set_date(&datetime.date());
+            self._set_time(&datetime.time());
+            self.exit_init();
+        })
+    }
 }

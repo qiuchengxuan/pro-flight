@@ -1,4 +1,9 @@
+use alloc::boxed::Box;
+
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
+use hal::rtc::{RTCReader, RTCWriter};
+
+use crate::sys::jiffies;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Error {
@@ -6,18 +11,19 @@ pub enum Error {
     NotInitialized,
 }
 
-extern "Rust" {
-    fn time_time() -> NaiveTime;
-    fn time_date() -> NaiveDate;
-    fn time_update(datetime: &NaiveDateTime) -> Result<(), Error>;
-}
+static mut RTC_READER: Option<Box<dyn RTCReader>> = None;
+static mut RTC_WRITER: Option<Box<dyn RTCWriter>> = None;
 
 pub fn date() -> NaiveDate {
-    unsafe { time_date() }
+    unsafe { RTC_READER.as_ref() }.map(|rtc| rtc.date()).unwrap_or(NaiveDate::from_ymd(1970, 1, 1))
 }
 
 pub fn time() -> NaiveTime {
-    unsafe { time_time() }
+    unsafe { RTC_READER.as_ref() }.map(|rtc| rtc.time()).unwrap_or_else(|| {
+        let jiffies = jiffies::get();
+        let (seconds, nanos) = (jiffies.as_secs() as u32, jiffies.subsec_nanos());
+        NaiveTime::from_num_seconds_from_midnight(seconds, nanos)
+    })
 }
 
 pub fn now() -> NaiveDateTime {
@@ -25,32 +31,14 @@ pub fn now() -> NaiveDateTime {
 }
 
 pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
-    unsafe { time_update(datetime) }
+    match unsafe { RTC_WRITER.as_ref() } {
+        Some(w) => w.set_datetime(datetime),
+        None => return Err(Error::NotInitialized),
+    }
+    Ok(())
 }
 
-#[macro_export]
-macro_rules! fake_rtc {
-    () => {
-        use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
-
-        use $crate::sys::jiffies;
-        use $crate::sys::time::Error;
-
-        #[no_mangle]
-        fn time_date() -> NaiveDate {
-            NaiveDate::from_ymd(1970, 1, 1)
-        }
-
-        #[no_mangle]
-        fn time_time() -> NaiveTime {
-            let jiffies = jiffies::get();
-            let (seconds, nanos) = (jiffies.as_secs() as u32, jiffies.subsec_nanos());
-            NaiveTime::from_num_seconds_from_midnight(seconds, nanos)
-        }
-
-        #[no_mangle]
-        fn time_update(_datetime: &NaiveDateTime) -> Result<(), Error> {
-            Err(Error::NotImplemented)
-        }
-    };
+pub fn init(reader: impl RTCReader + 'static, writer: impl RTCWriter + 'static) {
+    unsafe { RTC_READER = Some(Box::new(reader)) }
+    unsafe { RTC_WRITER = Some(Box::new(writer)) }
 }

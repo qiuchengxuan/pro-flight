@@ -4,3 +4,4 @@ extern crate alloc;
 
 pub mod dma;
 pub mod flash;
+pub mod rtc;

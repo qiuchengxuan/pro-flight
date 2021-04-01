@@ -3,7 +3,7 @@
 use chips::stm32f4::{
     clock, dma,
     flash::{Flash, Sector},
-    rtc,
+    rtc::RTC,
     spi::BaudrateControl,
     systick, usb_serial,
 };
@@ -29,6 +29,7 @@ use pro_flight::{
     },
     config,
     sync::DataWriter,
+    sys::time,
     sys::timer,
 };
 use stm32f4xx_hal::{
@@ -78,7 +79,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     reg.pwr_cr.modify(|r| r.set_dbp());
     reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
-    rtc::init(periph_rtc!(reg));
+    let rtc = RTC::new(periph_rtc!(reg));
+    let reader = rtc.reader();
+    time::init(reader, rtc);
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
     let (usb_global, usb_device, usb_pwrclk) =

@@ -5,6 +5,9 @@ readme = "README.md"
 name = "hal"
 version = "0.0.1"
 
+[dependencies]
+chrono = { version = "0.4", default-features = false }
+
 [lib]
 name = "hal"
 test = false

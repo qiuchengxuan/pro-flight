@@ -11,6 +11,7 @@ chrono = { version = "0.4", default-features = false }
 drone-core = { path = "drone-os/drone-core" }
 embedded-hal = "0.2"
 git-version = "0.3.4"
+hal = { path = "hal" }
 heapless = "0.6"
 integer-sqrt = "0.1"
 micromath = "1.0"
