@@ -1,20 +1,15 @@
 use core::fmt::Debug;
 
 use chips::stm32f4::delay::TickDelay;
-use drivers::mpu6000::{Convertor, MPU6000Init, NUM_MEASUREMENT_REGS};
+use drivers::mpu6000::{DmaMPU6000, MPU6000Init};
 use drone_core::fib::{new_fn, Yielded};
 use drone_cortexm::thr::ThrNvic;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
-use hal::dma::{BufferDescriptor, Peripheral, DMA};
+use hal::dma::{Peripheral, DMA};
 pub use mpu6000::SPI_MODE;
-use mpu6000::{
-    bus::{SpiBus, SpiError},
-    registers::Register,
-    MPU6000,
-};
+use mpu6000::{bus::SpiBus, MPU6000};
 use pro_flight::{
-    config,
     datastructures::measurement::{Acceleration, Measurement},
     sys::timer::SysTimer,
 };
@@ -41,50 +36,26 @@ where
     TX: DMA<Future = TXF>,
     THR: ThrNvic,
 {
-    pub fn init(self, mut handler: impl FnMut(Acceleration, Measurement) + 'static + Send) {
+    pub fn init(self, handler: impl FnMut(Acceleration, Measurement) + 'static + Send) {
         let mut mpu6000 = MPU6000::new(SpiBus::new(self.spi, self.cs, TickDelay {}));
         let mut delay = SysTimer::new();
-        let result: Result<(), SpiError<E, E, PE>> = (|| {
-            mpu6000.reset(&mut delay)?;
-            if !mpu6000.verify()? {
-                error!("MPU6000 not detected");
-                return Ok(());
-            }
-            mpu6000.init(SAMPLE_RATE as u16)
-        })();
-        if let Some(error) = result.err() {
+        if let Some(error) = mpu6000.probe(&mut delay).and(mpu6000.init(SAMPLE_RATE as u16)).err() {
             error!("MPU6000 init failed: {:?}", error);
             return;
         }
 
-        let (mut spi, mut cs, _) = mpu6000.free().free();
+        info!("MPU6000 detected");
+        let (mut spi, cs, _) = mpu6000.free().free();
 
-        let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
-        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-        info!("MPU6000 detected, Init DMA address at {:x}", address as usize);
-        let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
-        let convertor = Convertor::default();
-        let rotation = config::get().board.rotation;
-        rx_bd.set_transfer_done(move |bytes| {
-            cs_.set_high().ok();
-            let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);
-            handler(acceleration, gyro);
-        });
-
-        let bytes = [Register::AccelerometerXHigh as u8 | 0x80];
-        let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new(bytes));
-
-        let mut rx = self.rx;
+        let mut mpu6000 = DmaMPU6000::new(cs, handler);
+        let (mut rx, mut tx) = (self.rx, self.tx);
         rx.setup_peripheral(3, &mut spi);
-        let mut tx = self.tx;
         tx.setup_peripheral(3, &mut spi);
         let mut int = self.int;
 
         self.thread.add_fib(new_fn(move || {
             int.clear_interrupt_pending_bit();
-            cs.set_low().ok();
-            rx.rx(&rx_bd, false);
-            tx.tx(&tx_bd, Some(1 + NUM_MEASUREMENT_REGS));
+            mpu6000.trigger(&rx, &tx);
             Yielded::<(), ()>(())
         }));
         self.thread.enable_int()

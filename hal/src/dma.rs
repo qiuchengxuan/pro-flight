@@ -83,6 +83,30 @@ pub trait Peripheral {
 
 pub trait DMAFuture: Future<Output = ()> {}
 
+#[derive(Copy, Clone, Default)]
+pub struct TransferOption {
+    /// if not specified, default to buffer-descriptor size
+    pub size: Option<usize>,
+    /// memory address won't increase
+    pub fixed: bool,
+    /// restart another transfer when transfer completes
+    pub circle: bool,
+}
+
+impl TransferOption {
+    pub fn sized(size: usize) -> Self {
+        Self { size: Some(size), ..Default::default() }
+    }
+
+    pub fn repeat(size: usize) -> Self {
+        Self { size: Some(size), fixed: true, ..Default::default() }
+    }
+
+    pub fn circle() -> Self {
+        Self { circle: true, ..Default::default() }
+    }
+}
+
 /// Whenever tx or rx with buffer-descriptor, DMA does not take ownership of BD,
 /// but requires BD lifetime lives no less than DMA lifetime,
 /// when DMA lifetime ends, it should immediately stop and drop reference to BD
@@ -91,11 +115,12 @@ pub trait DMA: Send + 'static {
     type Future;
 
     fn setup_peripheral(&mut self, channel: u8, periph: &mut dyn Peripheral);
-    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, repeat: Option<usize>) -> Self::Future
+    fn is_busy(&self) -> bool;
+    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> Self::Future
     where
         W: Copy + Default,
         BD: AsRef<BufferDescriptor<W, N>> + 'a;
-    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, circle: bool) -> Self::Future
+    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> Self::Future
     where
         W: Copy + Default,
         BD: AsRef<BufferDescriptor<W, N>> + 'a;

@@ -1,4 +1,4 @@
-use hal::dma::{BufferDescriptor, Peripheral, DMA};
+use hal::dma::{BufferDescriptor, Peripheral, TransferOption, DMA};
 use pro_flight::algorithm::lpf::LPF;
 use pro_flight::datastructures::measurement::battery::Battery;
 use stm32f4xx_hal::{
@@ -65,5 +65,5 @@ where
 
     let mut adc = ADCWrapper(adc);
     dma.setup_peripheral(1, &mut adc);
-    dma.rx(&rx_bd, true);
+    dma.rx(&rx_bd, TransferOption::circle());
 }

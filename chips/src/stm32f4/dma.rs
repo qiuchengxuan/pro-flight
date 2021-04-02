@@ -7,7 +7,7 @@ use drone_core::fib::{new_fn, Yielded};
 use drone_cortexm::{reg::prelude::*, reg::Reg as _, thr::ThrNvic};
 use drone_stm32_map::periph::dma::ch::*;
 
-use hal::dma::{BufferDescriptor, DMAFuture, Meta, Peripheral, DMA};
+use hal::dma::{BufferDescriptor, DMAFuture, Meta, Peripheral, TransferOption, DMA};
 
 pub enum Direction {
     PeripheralToMemory = 0b00,
@@ -104,7 +104,11 @@ impl<M: DmaChMap> DMA for Channel<M> {
         });
     }
 
-    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, repeat: Option<usize>) -> DMABusy<M>
+    fn is_busy(&self) -> bool {
+        self.reg.configuration.en().read_bit()
+    }
+
+    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> DMABusy<M>
     where
         W: Copy + Default,
         BD: AsRef<BufferDescriptor<W, N>> + 'a,
@@ -113,12 +117,12 @@ impl<M: DmaChMap> DMA for Channel<M> {
         self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.clear_interrupts();
-        self.reg.number_of_data.store_bits(repeat.unwrap_or(bytes.len()) as u32);
+        self.reg.number_of_data.store_bits(option.size.unwrap_or(bytes.len()) as u32);
         self.reg.configuration.modify_reg(|r, v| {
-            if repeat.is_some() {
-                r.minc().clear(v);
+            if option.fixed {
+                r.minc().clear(v)
             } else {
-                r.minc().set(v);
+                r.minc().set(v)
             }
             r.msize().write(v, msize);
             r.dir().write(v, Direction::MemoryToPeripheral as u32);
@@ -127,7 +131,7 @@ impl<M: DmaChMap> DMA for Channel<M> {
         DMABusy(self.reg.configuration)
     }
 
-    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, circle: bool) -> DMABusy<M>
+    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> DMABusy<M>
     where
         W: Copy + Default,
         BD: AsRef<BufferDescriptor<W, N>> + 'a,
@@ -140,8 +144,10 @@ impl<M: DmaChMap> DMA for Channel<M> {
         self.reg.configuration.modify_reg(|r, v| {
             r.minc().set(v);
             r.msize().write(v, msize);
-            if circle {
+            if option.circle {
                 r.circ().set(v);
+            } else {
+                r.circ().clear(v);
             }
             r.dir().write(v, Direction::PeripheralToMemory as u32);
             r.en().set(v);

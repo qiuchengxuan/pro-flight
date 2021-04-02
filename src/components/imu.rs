@@ -1,5 +1,3 @@
-#[allow(unused_imports)] // false warning
-use micromath::F32Ext;
 use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};

@@ -1,3 +1,4 @@
+#[derive(Copy, Clone)]
 pub struct BaudrateControl(pub u32);
 
 impl BaudrateControl {

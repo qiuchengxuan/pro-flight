@@ -7,7 +7,7 @@ endif
 
 .PHONY: $(TARGET)
 boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD):
-	(cd boards/$(BOARD); cargo build --release)
+	@(cd boards/$(BOARD); cargo build --release)
 
 define TEXT_ADDRESS
 	$(shell arm-none-eabi-readelf -S $(TARGET) | grep .text | awk '{print "0x"$$5}')
@@ -25,7 +25,7 @@ test:
 
 .PHONY: clean
 clean:
-	(cd boards/$(BOARD); cargo clean)
+	@(cd boards/$(BOARD); cargo clean)
 
 .PHONY: dfu
 dfu: $(BOARD).dfu

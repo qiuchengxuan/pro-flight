@@ -16,6 +16,7 @@ extern crate nb;
 extern crate sval;
 extern crate sval_json;
 
+#[macro_use]
 pub mod components;
 #[macro_use]
 pub mod datastructures;
