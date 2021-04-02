@@ -49,3 +49,13 @@ heap! {
 /// The global allocator.
 #[global_allocator]
 pub static HEAP: Heap = Heap::new();
+
+#[no_mangle]
+fn board_name() -> &'static str {
+    "OMNIBUSF4V3"
+}
+
+#[no_mangle]
+fn reboot() {
+    cortex_m::peripheral::SCB::sys_reset()
+}

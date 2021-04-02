@@ -21,11 +21,7 @@ use futures::prelude::*;
 use hal::persist::PersistDatastore;
 use pro_flight::{
     components::{
-        cli::{Command, CLI},
-        flight_data::FlightDataHUB,
-        imu::IMU,
-        logger,
-        positioning::Positioning,
+        cli::CLI, flight_data::FlightDataHUB, imu::IMU, logger, positioning::Positioning,
         speedometer::Speedometer,
     },
     config,
@@ -149,23 +145,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let dma_rx = dma::Channel::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
     let battery = &hub.battery;
     voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
-
-    let mut commands = [
-        Command::new("bootloader", "Enter bootloader", move |_| {
-            sysinfo.reboot_reason = RebootReason::Bootloader;
-            persist.save(&sysinfo);
-            cortex_m::peripheral::SCB::sys_reset();
-        }),
-        Command::new("reboot", "Reboot", |_| cortex_m::peripheral::SCB::sys_reset()),
-        Command::new("logread", "Show log", |_| println!("{}", logger::get())),
-        Command::new("telemetry", "Show flight data", move |_| println!("{}", reader.read())),
-        Command::new("save", "Save configuration", move |_| {
-            if let Some(err) = nvram.store(config::get()).err() {
-                println!("Save configuration failed: {:?}", err);
-                nvram.reset().ok();
-            }
-        }),
-    ];
+    let mut commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
     let mut cli = CLI::new(&mut commands);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {

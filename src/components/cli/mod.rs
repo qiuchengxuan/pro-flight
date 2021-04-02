@@ -19,26 +19,35 @@ pub struct FnCommand {
     action: fn(&str),
 }
 
-macro_rules! command {
-    ($name:literal, $description: literal, $action:expr) => {
-        FnCommand { name: $name, description: $description, action: $action }
+extern "Rust" {
+    pub fn reboot();
+    fn board_name() -> &'static str;
+}
+
+macro_rules! __builtin_commands {
+    ($(($name:literal, $description: literal, $action:expr)),+) => {
+        [$(FnCommand{name: $name, description: $description, action: $action}),+]
     };
 }
 
-const BUILTIN_CMDS: [FnCommand; 12] = [
-    command!("date", "Show date", |line| datetime::date(line)),
-    command!("dump", "Dump memory address", |line| memory::dump(line)),
-    command!("logread", "Read log", |_| print!("{}", logger::get())),
-    command!("read", "Read memory address", |line| memory::read(line)),
-    command!("readx", "Read memory address in hex", |line| memory::readx(line)),
-    command!("writex", "Write memory address in hex", |line| memory::writex(line)),
-    command!("import", "Import config", |line| config::import(line)),
-    command!("export", "Export config", |line| config::export(line)),
-    command!("set", "Set config entry", |line| config::set(line)),
-    command!("reset", "Reset config", |_| config::reset()),
-    command!("show", "Show config", |_| config::show()),
-    command!("version", "Get version", |_| println!("{}-{}", VERSION, REVISION)),
-];
+const BUILTIN_CMDS: [FnCommand; 13] = __builtin_commands!(
+    ("date", "Show date", |line| datetime::date(line)),
+    ("dump", "Dump memory address", |line| memory::dump(line)),
+    ("logread", "Read log", |_| print!("{}", logger::get())),
+    ("read", "Read memory address", |line| memory::read(line)),
+    ("readx", "Read memory address in hex", |line| memory::readx(line)),
+    ("writex", "Write memory address in hex", |line| memory::writex(line)),
+    ("import", "Import config", |line| config::import(line)),
+    ("export", "Export config", |line| config::export(line)),
+    ("set", "Set config entry", |line| config::set(line)),
+    ("reboot", "Reboot", |_| unsafe { reboot() }),
+    ("reset", "Reset config", |_| config::reset()),
+    ("show", "Show config", |_| config::show()),
+    ("version", "Get version", |_| {
+        println!("board: {}", unsafe { board_name() });
+        println!("version: {}-{}", VERSION, REVISION);
+    })
+);
 
 pub struct Command {
     name: &'static str,
@@ -50,6 +59,38 @@ impl Command {
     pub fn new(name: &'static str, desc: &'static str, action: impl FnMut(&str) + 'static) -> Self {
         Self { name, description: desc, action: Box::new(action) }
     }
+}
+
+#[macro_export]
+macro_rules! __command {
+    (bootloader, [$persist:ident]) => {
+        $crate::components::cli::Command::new("bootloader", "Reboot to bootloader", move |_| {
+            let mut sysinfo: $crate::sysinfo::SystemInfo = $persist.load();
+            sysinfo.reboot_reason = RebootReason::Bootloader;
+            $persist.save(&sysinfo);
+            unsafe { $crate::components::cli::reboot() };
+        })
+    };
+    (telemetry, [$reader:ident]) => {
+        $crate::components::cli::Command::new("telemetry", "Show flight data", move |_| {
+            println!("{}", $reader.read())
+        })
+    };
+    (save, [$nvram:ident]) => {
+        $crate::components::cli::Command::new("save", "Save configuration", move |_| {
+            if let Some(err) = $nvram.store(config::get()).err() {
+                println!("Save configuration failed: {:?}", err);
+                $nvram.reset().ok();
+            }
+        })
+    };
+}
+
+#[macro_export]
+macro_rules! commands {
+    ($(($name:ident, $args:tt)),+) => {
+        [$(__command!($name, $args)),+]
+    };
 }
 
 pub struct CLI<'a> {
