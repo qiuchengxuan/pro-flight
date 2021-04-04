@@ -1,8 +1,11 @@
 use drone_core::prelude::*;
+use embedded_hal::blocking::delay::DelayUs;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use usb_device::bus::UsbBusAllocator;
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, UsbError};
+
+use super::delay::TickDelay;
 
 static mut SERIAL_PORT: Option<SerialPort<'static, UsbBus<USB>>> = None;
 
@@ -11,21 +14,13 @@ fn write_bytes(mut bytes: &[u8]) {
         Some(port) => port,
         None => return,
     };
-    cortex_m::interrupt::free(|_| {
-        while bytes.len() > 0 {
-            let result = nb::block!({
-                match serial_port.write(bytes) {
-                    Ok(size) => Ok(size),
-                    Err(UsbError::WouldBlock) => Err(nb::Error::WouldBlock),
-                    Err(e) => Err(nb::Error::Other(e)),
-                }
-            });
-            match result {
-                Ok(size) => bytes = &bytes[size..],
-                Err(_) => break,
-            }
+    while bytes.len() > 0 {
+        match cortex_m::interrupt::free(|_| serial_port.write(bytes)) {
+            Ok(size) => bytes = &bytes[size..],
+            Err(UsbError::WouldBlock) => TickDelay.delay_us(1u32),
+            Err(_) => return,
         }
-    });
+    }
 }
 
 #[no_mangle]

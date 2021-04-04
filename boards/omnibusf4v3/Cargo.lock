@@ -91,6 +91,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46afbd2983a5d5a7bd740ccb198caf5b82f45c40c09c0eed36052d91cb92e719"
 
 [[package]]
+name = "bmp280-core"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "345ff6d0c6375470cfc898d8f4569e6fd685167f77038427bbb298b69431d892"
+dependencies = [
+ "embedded-hal",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -190,6 +199,7 @@ dependencies = [
 name = "drivers"
 version = "0.0.1"
 dependencies = [
+ "bmp280-core",
  "embedded-hal",
  "hal",
  "mpu6000",
@@ -855,6 +865,7 @@ name = "pro-flight"
 version = "0.1.0"
 dependencies = [
  "ascii",
+ "bmp280-core",
  "chrono",
  "drone-core",
  "embedded-hal",

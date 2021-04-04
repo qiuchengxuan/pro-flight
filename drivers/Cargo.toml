@@ -6,6 +6,7 @@ name = "drivers"
 version = "0.0.1"
 
 [dependencies]
+bmp280-core = "0.1"
 embedded-hal = "0.2"
 hal = { path = "../hal" }
 mpu6000 = "0.2.1"

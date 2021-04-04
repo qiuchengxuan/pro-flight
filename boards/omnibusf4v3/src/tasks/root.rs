@@ -1,28 +1,42 @@
 //! The root task.
 
+use core::time::Duration;
+
 use chips::stm32f4::{
-    clock, dfu, dma,
+    clock,
+    delay::TickDelay,
+    dfu, dma,
     flash::{Flash, Sector},
     rtc,
+    softint::make_soft_int,
     spi::BaudrateControl,
     systick, usb_serial,
 };
-use drivers::{led::LED, nvram::NVRAM};
+use drivers::{
+    barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
+    led::LED,
+    nvram::NVRAM,
+};
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
-    dma::{periph_dma2_ch0, periph_dma2_ch2, periph_dma2_ch3},
+    dma::{periph_dma1_ch0, periph_dma1_ch5, periph_dma2_ch0, periph_dma2_ch2, periph_dma2_ch3},
+    exti::periph_exti2,
     flash::periph_flash,
     rtc::periph_rtc,
-    spi::periph_spi1,
+    spi::{periph_spi1, periph_spi3},
     sys_tick::periph_sys_tick,
 };
 use futures::prelude::*;
-use hal::{event::Notifier, persist::PersistDatastore};
+use hal::{
+    dma::DMA,
+    event::{Notifier, TimedNotifier},
+    persist::PersistDatastore,
+};
 use pro_flight::{
     components::{
         cli::CLI, flight_data::FlightDataHUB, imu::IMU, logger, positioning::Positioning,
-        speedometer::Speedometer,
+        speedometer::Speedometer, variometer::Variometer,
     },
     config,
     sync::DataWriter,
@@ -37,7 +51,12 @@ use stm32f4xx_hal::{
 };
 
 use crate::{
-    board_name, flash::FlashWrapper, mpu6000::DmaSpiMPU6000, spi::Spi1, thread, thread::ThrsInit,
+    board_name,
+    flash::FlashWrapper,
+    mpu6000::DmaSpiMPU6000,
+    spi::{Spi1, Spi3},
+    thread,
+    thread::ThrsInit,
     voltage_adc, Regs,
 };
 
@@ -72,8 +91,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     systick::init(periph_sys_tick!(reg), thread.sys_tick, move || poller.poll());
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
-    reg.rcc_ahb1enr.modify(|r| r.set_dma2en());
-    reg.rcc_apb1enr.pwren.set_bit();
+    reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en());
+    reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
     reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
 
     reg.pwr_cr.modify(|r| r.set_dbp());
@@ -144,6 +163,31 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let battery = &hub.battery;
     voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
 
+    let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
+    let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
+    let spi3 = Spi3::new(periph_spi3!(reg), pins, thread.spi_3, baudrate, bmp280::SPI_MODE);
+    let cs_baro = gpio_b.pb3.into_push_pull_output();
+    let mut cs_osd = gpio_a.pa15.into_push_pull_output();
+    cs_osd.set_high().ok();
+    let mut bmp280 = bmp280_spi(spi3, cs_baro, TickDelay {});
+    bmp280.init().map_err(|e| error!("Init bmp280 err: {:?}", e)).ok();
+    let compensator = Compensator(bmp280.read_calibration().unwrap_or_default());
+    let (mut spi, cs, _) = bmp280.free().free();
+
+    let (altimeter, vertical_speed) = (&hub.altimeter, &hub.vertical_speed);
+    let mut vs = Variometer::new(1000 / bmp280::SAMPLE_RATE);
+    let mut bmp280 = DmaBMP280::new(cs, compensator, move |v| {
+        altimeter.write(v.into());
+        vertical_speed.write(vs.update(v.into()));
+    });
+
+    let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), thread.dma_1_stream_0);
+    rx.setup_peripheral(0, &mut spi);
+    let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma_1_stream_5);
+    tx.setup_peripheral(0, &mut spi);
+    let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
+    let mut bmp280 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(100));
+
     let mut commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
     let mut cli = CLI::new(&mut commands);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
@@ -151,6 +195,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let mut buffer = [0u8; 80];
         cli.receive(usb_serial::read(&mut buffer[..]));
         led.notify();
+        bmp280.notify();
     }
 
     reg.scb_scr.sleeponexit.set_bit(); // Enter a sleep state on ISR exit.

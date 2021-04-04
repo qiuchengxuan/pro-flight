@@ -4,6 +4,7 @@ pub mod dfu;
 pub mod dma;
 pub mod flash;
 pub mod rtc;
+pub mod softint;
 pub mod spi;
 pub mod systick;
 pub mod usb_serial;

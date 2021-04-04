@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate alloc;
 extern crate ascii;
+extern crate bmp280_core as bmp280;
 #[macro_use]
 extern crate drone_core;
 extern crate heapless;

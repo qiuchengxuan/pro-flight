@@ -98,6 +98,8 @@ impl<E, CS: OutputPin<Error = E> + Send + 'static + Unpin> DmaMPU6000<CS> {
         H: FnMut(Acceleration, Measurement) + 'static + Send,
     {
         let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
+        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+        debug!("Init MPU6000 DMA address at 0x{:x}", address as usize);
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
         let convertor = Convertor::default();
         let rotation = config::get().board.rotation;

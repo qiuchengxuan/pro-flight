@@ -7,6 +7,7 @@ readme = "README.md"
 
 [dependencies]
 ascii = { version = "1.0", default-features = false }
+bmp280-core = "0.1"
 chrono = { version = "0.4", default-features = false }
 drone-core = { path = "drone-os/drone-core" }
 embedded-hal = "0.2"

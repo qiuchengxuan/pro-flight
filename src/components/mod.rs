@@ -5,3 +5,4 @@ pub mod logger;
 pub mod imu;
 pub mod positioning;
 pub mod speedometer;
+pub mod variometer;
