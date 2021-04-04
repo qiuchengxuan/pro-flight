@@ -2,8 +2,7 @@ use nalgebra::Vector3;
 
 use crate::algorithm::ComplementaryFilter;
 use crate::config;
-use crate::datastructures::measurement::unit::{Meter, MilliMeter};
-use crate::datastructures::measurement::{Velocity, VelocityVector, GRAVITY};
+use crate::datastructures::measurement::{unit, Velocity, VelocityVector, GRAVITY};
 use crate::sync::{AgingDataReader, DataReader};
 
 pub struct Speedometer<A, GNSS> {
@@ -13,13 +12,13 @@ pub struct Speedometer<A, GNSS> {
     interval: f32,
     filters: [ComplementaryFilter<f32>; 3],
     acceleration: Vector3<f32>,
-    velocity: VelocityVector<f32, Meter>,
+    velocity: VelocityVector<f32, unit::MpS>,
 }
 
 impl<A, GNSS> Speedometer<A, GNSS>
 where
-    A: DataReader<Velocity<f32, Meter>>,
-    GNSS: AgingDataReader<VelocityVector<i32, MilliMeter>>,
+    A: DataReader<Velocity<f32, unit::MpS>>,
+    GNSS: AgingDataReader<VelocityVector<i32, unit::MMpS>>,
 {
     pub fn new(altimeter: A, gnss: GNSS, sample_rate: usize, gnss_rate: usize) -> Self {
         let config = &config::get().speedometer;
@@ -34,11 +33,11 @@ where
         }
     }
 
-    pub fn update(&mut self, acceleration: Vector3<f32>) -> VelocityVector<f32, Meter> {
+    pub fn update(&mut self, acceleration: Vector3<f32>) -> VelocityVector<f32, unit::MpS> {
         let mut a = acceleration * GRAVITY;
         a[2] += GRAVITY;
         if let Some(velocity) = self.gnss.get_aging_last(self.gnss_aging) {
-            let v = velocity.convert(|v| v as f32).to_unit(Meter);
+            let v = velocity.convert(|v| v as f32).to_unit(unit::MpS);
             self.velocity.x.value = self.filters[0].filter(v.x.value(), a[0]);
             self.velocity.y.value = self.filters[1].filter(v.y.value(), a[1]);
             self.velocity.z.value = self.filters[2].filter(v.z.value(), a[2]);
@@ -48,7 +47,7 @@ where
             self.velocity.z.value = self.filters[2].filter(velocity.value(), a[2]);
         } else {
             let v = (a + (a - self.acceleration) / 2.0) * self.interval;
-            self.velocity += VelocityVector::new(v[0], v[1], v[2], Meter);
+            self.velocity += VelocityVector::new(v[0], v[1], v[2], unit::MpS);
         }
         self.acceleration = a;
         self.velocity

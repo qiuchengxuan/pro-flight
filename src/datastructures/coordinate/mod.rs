@@ -9,10 +9,9 @@ pub mod longitude;
 pub use latitude::Latitude;
 pub use longitude::Longitude;
 
-use crate::datastructures::measurement::displacement::DistanceVector;
-use crate::datastructures::measurement::distance::Distance;
-use crate::datastructures::measurement::unit::{CentiMeter, Meter};
-use crate::datastructures::measurement::Altitude;
+use crate::datastructures::measurement::{
+    displacement::DistanceVector, distance::Distance, unit, Altitude,
+};
 
 #[derive(Copy, Clone, Default, Value, PartialEq, Debug)]
 pub struct SphericalCoordinate<U: Copy> {
@@ -39,7 +38,10 @@ impl<U: Copy + Default> From<DistanceVector<f32, U>> for SphericalCoordinate<U> 
 }
 
 impl<U: Copy + Default + Into<u32>> SphericalCoordinate<U> {
-    pub fn to_unit<V: Copy + Default + Into<u32>>(self, unit: V) -> SphericalCoordinate<V> {
+    pub fn to_unit<V>(self, unit: V) -> SphericalCoordinate<V>
+    where
+        V: Copy + Default + Into<u32> + unit::Distance,
+    {
         SphericalCoordinate { rho: self.rho.to_unit(unit), theta: self.theta, phi: self.phi }
     }
 }
@@ -54,13 +56,13 @@ pub struct Position {
 }
 
 impl core::ops::Sub for Position {
-    type Output = Displacement<Meter>;
+    type Output = Displacement<unit::Meter>;
 
     fn sub(self, other: Self) -> Self::Output {
         let x = self.longitude - other.longitude;
         let y = self.latitude - other.latitude;
         let height = self.altitude - other.altitude;
-        Self::Output { x: x, y: y, z: height.to_unit(Meter).into() }
+        Self::Output { x: x, y: y, z: height.to_unit(unit::Meter).into() }
     }
 }
 
@@ -70,7 +72,7 @@ impl<U: Copy + Default + Into<i32>> core::ops::Add<Displacement<U>> for Position
     fn add(self, displacement: Displacement<U>) -> Self {
         let longitude = self.longitude + displacement.x;
         let latitude = self.latitude + displacement.y;
-        let altitude = self.altitude + displacement.z.to_unit(CentiMeter);
+        let altitude = self.altitude + displacement.z.to_unit(unit::CentiMeter);
         Self { latitude, longitude, altitude }
     }
 }
@@ -81,7 +83,7 @@ impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<U>> for Position
     fn sub(self, displacement: Displacement<U>) -> Self {
         let longitude = self.longitude - displacement.x;
         let latitude = self.latitude - displacement.y;
-        let altitude = self.altitude - displacement.z.to_unit(CentiMeter);
+        let altitude = self.altitude - displacement.z.to_unit(unit::CentiMeter);
         Self { latitude, longitude, altitude }
     }
 }

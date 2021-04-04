@@ -1,10 +1,6 @@
 use crate::datastructures::{
     coordinate::{Displacement, Position},
-    measurement::{
-        displacement::DistanceVector,
-        unit::{CentiMeter, Meter},
-        Altitude, VelocityVector,
-    },
+    measurement::{displacement::DistanceVector, unit, Altitude, VelocityVector},
 };
 use crate::sync::{AgingDataReader, DataReader};
 
@@ -12,12 +8,12 @@ pub struct Positioning<A, GNSS> {
     altimeter: A,
     gnss: GNSS,
     interval: f32,
-    velocity: VelocityVector<f32, Meter>,
-    current: Position,                        // updated from GNSS
-    displacement: DistanceVector<f32, Meter>, // relative to current position
+    velocity: VelocityVector<f32, unit::MpS>,
+    current: Position,                              // updated from GNSS
+    displacement: DistanceVector<f32, unit::Meter>, // relative to current position
 }
 
-type Output = (Position, Displacement<CentiMeter>);
+type Output = (Position, Displacement<unit::CentiMeter>);
 
 impl<A, GNSS> Positioning<A, GNSS>
 where
@@ -35,7 +31,7 @@ where
         }
     }
 
-    pub fn update(&mut self, v: VelocityVector<f32, Meter>) -> Output {
+    pub fn update(&mut self, v: VelocityVector<f32, unit::MpS>) -> Output {
         if let Some(position) = self.gnss.get() {
             self.current = position;
             self.displacement = DistanceVector::default();
@@ -44,10 +40,11 @@ where
                 self.current.altitude = altitude;
                 self.displacement.z = Default::default();
             }
-            self.displacement += (self.velocity + (v - self.velocity) / 2.0) * self.interval;
+            let integral = (self.velocity + (v - self.velocity) / 2.0) * self.interval;
+            self.displacement += integral.to_unit(unit::Meter);
         }
         self.velocity = v;
-        let displacement = self.displacement.to_unit(CentiMeter).convert(|v| v as i32);
+        let displacement = self.displacement.to_unit(unit::CentiMeter).convert(|v| v as i32);
         (self.current + displacement, displacement)
     }
 }

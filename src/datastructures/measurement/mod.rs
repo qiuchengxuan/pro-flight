@@ -1,18 +1,21 @@
-use core::str::FromStr;
-
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
+pub mod axes;
 pub mod battery;
 pub mod displacement;
 pub mod distance;
 pub mod euler;
+pub mod rotation;
 pub mod unit;
 
 use crate::datastructures::decimal::IntegerDecimal;
 
 use distance::Distance;
 use unit::CentiMeter;
+
+pub use axes::Axes;
+pub use rotation::Rotation;
 
 pub type Velocity<T, U> = distance::Distance<T, U>;
 pub type VelocityVector<T, U> = displacement::DistanceVector<T, U>;
@@ -22,119 +25,6 @@ pub type Altitude = Distance<i32, CentiMeter>;
 
 pub type Heading = IntegerDecimal;
 pub type Course = IntegerDecimal;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Rotation {
-    NoRotation,
-    Degree90,
-    Degree180,
-    Degree270,
-}
-
-impl Default for Rotation {
-    fn default() -> Self {
-        Self::NoRotation
-    }
-}
-
-impl FromStr for Rotation {
-    type Err = ();
-
-    fn from_str(name: &str) -> Result<Rotation, ()> {
-        match name {
-            "0" => Ok(Rotation::NoRotation),
-            "90" => Ok(Rotation::Degree90),
-            "180" => Ok(Rotation::Degree180),
-            "270" => Ok(Rotation::Degree270),
-            _ => Err(()),
-        }
-    }
-}
-
-impl core::fmt::Display for Rotation {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        let s = match self {
-            Self::NoRotation => "0",
-            Self::Degree90 => "90",
-            Self::Degree180 => "180",
-            Self::Degree270 => "270",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Default, Value)]
-pub struct Axes {
-    pub x: i32,
-    pub y: i32,
-    pub z: i32,
-}
-
-impl Axes {
-    pub const MAX: Axes = Axes { x: i32::MAX, y: i32::MAX, z: i32::MAX };
-    pub const MIN: Axes = Axes { x: i32::MIN, y: i32::MIN, z: i32::MIN };
-
-    pub fn rotate(self, rotation: Rotation) -> Self {
-        let (x, y, z) = (self.x, self.y, self.z);
-        let (x, y, z) = match rotation {
-            Rotation::NoRotation => (x, y, z),
-            Rotation::Degree90 => (y, x, z),
-            Rotation::Degree180 => (-x, -y, z),
-            Rotation::Degree270 => (-y, x, z),
-        };
-        Self { x, y, z }
-    }
-}
-
-impl core::ops::Add for Axes {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self { x: (self.x + other.x), y: (self.y + other.y), z: (self.z + other.z) }
-    }
-}
-
-impl core::ops::Sub<Self> for Axes {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
-    }
-}
-
-impl core::ops::Sub<&Self> for Axes {
-    type Output = Self;
-
-    fn sub(self, other: &Self) -> Self {
-        Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
-    }
-}
-
-impl core::ops::Div<i32> for Axes {
-    type Output = Self;
-
-    fn div(self, div: i32) -> Self {
-        Self { x: self.x / div, y: self.y / div, z: self.z / div }
-    }
-}
-
-impl core::ops::Mul<&Self> for Axes {
-    type Output = Self;
-
-    fn mul(self, other: &Self) -> Self {
-        Self { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
-    }
-}
-
-impl PartialOrd for Axes {
-    fn partial_cmp(self: &Self, other: &Self) -> Option<core::cmp::Ordering> {
-        if self.x > other.x || self.y > other.y || self.z > other.z {
-            Some(core::cmp::Ordering::Greater)
-        } else {
-            Some(core::cmp::Ordering::Less)
-        }
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Gain {

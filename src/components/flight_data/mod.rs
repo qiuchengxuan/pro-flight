@@ -12,8 +12,7 @@ use crate::datastructures::{
     measurement::{
         battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
-        unit::{CentiMeter, Meter, MilliMeter},
-        Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
+        unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
     GNSSFixed,
 };
@@ -48,14 +47,14 @@ macro_rules! flight_data {
 
 flight_data! {
     altimeter: Altitude,
-    vertical_speed: Velocity<f32, Meter>,
+    vertical_speed: Velocity<f32, unit::MpS>,
     battery: Battery,
     accelerometer: Acceleration,
     gyroscope: Gyro,
     imu: UnitQuaternion<f32>,
-    speedometer: VelocityVector<f32, Meter>,
+    speedometer: VelocityVector<f32, unit::MpS>,
     positioning: Position,
-    displacement: Displacement<CentiMeter>,
+    displacement: Displacement<unit::CentiMeter>,
 
     rssi: RSSI,
     control_input: ControlInput,
@@ -65,7 +64,7 @@ flight_data! {
     gnss_heading: Heading,
     gnss_course: Course,
     gnss_position: Position,
-    gnss_velocity: VelocityVector<i32, MilliMeter>
+    gnss_velocity: VelocityVector<i32, unit::MMpS>
 }
 
 impl<'a> FlightDataReader<'a> {
