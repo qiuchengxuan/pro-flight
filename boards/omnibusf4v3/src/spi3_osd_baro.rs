@@ -1,9 +1,9 @@
 use core::mem::MaybeUninit;
 
-use bmp280::bus::{DelayNs, DummyOutputPin, SpiBus};
+use bmp280::bus::{DummyOutputPin, SpiBus};
 use bmp280::registers::Register;
 use crc::Hasher32;
-use max7456::not_null_writer::NotNullWriter;
+use max7456::not_null_writer::LinesWriter;
 use max7456::SPI_MODE;
 use pro_flight::components::ascii_hud::AsciiHud;
 use pro_flight::components::schedule::{Rate, Schedulable};
@@ -14,6 +14,7 @@ use pro_flight::datastructures::Ratio;
 use pro_flight::drivers::barometer::bmp280::{init as bmp280_init, on_dma_receive};
 use pro_flight::drivers::max7456::init as max7456_init;
 use pro_flight::drivers::shared_spi::{SharedSpi, VirtualSpi};
+use pro_flight::sys::timer::SysTimer;
 use stm32f4xx_hal::gpio::gpioa::PA15;
 use stm32f4xx_hal::gpio::gpiob::PB3;
 use stm32f4xx_hal::gpio::gpioc::{PC10, PC11, PC12};
@@ -31,20 +32,6 @@ const STREAM2_OFFSET: usize = 16;
 static mut CS_BMP280: MaybeUninit<PB3<Output<PushPull>>> = MaybeUninit::uninit();
 static mut CS_MAX7456: MaybeUninit<PA15<Output<PushPull>>> = MaybeUninit::uninit();
 static mut DMA_BUFFER: [u8; 8] = [0u8; 8];
-
-pub struct TickDelay(u32);
-
-impl DelayNs<u8> for TickDelay {
-    fn delay_ns(&mut self, ns: u8) {
-        cortex_m::asm::delay(ns as u32 * (self.0 / 1000_000) / 1000 + 1)
-    }
-}
-
-impl DelayNs<u16> for TickDelay {
-    fn delay_ns(&mut self, ns: u16) {
-        cortex_m::asm::delay(ns as u32 * (self.0 / 1000_000) / 1000 + 1)
-    }
-}
 
 #[interrupt]
 unsafe fn DMA1_STREAM2() {
@@ -130,7 +117,7 @@ impl<T: StaticData<TelemetryData>> Schedulable for OSDScheduler<T> {
         let screen = self.0.draw();
         static mut OSD_DMA_BUFFER: [u8; 800] = [0u8; 800];
         let mut dma_buffer = unsafe { &mut OSD_DMA_BUFFER[..] };
-        let mut writer = NotNullWriter::new(screen, Default::default());
+        let mut writer = Lineswriter::new(screen, Default::default());
         let display = writer.write(&mut dma_buffer);
         spi3_start_tx(&display.0, display.0.len());
         true
@@ -171,7 +158,7 @@ pub fn init<'a, CRC: Hasher32>(
     let spi = SharedSpi::new(spi3, (cs_baro, cs_osd));
 
     let mut dummy_cs = DummyOutputPin {};
-    let bus = SpiBus::new(VirtualSpi::new(&spi, 0), &mut dummy_cs, TickDelay(clocks.sysclk().0));
+    let bus = SpiBus::new(VirtualSpi::new(&spi, 0), &mut dummy_cs, SysTimer::new());
     if !bmp280_init(bus).is_ok() {
         warn!("BMP280 init not ok")
     }

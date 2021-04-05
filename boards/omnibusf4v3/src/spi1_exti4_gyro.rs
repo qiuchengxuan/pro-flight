@@ -1,11 +1,12 @@
 use core::convert::Infallible;
 use core::mem::MaybeUninit;
 
-use mpu6000::bus::{self, DelayNs, SpiBus};
+use mpu6000::bus::{self, SpiBus};
 use mpu6000::registers::Register;
 use mpu6000::SPI_MODE;
 use pro_flight::config;
 use pro_flight::drivers::mpu6000::{init as mpu6000_init, on_dma_receive};
+use pro_flight::sys::timer::SysTimer;
 use stm32f4xx_hal::gpio::gpioa;
 use stm32f4xx_hal::gpio::gpioc;
 use stm32f4xx_hal::gpio::ExtiPin;
@@ -14,20 +15,6 @@ use stm32f4xx_hal::interrupt;
 use stm32f4xx_hal::rcc::Clocks;
 use stm32f4xx_hal::spi::{Error, Spi};
 use stm32f4xx_hal::{prelude::*, stm32};
-
-pub struct TickDelay(u32);
-
-impl DelayNs<u8> for TickDelay {
-    fn delay_ns(&mut self, ns: u8) {
-        cortex_m::asm::delay(ns as u32 * (self.0 / 1000_000) / 1000 + 1)
-    }
-}
-
-impl DelayNs<u16> for TickDelay {
-    fn delay_ns(&mut self, ns: u16) {
-        cortex_m::asm::delay(ns as u32 * (self.0 / 1000_000) / 1000 + 1)
-    }
-}
 
 type SpiError = bus::SpiError<Error, Error, Infallible>;
 
@@ -117,7 +104,7 @@ pub fn init(
 
     let freq: stm32f4xx_hal::time::Hertz = 1.mhz().into();
     let spi1 = Spi::spi1(spi1, (sclk, miso, mosi), SPI_MODE, freq, clocks);
-    let bus = SpiBus::new(spi1, &mut cs, TickDelay(clocks.sysclk().0));
+    let bus = SpiBus::new(spi1, &mut cs, SysTimer::new());
     if !mpu6000_init(bus, sample_rate)? {
         return Ok(false);
     }
