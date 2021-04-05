@@ -18,22 +18,23 @@ impl Into<bool> for Owner {
     }
 }
 
+#[repr(C)]
 #[derive(Default)]
-pub struct Meta {
+pub struct Meta<W> {
     pub size: usize,
     pub owner: AtomicBool,
-    pub transfer_done: Option<Box<dyn FnMut(&[u8]) + Send + 'static>>,
+    pub transfer_done: Option<Box<dyn FnMut(&[W]) + Send + 'static>>,
 }
 
-impl Meta {
+impl<W> Meta<W> {
     pub unsafe fn from_raw<'a>(pointer: usize) -> &'a mut Self {
         let address = pointer - mem::size_of::<Self>();
         &mut *(address as *mut Self)
     }
 
-    pub unsafe fn get_bytes<'a>(&self) -> &'a [u8] {
+    pub unsafe fn get_data<'a>(&self) -> &'a [W] {
         let address = self as *const _ as usize + mem::size_of::<Self>();
-        slice::from_raw_parts(address as *const u8, self.size)
+        slice::from_raw_parts(address as *const W, self.size)
     }
 
     pub fn release(&mut self) {
@@ -43,7 +44,7 @@ impl Meta {
 
 #[repr(C)]
 pub struct BufferDescriptor<W: Default + Copy, const N: usize> {
-    meta: Meta,
+    meta: Meta<W>,
     buffer: [W; N],
 }
 
@@ -58,7 +59,7 @@ impl<W: Copy + Default, const N: usize> BufferDescriptor<W, N> {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub fn set_transfer_done(&mut self, closure: impl FnMut(&[u8]) + Send + 'static) {
+    pub fn set_transfer_done(&mut self, closure: impl FnMut(&[W]) + Send + 'static) {
         self.meta.transfer_done = Some(Box::new(closure));
     }
 

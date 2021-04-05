@@ -18,7 +18,7 @@ use drone_stm32_map::periph::{
     sys_tick::periph_sys_tick,
 };
 use futures::prelude::*;
-use hal::persist::PersistDatastore;
+use hal::{event::Notifier, persist::PersistDatastore};
 use pro_flight::{
     components::{
         cli::CLI, flight_data::FlightDataHUB, imu::IMU, logger, positioning::Positioning,
@@ -74,7 +74,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     reg.rcc_ahb1enr.modify(|r| r.set_dma2en());
     reg.rcc_apb1enr.pwren.set_bit();
-    reg.rcc_apb2enr.modify(|r| r.set_spi1en());
+    reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
 
     reg.pwr_cr.modify(|r| r.set_dbp());
     reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
@@ -100,8 +100,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let flash = FlashWrapper::new(Flash::new(periph_flash!(reg)));
     let sector1 = unsafe { Sector::new(1).unwrap().as_slice() };
     let sector2 = unsafe { Sector::new(2).unwrap().as_slice() };
-    let mut nvram = NVRAM::new(flash, [sector1, sector2]).unwrap();
-    match nvram.load() {
+    let mut nvram = NVRAM::new(flash, [sector1, sector2]);
+    match nvram.init().and(nvram.load()) {
         Ok(option) => config::replace(option.unwrap_or_default()),
         Err(error) => error!("Load config failed: {:?}", error),
     }
@@ -120,8 +120,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         spi: Spi1::new(periph_spi1!(reg), pins, thread.spi_1, baudrate, mpu6000::SPI_MODE),
         cs: gpio_a.pa4.into_push_pull_output(),
         int: into_interrupt!(syscfg, peripherals, gpio_c.pc4),
-        rx: dma::Channel::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0),
-        tx: dma::Channel::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3),
+        rx: dma::Stream::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0),
+        tx: dma::Stream::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3),
         thread: thread.exti_4,
     };
     let (accelerometer, gyroscope) = (&hub.accelerometer, &hub.gyroscope);
@@ -140,16 +140,17 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         }
     });
 
-    let dma_rx = dma::Channel::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
+    let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
     let battery = &hub.battery;
     voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
+
     let mut commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
     let mut cli = CLI::new(&mut commands);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {
         let mut buffer = [0u8; 80];
         cli.receive(usb_serial::read(&mut buffer[..]));
-        led.check_toggle();
+        led.notify();
     }
 
     reg.scb_scr.sleeponexit.set_bit(); // Enter a sleep state on ISR exit.

@@ -44,6 +44,7 @@ macro_rules! velocity_units {
 
 velocity_units! {
     MMpS => (1.0, "mm/s"),
+    CMpS => (10.0, "cm/s"),
     MpS => (1000.0, "m/s"),
     FTpM => (303.0 / 60.0, "ft/min"),
     KMpH => (1000_000.0 / 3600.0 , "km/h"),

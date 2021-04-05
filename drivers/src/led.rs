@@ -2,6 +2,7 @@ use core::time::Duration;
 
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::timer::CountDown;
+use hal::event::Notifier;
 
 pub struct LED<P, T> {
     pin: P,
@@ -14,8 +15,10 @@ impl<E, P: OutputPin<Error = E>, T: CountDown<Time = Duration>> LED<P, T> {
         pin.set_low().ok();
         Self { pin, timer, on: true }
     }
+}
 
-    pub fn check_toggle(&mut self) {
+impl<E, P: OutputPin<Error = E>, T: CountDown<Time = Duration>> Notifier for LED<P, T> {
+    fn notify(&mut self) {
         if !self.timer.wait().is_ok() {
             return;
         }

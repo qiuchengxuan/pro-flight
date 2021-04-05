@@ -68,22 +68,21 @@ impl<M: DmaChMap> Future for DMABusy<M> {
 
 impl<M: DmaChMap> DMAFuture for DMABusy<M> {}
 
-pub struct Channel<M: DmaChMap> {
+pub struct Stream<M: DmaChMap> {
     reg: Reg<M>,
 }
 
-impl<M: DmaChMap> Channel<M> {
+impl<M: DmaChMap> Stream<M> {
     pub fn new<INT: ThrNvic>(raw: DmaChPeriph<M>, int: INT) -> Self {
         let reg: Reg<M> = raw.into();
         let (address_reg, transfer_complete) = (reg.memory0_address, reg.transfer_complete);
         int.add_fib(new_fn(move || {
             transfer_complete.set_bit();
-            unsafe {
-                let meta = Meta::from_raw(address_reg.load_bits() as usize);
-                let bytes = meta.get_bytes();
-                meta.transfer_done.as_mut().map(|f| f(bytes));
-                meta.release();
-            }
+            let address = address_reg.load_bits() as usize;
+            let meta = unsafe { Meta::<u8>::from_raw(address) };
+            let data = unsafe { meta.get_data() };
+            meta.release();
+            meta.transfer_done.as_mut().map(|f| f(data));
             Yielded::<(), ()>(())
         }));
         int.enable_int();
@@ -92,7 +91,7 @@ impl<M: DmaChMap> Channel<M> {
     }
 }
 
-impl<M: DmaChMap> DMA for Channel<M> {
+impl<M: DmaChMap> DMA for Stream<M> {
     type Future = DMABusy<M>;
 
     fn setup_peripheral(&mut self, channel: u8, periph: &mut dyn Peripheral) {
@@ -156,22 +155,17 @@ impl<M: DmaChMap> DMA for Channel<M> {
     }
 
     fn stop(&self) {
+        self.reg.configuration.tcie().clear_bit();
         if self.reg.configuration.en().read_bit() {
             self.reg.configuration.en().clear_bit();
             while self.reg.configuration.en().read_bit() {}
         }
         let address = self.reg.memory0_address.load_bits();
         if address > 0 {
-            unsafe { Meta::from_raw(address as usize).release() }
+            unsafe { Meta::<u8>::from_raw(address as usize).release() }
             self.reg.memory0_address.store_bits(0);
         }
     }
 }
 
-impl<M: DmaChMap> Drop for Channel<M> {
-    fn drop(&mut self) {
-        self.stop()
-    }
-}
-
-unsafe impl<M: DmaChMap> Send for Channel<M> {}
+unsafe impl<M: DmaChMap> Send for Stream<M> {}

@@ -9,10 +9,7 @@ use embedded_hal::digital::v2::OutputPin;
 use hal::dma::{Peripheral, DMA};
 pub use mpu6000::SPI_MODE;
 use mpu6000::{bus::SpiBus, MPU6000};
-use pro_flight::{
-    datastructures::measurement::{Acceleration, Measurement},
-    sys::timer::SysTimer,
-};
+use pro_flight::datastructures::measurement::{Acceleration, Measurement};
 use stm32f4xx_hal::gpio::ExtiPin;
 
 const SAMPLE_RATE: usize = 1000;
@@ -38,8 +35,7 @@ where
 {
     pub fn init(self, handler: impl FnMut(Acceleration, Measurement) + 'static + Send) {
         let mut mpu6000 = MPU6000::new(SpiBus::new(self.spi, self.cs, TickDelay {}));
-        let mut delay = SysTimer::new();
-        if let Some(error) = mpu6000.probe(&mut delay).and(mpu6000.init(SAMPLE_RATE as u16)).err() {
+        if let Some(error) = mpu6000.init(SAMPLE_RATE as u16).err() {
             error!("MPU6000 init failed: {:?}", error);
             return;
         }

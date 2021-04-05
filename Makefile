@@ -2,12 +2,18 @@ BOARD := omnibusf4v3
 TARGET := boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD)
 GDB := gdb-multiarch
 
+mass-erase := false
+
 ifeq ($(shell uname),Linux)
 	SUDO := sudo
 endif
 
+.PHONY: submodule
+submodule:
+	@git submodule update --init --recursive
+
 .PHONY: $(TARGET)
-boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD):
+boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD): submodule
 	@(cd boards/$(BOARD); cargo build --release)
 
 define TEXT_ADDRESS
@@ -30,6 +36,9 @@ clean:
 
 .PHONY: dfu
 dfu: $(BOARD).dfu
+ifeq ($(mass-erase),true)
+	$(SUDO) dfu-util -d 0483:df11 -a 0 -s 0x08000000:mass-erase:force
+endif
 	$(SUDO) dfu-util -d 0483:df11 -a 0 -D $(BOARD).dfu
 	@$(SUDO) dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -Z 0 -U empty.bin > /dev/null
 	@rm -f empty.bin

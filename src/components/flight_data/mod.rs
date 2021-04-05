@@ -47,7 +47,7 @@ macro_rules! flight_data {
 
 flight_data! {
     altimeter: Altitude,
-    vertical_speed: Velocity<f32, unit::MpS>,
+    vertical_speed: Velocity<i32, unit::CMpS>,
     battery: Battery,
     accelerometer: Acceleration,
     gyroscope: Gyro,

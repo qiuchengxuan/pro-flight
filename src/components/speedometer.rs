@@ -17,7 +17,7 @@ pub struct Speedometer<A, GNSS> {
 
 impl<A, GNSS> Speedometer<A, GNSS>
 where
-    A: DataReader<Velocity<f32, unit::MpS>>,
+    A: DataReader<Velocity<i32, unit::CMpS>>,
     GNSS: AgingDataReader<VelocityVector<i32, unit::MMpS>>,
 {
     pub fn new(altimeter: A, gnss: GNSS, sample_rate: usize, gnss_rate: usize) -> Self {
@@ -41,10 +41,11 @@ where
             self.velocity.x.value = self.filters[0].filter(v.x.value(), a[0]);
             self.velocity.y.value = self.filters[1].filter(v.y.value(), a[1]);
             self.velocity.z.value = self.filters[2].filter(v.z.value(), a[2]);
-        } else if let Some(velocity) = self.altimeter.get_last() {
+        } else if let Some(vertical_speed) = self.altimeter.get_last() {
             self.velocity.x.value += (a[0] + (a[0] - self.acceleration[0]) / 2.0) * self.interval;
             self.velocity.y.value += (a[1] + (a[1] - self.acceleration[1]) / 2.0) * self.interval;
-            self.velocity.z.value = self.filters[2].filter(velocity.value(), a[2]);
+            let vs = vertical_speed.convert(|v| v as f32).to_unit(unit::MpS).value();
+            self.velocity.z.value = self.filters[2].filter(vs, a[2]);
         } else {
             let v = (a + (a - self.acceleration) / 2.0) * self.interval;
             self.velocity += VelocityVector::new(v[0], v[1], v[2], unit::MpS);

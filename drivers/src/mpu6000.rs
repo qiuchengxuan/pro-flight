@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::blocking::delay::DelayUs;
 use embedded_hal::digital::v2::OutputPin;
 use hal::dma::{BufferDescriptor, TransferOption, DMA};
 use mpu6000::bus::Bus;
@@ -58,21 +58,13 @@ impl Convertor {
 }
 
 pub trait MPU6000Init<E> {
-    fn probe<D: DelayMs<u8>>(&mut self, delay: &mut D) -> Result<(), E>;
     fn init(&mut self, sample_rate: u16) -> Result<(), E>;
 }
 
 impl<E, BUS: Bus<Error = E>> MPU6000Init<E> for MPU6000<BUS> {
-    fn probe<D: DelayMs<u8>>(&mut self, delay: &mut D) -> Result<(), E> {
-        self.reset(delay)?;
-        if !self.verify()? {
-            error!("MPU6000 not detected");
-        }
-        Ok(())
-    }
-
     fn init(&mut self, sample_rate: u16) -> Result<(), E> {
         let mut delay = SysTimer::new();
+        self.reset(&mut delay)?;
         self.set_sleep(false)?;
         delay.delay_us(15u8);
         self.set_i2c_disable(true)?;

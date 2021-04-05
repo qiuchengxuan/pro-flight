@@ -21,9 +21,9 @@ const SAMPLE_SIZE: usize = 16;
 const VREF: usize = 3300;
 
 impl VoltageADC {
-    fn convert(&mut self, bytes: &[u16; SAMPLE_SIZE]) -> Battery {
-        let sum: usize = bytes.iter().map(|&v| v as usize).sum();
-        let value = self.0.filter((sum / SAMPLE_SIZE * VREF / 0xFFF) as u16) as usize;
+    fn convert(&mut self, data: &[u16]) -> Battery {
+        let sum: usize = data.iter().map(|&v| v as usize).sum();
+        let value = self.0.filter((sum / data.len() * VREF / 0xFFF) as u16) as usize;
         let milli_voltages = value * VOLTAGE_SCALE_X100 / 100;
         Battery(milli_voltages as u16)
     }
@@ -54,14 +54,11 @@ where
     adc.configure_channel(&vbat, Sequence::One, SampleTime::Cycles_480);
     adc.start_conversion();
 
-    let mut rx_bd = Box::new(BufferDescriptor::<u8, SAMPLE_SIZE>::default());
+    let mut rx_bd = Box::new(BufferDescriptor::<u16, SAMPLE_SIZE>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
     info!("Init voltage ADC DMA address at {:x}", address as usize);
     let mut voltage_adc = VoltageADC::default();
-    rx_bd.set_transfer_done(move |bytes| {
-        let data = unsafe { &*(bytes.as_ptr() as *const _ as *const [u16; SAMPLE_SIZE]) };
-        handler(voltage_adc.convert(data))
-    });
+    rx_bd.set_transfer_done(move |data| handler(voltage_adc.convert(data)));
 
     let mut adc = ADCWrapper(adc);
     dma.setup_peripheral(1, &mut adc);

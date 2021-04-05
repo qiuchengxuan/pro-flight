@@ -26,13 +26,14 @@ pub async fn setup_pll(
 
     cir.modify(|r| r.set_hserdyie().set_pllrdyie());
 
-    let reg::rcc::Cir { hserdyc, hserdyf, .. } = cir;
+    let reg::rcc::Cir { hserdyc, hserdyie, hserdyf, .. } = cir;
 
     let hse_ready = thread.add_future(fib::new_fn(move || {
         if !hserdyf.read_bit() {
             return fib::Yielded(());
         }
         hserdyc.set_bit();
+        hserdyie.clear_bit();
         fib::Complete(())
     }));
     cr.modify(|r| r.set_hseon());
@@ -43,12 +44,13 @@ pub async fn setup_pll(
     // PLL = (8MHz / M) * N / P = (8MHz / 8) * 336 / 2 = 168MHz
     pllcfgr.modify(|r| r.write_pllm(8).write_plln(336).write_pllp(0).write_pllq(7).set_pllsrc());
     cr.modify(|r| r.set_pllon());
-    let reg::rcc::Cir { pllrdyc, pllrdyf, .. } = cir;
+    let reg::rcc::Cir { pllrdyc, pllrdyie, pllrdyf, .. } = cir;
     let pll_ready = thread.add_future(fib::new_fn(move || {
         if !pllrdyf.read_bit() {
             return fib::Yielded(());
         }
         pllrdyc.set_bit();
+        pllrdyie.clear_bit();
         fib::Complete(())
     }));
     pll_ready.await;

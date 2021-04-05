@@ -1,6 +1,10 @@
 use hal::flash::Flash;
 
+#[cfg(target_endian = "big")]
 const ACTIVE: u32 = 0x4E565241;
+#[cfg(target_endian = "little")]
+const ACTIVE: u32 = 0x4152564E;
+
 const EMPTY: u32 = 0xFFFFFFFF;
 
 fn locate(sector: &[u32]) -> (usize, usize) {
@@ -29,7 +33,13 @@ pub struct NVRAM<F> {
 }
 
 impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
-    pub fn new(mut flash: F, sectors: [&'static mut [u32]; 2]) -> Result<Self, E> {
+    pub fn new(flash: F, sectors: [&'static mut [u32]; 2]) -> Self {
+        Self { flash, sectors, active_sector: 0, read_offset: 0, write_offset: 1 }
+    }
+
+    pub fn init(&mut self) -> Result<(), E> {
+        let sectors = &mut self.sectors;
+        let flash = &mut self.flash;
         if sectors[0][0] != ACTIVE && sectors[0][0] != EMPTY {
             flash.erase(sectors[0].as_ptr() as *const _ as usize)?;
         }
@@ -56,7 +66,10 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
             flash.program(&sectors[active_sector][0] as *const _ as usize, &[ACTIVE])?;
         }
         let (read_offset, write_offset) = locate(sectors[active_sector]);
-        Ok(Self { flash, sectors, active_sector, read_offset, write_offset })
+        self.active_sector = active_sector;
+        self.read_offset = read_offset;
+        self.write_offset = write_offset;
+        Ok(())
     }
 
     pub fn load<'a, T: From<&'a [u32]> + Default>(&'a self) -> Result<Option<T>, E> {
@@ -65,6 +78,9 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         }
         let sector = &self.sectors[self.active_sector];
         let length = sector[self.read_offset];
+        if length as usize != core::mem::size_of::<T>() {
+            return Ok(None);
+        }
         let sector = &sector[self.read_offset + 1..];
         Ok(Some(T::from(&sector[..length as usize])))
     }
