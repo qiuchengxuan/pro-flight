@@ -13,7 +13,7 @@ use core::mem;
 use core::slice;
 use core::str::Split;
 
-use crate::datastructures::decimal::IntegerDecimal;
+use crate::datastructures::fixed_point::FixedPoint;
 use crate::datastructures::measurement::{Axes, Gain};
 use crate::io::Read;
 pub use aircraft::Aircraft;
@@ -74,11 +74,11 @@ impl ToYAML for Gain {
     }
 }
 
-const DEFAULT_KP: IntegerDecimal = integer_decimal!(0_25, 2);
+const DEFAULT_KP: FixedPoint<i32, 3> = FixedPoint(0_250);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Speedometer {
-    pub kp: IntegerDecimal,
+    pub kp: FixedPoint<i32, 3>,
 }
 
 impl Default for Speedometer {

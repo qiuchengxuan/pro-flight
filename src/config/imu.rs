@@ -1,7 +1,7 @@
 use core::fmt::Write;
 use core::str::Split;
 
-use crate::datastructures::decimal::IntegerDecimal;
+use crate::datastructures::fixed_point::FixedPoint;
 use crate::datastructures::measurement::{Axes, Gain};
 
 use super::setter::{Error, Setter, Value};
@@ -11,7 +11,7 @@ use super::yaml::ToYAML;
 pub struct Accelerometer {
     pub bias: Axes,
     pub gain: Gain,
-    pub sensitive: IntegerDecimal,
+    pub sensitive: FixedPoint<i32, 1>,
 }
 
 impl Setter for Accelerometer {
@@ -45,7 +45,7 @@ impl ToYAML for Accelerometer {
 pub struct Magnetometer {
     pub bias: Axes,
     pub gain: Gain,
-    pub declination: IntegerDecimal,
+    pub declination: FixedPoint<i32, 1>,
 }
 
 impl Setter for Magnetometer {
@@ -75,13 +75,13 @@ impl ToYAML for Magnetometer {
     }
 }
 
-const DEFAULT_KP: IntegerDecimal = integer_decimal!(0_25, 2);
-const DEFAULT_KI: IntegerDecimal = integer_decimal!(0_005, 3);
+const DEFAULT_KP: FixedPoint<i32, 3> = FixedPoint(0_250);
+const DEFAULT_KI: FixedPoint<i32, 3> = FixedPoint(0_005);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Mahony {
-    pub kp: IntegerDecimal,
-    pub ki: IntegerDecimal,
+    pub kp: FixedPoint<i32, 3>,
+    pub ki: FixedPoint<i32, 3>,
 }
 
 impl Default for Mahony {

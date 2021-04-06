@@ -1,8 +1,7 @@
 use core::str::FromStr;
 
 pub mod coordinate;
-#[macro_use]
-pub mod decimal;
+pub mod fixed_point;
 pub mod input;
 pub mod measurement;
 pub mod waypoint;

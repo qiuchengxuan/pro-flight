@@ -9,7 +9,7 @@ pub mod euler;
 pub mod rotation;
 pub mod unit;
 
-use crate::datastructures::decimal::IntegerDecimal;
+use crate::datastructures::fixed_point::FixedPoint;
 
 use distance::Distance;
 use unit::CentiMeter;
@@ -23,8 +23,8 @@ pub type VelocityVector<T, U> = displacement::DistanceVector<T, U>;
 pub type Temperature = i16;
 pub type Altitude = Distance<i32, CentiMeter>;
 
-pub type Heading = IntegerDecimal;
-pub type Course = IntegerDecimal;
+pub type Heading = FixedPoint<i32, 1>;
+pub type Course = FixedPoint<i32, 1>;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Gain {

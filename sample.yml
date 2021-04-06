@@ -2,9 +2,9 @@ aircraft:
   configuration: airplane
 battery:
   cells: 3
-  min-cell-voltage: 3.3
-  max-cell-voltage: 4.2
-  warning-cell-voltage: 3.5
+  min-cell-voltage: 3.300
+  max-cell-voltage: 4.200
+  warning-cell-voltage: 3.500
 board:
   rotation: 270
 imu:
@@ -29,7 +29,7 @@ imu:
       z: 3443
     declination: 5.8
   mahony:
-    kp: 0.25
+    kp: 0.250
     ki: 0.005
 osd:
   aspect-ratio: '16:9'
@@ -51,7 +51,7 @@ receiver:
     yaw:
       channel: 4
 speedometer:
-  kp: 0.1
+  kp: 0.100
 peripherals:
   serial:
     USART1:

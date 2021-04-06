@@ -1,21 +1,21 @@
 use core::fmt::Write;
 use core::str::Split;
 
-use crate::datastructures::decimal::IntegerDecimal;
+use crate::datastructures::fixed_point::FixedPoint;
 
 use super::setter::{Error, Setter, Value};
 use super::yaml::ToYAML;
 
-const DEFAULT_MIN_CELL_VOLTAGE: IntegerDecimal = integer_decimal!(3_3, 1);
-const DEFAULT_MAX_CELL_VOLTAGE: IntegerDecimal = integer_decimal!(4_2, 1);
-const DEFAULT_WARNING_CELL_VOLTAGE: IntegerDecimal = integer_decimal!(3_5, 1);
+const DEFAULT_MIN_CELL_VOLTAGE: FixedPoint<i32, 3> = FixedPoint(3_300);
+const DEFAULT_MAX_CELL_VOLTAGE: FixedPoint<i32, 3> = FixedPoint(4_200);
+const DEFAULT_WARNING_CELL_VOLTAGE: FixedPoint<i32, 3> = FixedPoint(3_500);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Battery {
     pub cells: u8,
-    pub min_cell_voltage: IntegerDecimal,
-    pub max_cell_voltage: IntegerDecimal,
-    pub warning_cell_voltage: IntegerDecimal,
+    pub min_cell_voltage: FixedPoint<i32, 3>,
+    pub max_cell_voltage: FixedPoint<i32, 3>,
+    pub warning_cell_voltage: FixedPoint<i32, 3>,
 }
 
 impl Default for Battery {
