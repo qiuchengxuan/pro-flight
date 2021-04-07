@@ -1,9 +1,9 @@
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Battery(pub u16); // unit of milli voltage
 
-impl sval::value::Value for Battery {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.any(self.0)
+impl serde::Serialize for Battery {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_u16(self.0)
     }
 }
 

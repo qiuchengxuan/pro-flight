@@ -13,7 +13,7 @@ use crate::datastructures::measurement::{
     displacement::DistanceVector, distance::Distance, unit, Altitude,
 };
 
-#[derive(Copy, Clone, Default, Value, PartialEq, Debug)]
+#[derive(Copy, Clone, Default, Serialize, PartialEq, Debug)]
 pub struct SphericalCoordinate<U: Copy> {
     pub rho: Distance<u32, U>, // radius
     pub theta: i16,            // azimuth angle, [-180, 180]
@@ -48,7 +48,7 @@ impl<U: Copy + Default + Into<u32>> SphericalCoordinate<U> {
 
 pub type Displacement<U> = DistanceVector<i32, U>;
 
-#[derive(Default, Copy, Clone, Value, PartialEq, Debug)]
+#[derive(Default, Copy, Clone, Serialize, PartialEq, Debug)]
 pub struct Position {
     pub latitude: Latitude,
     pub longitude: Longitude,

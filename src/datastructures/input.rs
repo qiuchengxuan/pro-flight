@@ -55,7 +55,7 @@ pub enum LandingGear {
     Down,
 }
 
-#[derive(Copy, Clone, Debug, Value)]
+#[derive(Copy, Clone, Debug, Serialize)]
 pub struct ControlInput {
     pub throttle: Throttle,
     pub roll: Roll,

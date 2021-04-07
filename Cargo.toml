@@ -1,9 +1,9 @@
 [package]
+name = "pro-flight"
+version = "0.1.0"
 authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "pro-flight"
-version = "0.1.0"
 
 [dependencies]
 ascii = { version = "1.0", default-features = false }
@@ -17,8 +17,8 @@ integer-sqrt = "0.1"
 micromath = "1.0"
 nalgebra = { version = "0.21", default-features = false }
 nb = "0.1"
-sval = { version = "0.5", features = ["derive"] }
-sval_json = "0.5"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde-json-core-fmt = "0.1"
 void = { version = "1", default-features = false }
 
 [lib]
@@ -35,3 +35,5 @@ default = ["log-level-info"]
 hex-literal = "0.3"
 pretty_assertions = "0.4"
 serial_test = "*"
+serde_json = "1.0"
+drone-core = { path = "drone-os/drone-core", features = ["std"] }

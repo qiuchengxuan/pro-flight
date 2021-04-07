@@ -6,7 +6,7 @@ use nalgebra::UnitQuaternion;
 
 pub const DEGREE_PER_DAG: f32 = 180.0 / PI;
 
-#[derive(Default, Copy, Clone, Value, Debug, PartialEq)]
+#[derive(Default, Copy, Clone, Serialize, Debug, PartialEq)]
 pub struct Euler {
     pub roll: f32,
     pub pitch: f32,

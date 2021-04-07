@@ -1,5 +1,12 @@
-use crate::datastructures::measurement::distance::Distance;
-use crate::datastructures::measurement::unit::{CentiMeter, Meter};
+use core::fmt::Write;
+
+use heapless::consts::U14;
+use heapless::String;
+
+use crate::datastructures::measurement::{
+    distance::Distance,
+    unit::{CentiMeter, Meter},
+};
 
 pub const SUB_SECOND: i32 = 1000;
 
@@ -89,9 +96,11 @@ impl core::fmt::Display for Longitude {
     }
 }
 
-impl sval::Value for Longitude {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.fmt(format_args!("{}", self))
+impl serde::Serialize for Longitude {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut string: String<U14> = String::new();
+        write!(string, "{}", self).ok();
+        serializer.serialize_str(string.as_str())
     }
 }
 

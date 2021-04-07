@@ -45,7 +45,7 @@ impl Into<Axes> for Gain {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Value)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Measurement {
     pub axes: Axes,
     pub sensitive: i32,
@@ -92,9 +92,9 @@ pub const GRAVITY: f32 = 9.80665;
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Acceleration(pub Measurement);
 
-impl sval::Value for Acceleration {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        self.0.stream(stream)
+impl serde::Serialize for Acceleration {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
     }
 }
 

@@ -62,9 +62,15 @@ impl<T: From<i32>, const D: usize> FromStr for FixedPoint<T, D> {
 impl<T: Copy + From<i32> + Into<i32> + Display, const D: usize> Display for FixedPoint<T, D> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if D == 0 {
-            return write!(f, "{}", self.integer());
+            return write!(f, "{}.0", self.integer());
         }
         write!(f, "{}.{:0length$}", self.integer(), self.decimal().into().abs(), length = D)
+    }
+}
+
+impl<T: Copy + Into<i32>, const D: usize> serde::Serialize for FixedPoint<T, D> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_f32((*self).into())
     }
 }
 
@@ -74,7 +80,7 @@ mod test {
         use super::FixedPoint;
 
         let decimal: FixedPoint<i32, 0> = "0".parse().unwrap();
-        assert_eq!("0", format!("{}", decimal));
+        assert_eq!("0.0", format!("{}", decimal));
         let decimal: FixedPoint<i32, 1> = "0.0".parse().unwrap();
         assert_eq!("0.0", format!("{}", decimal));
         let decimal: FixedPoint<i32, 1> = "0.1".parse().unwrap();

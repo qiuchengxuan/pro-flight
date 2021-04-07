@@ -1,3 +1,5 @@
+use serde::ser::SerializeMap;
+
 use crate::datastructures::measurement::{Acceleration, Course, Gyro, Magnetism};
 
 #[derive(Copy, Clone, Debug)]
@@ -6,17 +8,14 @@ pub struct GNSS {
     pub course: Course,
 }
 
-impl sval::value::Value for GNSS {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(if self.fixed { 2 } else { 1 }))?;
-        stream.map_key("fixed")?;
-        stream.map_value(self.fixed)?;
+impl serde::Serialize for GNSS {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(if self.fixed { 2 } else { 1 }))?;
+        map.serialize_entry("fixed", &self.fixed)?;
         if self.fixed {
-            stream.map_key("fixed")?;
-            let course: f32 = self.course.into();
-            stream.map_value(course)?;
+            map.serialize_entry("course", &self.course)?;
         }
-        stream.map_end()
+        map.end()
     }
 }
 
@@ -39,30 +38,54 @@ impl Default for Sensor {
     }
 }
 
-impl sval::value::Value for Sensor {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(
-            4 + self.gnss.is_some() as usize + self.magnetism.is_some() as usize,
-        ))?;
-        stream.map_key("acceleration")?;
-        stream.map_value(&self.acceleration)?;
-        stream.map_key("gyro")?;
-        stream.map_value(&self.gyro)?;
-        if let Some(magnetism) = self.magnetism {
-            stream.map_key("magnetism")?;
-            stream.map_value(magnetism)?;
-        }
-        if let Some(gnss) = self.gnss {
-            stream.map_key("gnss")?;
-            stream.map_value(gnss)?;
-        }
-        stream.map_end()
+impl serde::Serialize for Sensor {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(4))?;
+        map.serialize_entry("acceleration", &self.acceleration)?;
+        map.serialize_entry("gyro", &self.gyro)?;
+        map.serialize_entry("magnetism", &self.magnetism)?;
+        map.serialize_entry("gnss", &self.gnss)?;
+        map.end()
     }
 }
 
-impl core::fmt::Display for Sensor {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        sval_json::to_fmt(f, self).ok();
-        Ok(())
+mod test {
+    #[test]
+    fn test_serialize_gnss() {
+        use std::str::FromStr;
+
+        use serde_json::json;
+
+        use super::GNSS;
+        use crate::datastructures::{fixed_point::FixedPoint, measurement::Course};
+
+        let gnss = GNSS { fixed: false, course: Course::from_str("1.1").unwrap() };
+        assert_eq!(json!({"fixed": false}), serde_json::to_value(&gnss).unwrap());
+
+        let course: f32 = FixedPoint::<i32, 1>::from_str("1.1").unwrap().into();
+        let gnss = GNSS { fixed: true, course: Course::from_str("1.1").unwrap() };
+        assert_eq!(json!({"fixed": true, "course": course}), serde_json::to_value(&gnss).unwrap());
+    }
+
+    #[test]
+    fn test_serialize() {
+        use serde_json::json;
+
+        use super::Sensor;
+
+        let expected = json!({
+            "acceleration": {
+                "axes": {"x": 0, "y": 0, "z": 0},
+                "sensitive": 2147483647,
+            },
+            "gyro": {
+                "axes": {"x": 0, "y": 0, "z": 0},
+                "sensitive": 2147483647,
+            },
+            "magnetism": null,
+            "gnss": null,
+        });
+        let sensor = Sensor::default();
+        assert_eq!(expected, serde_json::to_value(&sensor).unwrap());
     }
 }

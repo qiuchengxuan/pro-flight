@@ -4,7 +4,6 @@
 #[macro_use]
 extern crate alloc;
 extern crate ascii;
-#[cfg(not(test))]
 #[macro_use]
 extern crate drone_core;
 extern crate heapless;
@@ -13,8 +12,7 @@ extern crate micromath;
 extern crate nalgebra;
 extern crate nb;
 #[macro_use]
-extern crate sval;
-extern crate sval_json;
+extern crate serde;
 
 #[macro_use]
 pub mod components;

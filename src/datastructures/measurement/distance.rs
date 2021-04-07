@@ -73,9 +73,9 @@ impl<T: Div<Output = T> + Copy + Default + PartialEq, U: Copy> Div<T> for Distan
     }
 }
 
-impl<T: sval::Value + Copy + Default + PartialEq, U: Copy> sval::Value for Distance<T, U> {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        self.value.stream(stream)
+impl<T: serde::Serialize, U: Copy> serde::Serialize for Distance<T, U> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.value.serialize(serializer)
     }
 }
 

@@ -4,6 +4,7 @@ use integer_sqrt::IntegerSquareRoot as SquareRoot;
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 use nalgebra::Vector3;
+use serde::ser::SerializeMap;
 
 use super::distance::Distance;
 use super::unit::Meter;
@@ -15,16 +16,13 @@ pub struct DistanceVector<T, U> {
     pub z: Distance<T, U>,
 }
 
-impl<T: Copy + Default + PartialEq + sval::Value, U: Copy> sval::Value for DistanceVector<T, U> {
-    fn stream(&self, stream: &mut sval::value::Stream) -> sval::value::Result {
-        stream.map_begin(Some(3))?;
-        stream.map_key("x")?;
-        stream.map_value(self.x)?;
-        stream.map_key("y")?;
-        stream.map_value(self.y)?;
-        stream.map_key("z")?;
-        stream.map_value(self.z)?;
-        stream.map_end()
+impl<T: serde::Serialize, U: Copy> serde::Serialize for DistanceVector<T, U> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("x", &self.x)?;
+        map.serialize_entry("y", &self.y)?;
+        map.serialize_entry("z", &self.z)?;
+        map.end()
     }
 }
 
@@ -35,7 +33,7 @@ impl<T: Copy + Default, U: Copy> DistanceVector<T, U> {
 
     pub fn convert<V>(&self, convert: impl Fn(T) -> V + Copy) -> DistanceVector<V, U>
     where
-        V: Copy + Default + PartialEq + sval::Value,
+        V: Copy + Default + PartialEq + serde::Serialize,
     {
         DistanceVector {
             x: self.x.convert(convert),
@@ -47,7 +45,7 @@ impl<T: Copy + Default, U: Copy> DistanceVector<T, U> {
 
 impl<V, F: Copy + Default + Into<V>> DistanceVector<V, F>
 where
-    V: Mul<Output = V> + Div<Output = V> + Copy + Default + PartialEq + sval::Value,
+    V: Mul<Output = V> + Div<Output = V> + Copy + Default + PartialEq + serde::Serialize,
 {
     pub fn to_unit<T: Copy + Default + Into<V>>(&self, unit: T) -> DistanceVector<V, T> {
         DistanceVector { x: self.x.to_unit(unit), y: self.y.to_unit(unit), z: self.z.to_unit(unit) }
