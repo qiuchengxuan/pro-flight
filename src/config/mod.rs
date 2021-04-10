@@ -76,7 +76,7 @@ impl ToYAML for Gain {
 
 const DEFAULT_KP: FixedPoint<i32, 3> = FixedPoint(0_250);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Speedometer {
     pub kp: FixedPoint<i32, 3>,
 }

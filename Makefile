@@ -1,5 +1,6 @@
 BOARD := omnibusf4v3
 TARGET := boards/$(BOARD)/target/thumbv7em-none-eabihf/release/$(BOARD)
+GDB := gdb-multiarch
 
 ifeq ($(shell uname),Linux)
 	SUDO := sudo
@@ -32,5 +33,9 @@ dfu: $(BOARD).dfu
 	$(SUDO) dfu-util -d 0483:df11 -a 0 -D $(BOARD).dfu
 	@$(SUDO) dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -Z 0 -U empty.bin > /dev/null
 	@rm -f empty.bin
+
+.PHONY: gdb
+gdb:
+	$(GDB) $(TARGET)
 
 .DEFAULT_GOAL := $(BOARD).dfu

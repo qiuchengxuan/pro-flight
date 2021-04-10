@@ -58,13 +58,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     thread.hard_fault.add_once(|| panic!("Hard Fault"));
     thread.rcc.enable_int();
     let rcc_cir = reg.rcc_cir.into_copy();
+    let regs = (reg.rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
+    clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
 
     reg.rcc_ahb1enr.modify(|r| r.set_dma2en());
     reg.rcc_apb1enr.pwren.set_bit();
     reg.rcc_apb2enr.modify(|r| r.set_spi1en());
 
-    let regs = (reg.rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
-    clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
@@ -103,8 +103,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let sector2 = unsafe { Sector::new(2).unwrap().as_slice() };
     let mut nvram = NVRAM::new(flash, [sector1, sector2]).unwrap();
     match nvram.load() {
-        Ok(Some(config)) => config::replace(config),
-        Ok(None) => (),
+        Ok(option) => config::replace(option.unwrap_or_default()),
         Err(error) => error!("Load config failed: {:?}", error),
     }
 

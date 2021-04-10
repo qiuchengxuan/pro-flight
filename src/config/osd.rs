@@ -74,7 +74,7 @@ impl ToYAML for Offset {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OSD {
     pub aspect_ratio: Ratio,
     pub fov: u8,
