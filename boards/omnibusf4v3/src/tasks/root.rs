@@ -37,8 +37,8 @@ use stm32f4xx_hal::{
 };
 
 use crate::{
-    flash::FlashWrapper, mpu6000::DmaSpiMPU6000, spi::Spi1, thread, thread::ThrsInit, voltage_adc,
-    Regs,
+    board_name, flash::FlashWrapper, mpu6000::DmaSpiMPU6000, spi::Spi1, thread, thread::ThrsInit,
+    voltage_adc, Regs,
 };
 
 macro_rules! into_interrupt {
@@ -61,12 +61,20 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let regs = (reg.rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
     clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
 
+    let mut peripherals = stm32::Peripherals::take().unwrap();
+    let (usb_global, usb_device, usb_pwrclk) =
+        (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
+    let gpio_a = peripherals.GPIOA.split();
+    let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
+    let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
+    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
+    let mut poller = usb_serial::init(allocator, board_name());
+    systick::init(periph_sys_tick!(reg), thread.sys_tick, move || poller.poll());
+    logger::init(Box::leak(Box::new([0u8; 1024])));
+
     reg.rcc_ahb1enr.modify(|r| r.set_dma2en());
     reg.rcc_apb1enr.pwren.set_bit();
     reg.rcc_apb2enr.modify(|r| r.set_spi1en());
-
-    systick::init(periph_sys_tick!(reg), thread.sys_tick);
-    logger::init(Box::leak(Box::new([0u8; 1024])));
 
     reg.pwr_cr.modify(|r| r.set_dbp());
     reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
@@ -81,22 +89,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         _ => (),
     };
 
-    let mut peripherals = stm32::Peripherals::take().unwrap();
     let mut syscfg = peripherals.SYSCFG.constrain();
-    let (gpio_a, gpio_b, gpio_c) =
-        (peripherals.GPIOA.split(), peripherals.GPIOB.split(), peripherals.GPIOC.split());
+    let (gpio_b, gpio_c) = (peripherals.GPIOB.split(), peripherals.GPIOC.split());
 
     let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), timer::SysTimer::new());
 
     let reader = rtc.reader();
     time::init(reader, rtc);
-
-    let (usb_global, usb_device, usb_pwrclk) =
-        (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
-    let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
-    let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
-    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
-    let mut poller = usb_serial::init(allocator);
 
     let flash = FlashWrapper::new(Flash::new(periph_flash!(reg)));
     let sector1 = unsafe { Sector::new(1).unwrap().as_slice() };
@@ -148,7 +147,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut cli = CLI::new(&mut commands);
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {
-        poller.poll(|bytes| cli.receive(bytes));
+        let mut buffer = [0u8; 80];
+        cli.receive(usb_serial::read(&mut buffer[..]));
         led.check_toggle();
     }
 

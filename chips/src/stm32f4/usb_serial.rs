@@ -1,4 +1,3 @@
-use drone_core::log::STDOUT_PORT;
 use drone_core::prelude::*;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use usb_device::bus::UsbBusAllocator;
@@ -30,8 +29,8 @@ fn write_bytes(mut bytes: &[u8]) {
 }
 
 #[no_mangle]
-extern "C" fn drone_log_is_enabled(port: u8) -> bool {
-    port == STDOUT_PORT && unsafe { SERIAL_PORT.is_some() }
+extern "C" fn drone_log_is_enabled(_port: u8) -> bool {
+    unsafe { SERIAL_PORT.is_some() }
 }
 
 #[no_mangle]
@@ -61,33 +60,32 @@ extern "C" fn drone_log_flush() {
     }
 }
 
+pub fn read(buffer: &mut [u8]) -> &[u8] {
+    cortex_m::interrupt::free(move |_| {
+        let serial_port = unsafe { SERIAL_PORT.as_mut() }.unwrap();
+        let size = serial_port.read(buffer).ok().unwrap_or(0);
+        &buffer[..size]
+    })
+}
+
 pub struct UsbPoller(UsbDevice<'static, UsbBus<USB>>);
 
 impl UsbPoller {
-    pub fn poll(&mut self, mut receiver: impl FnMut(&[u8])) {
-        let mut buf = [0u8; 128];
-        let mut size = 0;
+    pub fn poll(&mut self) {
         cortex_m::interrupt::free(|_| {
             let serial_port = unsafe { SERIAL_PORT.as_mut() }.unwrap();
-            if self.0.poll(&mut [serial_port]) {
-                if let Some(sz) = serial_port.read(&mut buf).ok() {
-                    size = sz
-                }
-            }
+            self.0.poll(&mut [serial_port])
         });
-        if size > 0 {
-            receiver(&buf[..size]);
-        }
     }
 }
 
 type Allocator = UsbBusAllocator<UsbBus<USB>>;
 
-pub fn init(alloc: Allocator) -> UsbPoller {
+pub fn init(alloc: Allocator, board_name: &'static str) -> UsbPoller {
     let allocator: &'static mut Allocator = Box::leak(Box::new(alloc));
     unsafe { SERIAL_PORT = Some(SerialPort::new(allocator)) }
     let device = UsbDeviceBuilder::new(allocator, UsbVidPid(0x0403, 0x6001))
-        .product("pro-flight")
+        .product(board_name)
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();
     UsbPoller(device)

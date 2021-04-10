@@ -111,6 +111,7 @@ pub fn __write_log(args: core::fmt::Arguments, level: Level) {
     let logger = unsafe { &mut LOGGER };
     let jiffies = jiffies::get();
     let seconds = jiffies.as_secs() as u32;
+    println!("[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), args);
     writeln!(logger, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), args).ok();
 }
 
@@ -122,6 +123,7 @@ pub fn __write_log_literal(message: &'static str, level: Level) {
     let logger = unsafe { &mut LOGGER };
     let jiffies = jiffies::get();
     let seconds = jiffies.as_secs() as u32;
+    println!("[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), message);
     writeln!(logger, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), message).ok();
 }
 
