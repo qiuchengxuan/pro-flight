@@ -1,6 +1,6 @@
 use core::fmt::Write;
 
-use heapless::consts::U13;
+use heapless::consts::U16;
 use heapless::String;
 
 use crate::datastructures::measurement::{
@@ -104,7 +104,7 @@ impl core::fmt::Display for Latitude {
 
 impl serde::Serialize for Latitude {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut string: String<U13> = String::new();
+        let mut string: String<U16> = String::new();
         write!(string, "{}", self).ok();
         serializer.serialize_str(string.as_str())
     }

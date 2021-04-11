@@ -1,5 +1,7 @@
 pub mod aviation;
 pub mod data;
+pub mod misc;
+pub mod navigation;
 pub mod sensor;
 
 #[allow(unused_imports)] // false warning
@@ -20,7 +22,9 @@ use crate::sync::singular::{SingularData, SingularDataSource};
 use crate::sync::DataReader;
 
 pub use aviation::Aviation;
-pub use data::{FlightData, Misc, Navigation};
+pub use data::FlightData;
+pub use misc::Misc;
+pub use navigation::Navigation;
 pub use sensor::Sensor;
 
 macro_rules! flight_data {
