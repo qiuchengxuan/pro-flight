@@ -86,9 +86,15 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let gpio_a = peripherals.GPIOA.split();
     let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
     let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
-    let allocator = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
-    let mut poller = usb_serial::init(allocator, board_name());
-    systick::init(periph_sys_tick!(reg), thread.sys_tick, move || poller.poll());
+    let bus = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
+    let mut poller = usb_serial::init(bus, board_name());
+    thread.otg_fs.add_fib(new_fn(move || {
+        poller.poll();
+        Yielded::<(), ()>(())
+    }));
+    thread.otg_fs.enable_int();
+
+    systick::init(periph_sys_tick!(reg), thread.sys_tick);
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
     reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en());

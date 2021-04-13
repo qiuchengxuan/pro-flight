@@ -24,14 +24,13 @@ fn get_jiffies() -> Duration {
     })
 }
 
-pub fn init(systick: SysTickPeriph, thread: impl ThrToken, mut f: impl FnMut() + Send + 'static) {
+pub fn init(systick: SysTickPeriph, thread: impl ThrToken) {
     systick.stk_val.store(|r| r.write_current(0));
     systick.stk_load.store(|r| r.write_reload(SYSCLK / RATE - 1));
     systick.stk_ctrl.store(|r| r.set_clksource().set_tickint().set_enable());
     unsafe { SYS_TICK_PERIPH = MaybeUninit::new(systick) };
     thread.add_fib(new_fn(move || {
         COUNTER.fetch_add(1, Ordering::Relaxed);
-        f();
         Yielded::<(), ()>(())
     }));
 }

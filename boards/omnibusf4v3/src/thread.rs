@@ -37,6 +37,7 @@ thr::nvic! {
             56: pub dma2_stream0;
             58: pub dma2_stream2;
             59: pub dma2_stream3;
+            67: pub otg_fs;
         }
     };
 }

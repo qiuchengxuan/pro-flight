@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use drone_core::prelude::*;
 use embedded_hal::blocking::delay::DelayUs;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
@@ -8,13 +10,14 @@ use usbd_serial::{SerialPort, UsbError};
 use super::delay::TickDelay;
 
 static mut SERIAL_PORT: Option<SerialPort<'static, UsbBus<USB>>> = None;
+static POLL_OK: AtomicBool = AtomicBool::new(false);
 
 fn write_bytes(mut bytes: &[u8]) {
     let serial_port = match unsafe { SERIAL_PORT.as_mut() } {
         Some(port) => port,
         None => return,
     };
-    while bytes.len() > 0 {
+    while bytes.len() > 0 && POLL_OK.load(Ordering::Relaxed) {
         match cortex_m::interrupt::free(|_| serial_port.write(bytes)) {
             Ok(size) => bytes = &bytes[size..],
             Err(UsbError::WouldBlock) => TickDelay.delay_us(1u32),
@@ -69,7 +72,7 @@ impl UsbPoller {
     pub fn poll(&mut self) {
         cortex_m::interrupt::free(|_| {
             let serial_port = unsafe { SERIAL_PORT.as_mut() }.unwrap();
-            self.0.poll(&mut [serial_port])
+            POLL_OK.store(self.0.poll(&mut [serial_port]), Ordering::Relaxed);
         });
     }
 }
