@@ -1,3 +1,5 @@
+use alloc::boxed::Box;
+
 use hal::dma::{BufferDescriptor, Peripheral, TransferOption, DMA};
 use pro_flight::algorithm::lpf::LPF;
 use pro_flight::datastructures::measurement::battery::Battery;
@@ -46,7 +48,7 @@ impl Peripheral for ADCWrapper {
 pub fn init<F, D, H>(adc2: stm32::ADC2, pc2: PC2<Input<Floating>>, mut dma: D, mut handler: H)
 where
     D: DMA<Future = F>,
-    H: FnMut(Battery) + 'static + Send,
+    H: FnMut(Battery) + Send + 'static,
 {
     let config = AdcConfig::default().dma(Dma::Continuous).continuous(Continuous::Continuous);
     let mut adc = Adc::adc2(adc2, true, config);

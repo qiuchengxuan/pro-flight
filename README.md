@@ -1,10 +1,23 @@
 pro-flight
-=========
+==========
 
-Flight control software written in rust, provides more flexibility for customize
-and better OSD experience.
+Flight control software written in rust, aims to provider more convenience for developers
+and better OSD experience for users.
 
-Working in progress
+Why pro-flight?
+===============
+
+There are some popular flight-control software like Betaflight, INAV, PX4 and ardupilot,
+which is indeed mature and stable, while programming language they're using is C/C++ which
+is a bit of outdated, and besides:
+* all of them provides an ugly OSD
+* Betaflight and INAV is written in C, and codestyle is not very good
+* PX4 and ardupilot uses RTOS for concurrency, but with async and interrupt based thread
+  RTOS is no longer nessesary, and we'll achieve minimum latency
+* being lack of package manager their repository is huge, full filled with self made wheels
+
+In conclusion, I want to customize my own flight-control software while not willing to
+use C/C++.
 
 Progress
 ========
@@ -17,6 +30,7 @@ Progress
   - [x] YAML-like config
   - [x] Displacement integral
   - [x] Complementary filter
+  - [x] software interrupt based event
 * IO
   - [x] USB console serial
   - [x] DMA buffer descriptor
@@ -25,30 +39,34 @@ Progress
 * Sensor
   - [x] MPU6000
   - [x] Battery Voltage ADC
+  - [x] Barometer
+  - [x] DMA based OSD/HUD
 
 **WIP**
-  - [ ] Barometer
-  - [ ] DMA based OSD/HUD
+  - [ ] SBUS Receiver
+  - [ ] PWM & ESC
 
 **Future**
+
+* navigation
   - [ ] GNSS NMEA Protocol
-  - [ ] Magnetometer
-  - [ ] QMC5883L
-  - [ ] software interrupt based event
-  - [ ] SDCARD read & write
-  - [ ] PWM & ESC
-  - [ ] SBUS Receiver
   - [ ] GNSS UBX Protocol
-  - [ ] Stabilizer
+  - [ ] Magnetometer
   - [ ] DMA based I2C
-  - [ ] INS calibration
-  - [ ] Mavlink
-  - [ ] Setup calibration
-  - [ ] Blackbox
-  - [ ] DMA based SDCARD read & write
-  - [ ] Navigation
+  - [ ] QMC5883L
+  - [ ] Waypoint navigation
+* IMU
+  - [ ] INS and setup calibration for more accurate displacement integral
   - [ ] EKF filter
-  - [ ] Involve async syntax
+* fight-control
+  - [ ] PID & Stabilizer
+* logging
+  - [ ] SDCARD read & write
+  - [ ] DMA based SDCARD read & write
+  - [ ] Blackbox
+* protocol
+  - [ ] Mavlink
+* misc
   - [ ] Camera distortion adaption
 
 data-flow

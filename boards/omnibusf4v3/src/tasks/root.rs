@@ -16,6 +16,7 @@ use drivers::{
     barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
     led::LED,
     nvram::NVRAM,
+    stm32::voltage_adc,
 };
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
@@ -52,12 +53,11 @@ use stm32f4xx_hal::{
 
 use crate::{
     board_name,
-    flash::FlashWrapper,
     mpu6000::DmaSpiMPU6000,
     spi::{Spi1, Spi3},
     thread,
     thread::ThrsInit,
-    voltage_adc, Regs,
+    Regs,
 };
 
 macro_rules! into_interrupt {
@@ -116,7 +116,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let reader = rtc.reader();
     time::init(reader, rtc);
 
-    let flash = FlashWrapper::new(Flash::new(periph_flash!(reg)));
+    let flash = Flash::new(periph_flash!(reg));
     let sector1 = unsafe { Sector::new(1).unwrap().as_slice() };
     let sector2 = unsafe { Sector::new(2).unwrap().as_slice() };
     let mut nvram = NVRAM::new(flash, [sector1, sector2]);
@@ -185,7 +185,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     rx.setup_peripheral(0, &mut spi);
     let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma_1_stream_5);
     tx.setup_peripheral(0, &mut spi);
-    let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
+    let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move |_cx| bmp280.trigger(&rx, &tx));
     let mut bmp280 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(100));
 
     let mut commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));

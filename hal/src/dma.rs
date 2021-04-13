@@ -21,9 +21,9 @@ impl Into<bool> for Owner {
 #[repr(C)]
 #[derive(Default)]
 pub struct Meta<W> {
-    pub size: usize,
+    transfer_done: Option<Box<dyn FnMut(&[W]) + Send + 'static>>,
     pub owner: AtomicBool,
-    pub transfer_done: Option<Box<dyn FnMut(&[W]) + Send + 'static>>,
+    pub size: usize,
 }
 
 impl<W> Meta<W> {
@@ -37,10 +37,17 @@ impl<W> Meta<W> {
         slice::from_raw_parts(address as *const W, self.size)
     }
 
+    // unsafe because Sync
+    pub unsafe fn get_transfer_done(&mut self) -> Option<&mut (dyn FnMut(&[W]) + Send + 'static)> {
+        self.transfer_done.as_mut().map(|f| f.as_mut())
+    }
+
     pub fn release(&mut self) {
         self.owner.store(Owner::CPU.into(), Ordering::Relaxed);
     }
 }
+
+unsafe impl<W> Sync for Meta<W> {}
 
 #[repr(C)]
 pub struct BufferDescriptor<W: Default + Copy, const N: usize> {
@@ -112,7 +119,7 @@ impl TransferOption {
 /// but requires BD lifetime lives no less than DMA lifetime,
 /// when DMA lifetime ends, it should immediately stop and drop reference to BD
 /// if any to ensure BD memory safety.
-pub trait DMA: Send + 'static {
+pub trait DMA: Send + Sync + 'static {
     type Future;
 
     fn setup_peripheral(&mut self, channel: u8, periph: &mut dyn Peripheral);

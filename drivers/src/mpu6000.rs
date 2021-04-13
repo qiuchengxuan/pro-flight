@@ -92,10 +92,10 @@ pub struct DmaMPU6000<CS> {
     cs: CS,
 }
 
-impl<E, CS: OutputPin<Error = E> + Send + 'static + Unpin> DmaMPU6000<CS> {
+impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaMPU6000<CS> {
     pub fn new<H>(cs: CS, mut handler: H) -> Self
     where
-        H: FnMut(Acceleration, Measurement) + 'static + Send,
+        H: FnMut(Acceleration, Measurement) + Send + 'static,
     {
         let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();

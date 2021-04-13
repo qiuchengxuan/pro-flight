@@ -13,11 +13,9 @@ extern crate hal;
 #[macro_use]
 extern crate pro_flight;
 
-mod flash;
 mod mpu6000;
 pub mod tasks;
 pub mod thread;
-mod voltage_adc;
 
 use drone_core::heap;
 #[prelude_import]

@@ -4,6 +4,7 @@ use core::slice;
 use drone_core::reg::prelude::*;
 use drone_cortexm::reg::prelude::*;
 use drone_stm32_map::periph::flash::FlashPeriph;
+use hal;
 
 pub struct Flash(FlashPeriph);
 
@@ -152,5 +153,17 @@ impl Flash {
         });
         self.lock();
         result
+    }
+}
+
+impl hal::flash::Flash<u32> for Flash {
+    type Error = Error;
+
+    fn erase(&mut self, address: usize) -> Result<(), Error> {
+        self.erase(Sector::from_address(address).unwrap())
+    }
+
+    fn program(&mut self, address: usize, words: &[u32]) -> Result<(), Error> {
+        self.program(address, words)
     }
 }

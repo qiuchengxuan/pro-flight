@@ -12,3 +12,5 @@ pub mod barometer;
 pub mod led;
 pub mod mpu6000;
 pub mod nvram;
+#[cfg(feature = "stm32")]
+pub mod stm32;

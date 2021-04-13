@@ -204,6 +204,7 @@ dependencies = [
  "hal",
  "mpu6000",
  "pro-flight",
+ "stm32f4xx-hal",
 ]
 
 [[package]]

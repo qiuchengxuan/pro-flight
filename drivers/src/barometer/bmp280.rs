@@ -55,10 +55,10 @@ pub struct DmaBMP280<CS> {
     cs: CS,
 }
 
-impl<E, CS: OutputPin<Error = E> + Send + 'static + Unpin> DmaBMP280<CS> {
+impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
     pub fn new<H>(cs: CS, compensator: Compensator, mut handler: H) -> Self
     where
-        H: FnMut(Pressure) + 'static + Send,
+        H: FnMut(Pressure) + Send + 'static,
     {
         let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::default());
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();

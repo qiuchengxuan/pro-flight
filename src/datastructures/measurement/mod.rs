@@ -20,6 +20,18 @@ pub use rotation::Rotation;
 pub type Velocity<T, U> = distance::Distance<T, U>;
 pub type VelocityVector<T, U> = displacement::DistanceVector<T, U>;
 
+impl Into<Vector3<f32>> for VelocityVector<f32, unit::MpS> {
+    fn into(self) -> Vector3<f32> {
+        Vector3::new(self.x.value(), self.y.value(), self.z.value())
+    }
+}
+
+impl From<Vector3<f32>> for VelocityVector<f32, unit::MpS> {
+    fn from(vector: Vector3<f32>) -> Self {
+        Self::new(vector[0], vector[1], vector[2], unit::MpS)
+    }
+}
+
 pub type Temperature = i16;
 pub type Altitude = Distance<i32, CentiMeter>;
 

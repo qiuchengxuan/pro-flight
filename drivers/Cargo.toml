@@ -11,6 +11,11 @@ embedded-hal = "0.2"
 hal = { path = "../hal" }
 mpu6000 = "0.2.1"
 pro-flight = { path = "../", default-features = false }
+stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }
+
+[features]
+default = []
+stm32 = []
 
 [lib]
 name = "drivers"

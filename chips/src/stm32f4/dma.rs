@@ -24,12 +24,27 @@ pub enum Burst {
 pub struct Reg<M: DmaChMap> {
     configuration: M::CDmaCcr,
     memory0_address: M::CDmaCm0Ar,
-    number_of_data: M::SDmaCndtr,
-    peripheral_address: M::SDmaCpar,
+    number_of_data: M::CDmaCndtr,
+    peripheral_address: M::CDmaCpar,
     transfer_complete: M::CDmaIfcrCtcif,
     half_transfer: M::CDmaIfcrChtif,
     transfer_error: M::CDmaIfcrCteif,
     direct_mode_error: M::CDmaIfcrCdmeif,
+}
+
+impl<M: DmaChMap> Clone for Reg<M> {
+    fn clone(&self) -> Self {
+        Self {
+            configuration: self.configuration,
+            memory0_address: self.memory0_address,
+            number_of_data: self.number_of_data,
+            peripheral_address: self.peripheral_address,
+            transfer_complete: self.transfer_complete,
+            half_transfer: self.half_transfer,
+            transfer_error: self.transfer_error,
+            direct_mode_error: self.direct_mode_error,
+        }
+    }
 }
 
 impl<M: DmaChMap> Reg<M> {
@@ -46,8 +61,8 @@ impl<M: DmaChMap> From<DmaChPeriph<M>> for Reg<M> {
         Self {
             configuration: reg.dma_ccr.into_copy(),
             memory0_address: reg.dma_cm0ar.into_copy(),
-            number_of_data: reg.dma_cndtr,
-            peripheral_address: reg.dma_cpar,
+            number_of_data: reg.dma_cndtr.into_copy(),
+            peripheral_address: reg.dma_cpar.into_copy(),
             transfer_complete: reg.dma_ifcr_ctcif.into_copy(),
             half_transfer: reg.dma_ifcr_chtif.into_copy(),
             transfer_error: reg.dma_ifcr_cteif.into_copy(),
@@ -72,6 +87,12 @@ pub struct Stream<M: DmaChMap> {
     reg: Reg<M>,
 }
 
+impl<M: DmaChMap> Clone for Stream<M> {
+    fn clone(&self) -> Self {
+        Self { reg: self.reg.clone() }
+    }
+}
+
 impl<M: DmaChMap> Stream<M> {
     pub fn new<INT: ThrNvic>(raw: DmaChPeriph<M>, int: INT) -> Self {
         let reg: Reg<M> = raw.into();
@@ -82,7 +103,7 @@ impl<M: DmaChMap> Stream<M> {
             let meta = unsafe { Meta::<u8>::from_raw(address) };
             let data = unsafe { meta.get_data() };
             meta.release();
-            meta.transfer_done.as_mut().map(|f| f(data));
+            unsafe { meta.get_transfer_done() }.map(|f| f(data));
             Yielded::<(), ()>(())
         }));
         int.enable_int();
@@ -169,3 +190,4 @@ impl<M: DmaChMap> DMA for Stream<M> {
 }
 
 unsafe impl<M: DmaChMap> Send for Stream<M> {}
+unsafe impl<M: DmaChMap> Sync for Stream<M> {}
