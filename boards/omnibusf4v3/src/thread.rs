@@ -29,6 +29,7 @@ thr::nvic! {
         interrupts => {
             5: pub rcc;
             8: pub exti2;
+            9: pub exti3;
             10: pub exti4;
             11: pub dma1_stream0;
             16: pub dma1_stream5;

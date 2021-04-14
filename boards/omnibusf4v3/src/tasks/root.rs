@@ -8,13 +8,14 @@ use chips::stm32f4::{
     dfu, dma,
     flash::{Flash, Sector},
     rtc,
-    softint::make_soft_int,
+    softint::{make_soft_int, TryPoll},
     spi::BaudrateControl,
     systick, usb_serial,
 };
 use drivers::{
     barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
     led::LED,
+    max7456::{self, DmaMAX7456},
     nvram::NVRAM,
     stm32::voltage_adc,
 };
@@ -22,7 +23,7 @@ use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
     dma::{periph_dma1_ch0, periph_dma1_ch5, periph_dma2_ch0, periph_dma2_ch2, periph_dma2_ch3},
-    exti::periph_exti2,
+    exti::{periph_exti2, periph_exti3},
     flash::periph_flash,
     rtc::periph_rtc,
     spi::{periph_spi1, periph_spi3},
@@ -172,26 +173,31 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
     let spi3 = Spi3::new(periph_spi3!(reg), pins, thread.spi_3, baudrate, bmp280::SPI_MODE);
-    let cs_baro = gpio_b.pb3.into_push_pull_output();
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
     cs_osd.set_high().ok();
+    let cs_baro = gpio_b.pb3.into_push_pull_output();
     let mut bmp280 = bmp280_spi(spi3, cs_baro, TickDelay {});
     bmp280.init().map_err(|e| error!("Init bmp280 err: {:?}", e)).ok();
     let compensator = Compensator(bmp280.read_calibration().unwrap_or_default());
-    let (mut spi, cs, _) = bmp280.free().free();
+    let (spi, cs_baro, _) = bmp280.free().free();
 
     let (altimeter, vertical_speed) = (&hub.altimeter, &hub.vertical_speed);
     let mut vs = Variometer::new(1000 / bmp280::SAMPLE_RATE);
-    let mut bmp280 = DmaBMP280::new(cs, compensator, move |v| {
+    let mut bmp280 = DmaBMP280::new(cs_baro, compensator, move |v| {
         altimeter.write(v.into());
         vertical_speed.write(vs.update(v.into()));
     });
 
+    let (mut spi, cs_osd) = max7456::init(spi, cs_osd).unwrap().free();
     let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), thread.dma_1_stream_0);
     rx.setup_peripheral(0, &mut spi);
     let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma_1_stream_5);
     tx.setup_peripheral(0, &mut spi);
-    let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move |_cx| bmp280.trigger(&rx, &tx));
+
+    let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader).run(Box::leak(Box::new(tx.clone()))));
+    let int = make_soft_int(thread.exti_3, periph_exti3!(reg), move || future.try_poll());
+    let mut max7456 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(20));
+    let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
     let mut bmp280 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(100));
 
     let mut commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
@@ -201,6 +207,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let mut buffer = [0u8; 80];
         cli.receive(usb_serial::read(&mut buffer[..]));
         led.notify();
+        max7456.notify();
         bmp280.notify();
     }
 

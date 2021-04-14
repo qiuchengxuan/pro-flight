@@ -9,6 +9,7 @@ version = "0.0.1"
 bmp280-core = "0.1"
 embedded-hal = "0.2"
 hal = { path = "../hal" }
+max7456 = "0.1.10"
 mpu6000 = "0.2.1"
 pro-flight = { path = "../", default-features = false }
 stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }

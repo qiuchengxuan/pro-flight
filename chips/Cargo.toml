@@ -9,6 +9,7 @@ version = "0.0.1"
 chrono = { version = "0.4", default-features = false }
 cortex-m = "0.6"
 cortex-m-rt = "0.6"
+crc = { version = "1.8", default-features = false }
 drone-core = { path = "../drone-os/drone-core" }
 embedded-hal = "0.2"
 futures = { version = "0.3.0", default-features = false }

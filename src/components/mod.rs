@@ -1,3 +1,4 @@
+pub mod ascii_hud;
 pub mod cli;
 pub mod flight_data;
 #[macro_use]

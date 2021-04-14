@@ -1,10 +1,9 @@
 #![cfg_attr(not(test), no_std)]
-#![feature(trait_alias)]
 
 #[macro_use]
 extern crate alloc;
 extern crate ascii;
-extern crate bmp280_core as bmp280;
+extern crate ascii_osd_hud;
 #[macro_use]
 extern crate drone_core;
 extern crate heapless;
