@@ -2,8 +2,8 @@
 #![feature(asm)]
 
 extern crate alloc;
+#[cfg(feature = "stm32")]
 extern crate cortex_m;
-extern crate cortex_m_rt;
 #[cfg(feature = "stm32")]
 extern crate drone_cortexm;
 #[cfg(feature = "stm32")]

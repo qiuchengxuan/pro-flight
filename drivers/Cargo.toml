@@ -6,18 +6,26 @@ name = "drivers"
 version = "0.0.1"
 
 [dependencies]
-crc = { version = "1.8", default-features = false }
 bmp280-core = "0.1"
+crc = { version = "1.8", default-features = false }
+cortex-m = { version = "0.6", optional = true }
+drone-core = { path = "../drone-os/drone-core" }
 embedded-hal = "0.2"
 hal = { path = "../hal" }
 max7456 = "0.1.10"
-mpu6000 = "0.2.1"
+mpu6000 = { git = "https://github.com/qiuchengxuan/mpu6000.git" }
 pro-flight = { path = "../", default-features = false }
-stm32f4xx-hal = { git = "https://github.com/stm32-rs/stm32f4xx-hal", features = ["stm32f405", "rt", "usb_fs"] }
+usb-device = "0.2"
+usbd-serial = "0.1"
+
+[dependencies.stm32f4xx-hal]
+git = "https://github.com/stm32-rs/stm32f4xx-hal"
+features = ["stm32f405", "rt", "usb_fs"]
+optional = true
 
 [features]
 default = []
-stm32 = []
+stm32 = ["stm32f4xx-hal", "cortex-m"]
 
 [lib]
 name = "drivers"

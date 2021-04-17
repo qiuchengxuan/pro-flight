@@ -62,31 +62,32 @@ where
     Ok(max7456)
 }
 
-pub struct DmaMAX7456<'a, CS> {
+pub struct DmaMAX7456<'a, CS, RX, TX> {
     cs: CS,
     reader: FlightDataReader<'a>,
     bd: Box<BufferDescriptor<u8, 800>>,
+    _rx: RX,
+    tx: TX,
 }
 
-impl<'a, E, CS: OutputPin<Error = E> + Send + 'static> DmaMAX7456<'a, CS> {
-    pub fn new(cs: CS, reader: FlightDataReader<'a>) -> Self {
+impl<'a, E, O, CS, RXF, RX, TXF, TX> DmaMAX7456<'a, CS, RX, TX>
+where
+    CS: OutputPin<Error = E> + Send + 'static,
+    RXF: Future<Output = O>,
+    RX: DMA<Future = RXF>,
+    TXF: Future<Output = O>,
+    TX: DMA<Future = TXF>,
+{
+    pub fn new(cs: CS, reader: FlightDataReader<'a>, rx: RX, tx: TX) -> Self {
         let mut bd = Box::new(BufferDescriptor::<u8, 800>::default());
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
         bd.set_transfer_done(move |_bytes| {
             cs_.set_high().ok();
         });
-        Self { cs, reader, bd }
+        Self { cs, reader, bd, _rx: rx, tx }
     }
-}
 
-impl<'a, E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaMAX7456<'a, CS> {
-    pub async fn run<O, RXF, RX, TXF, TX>(mut self, _rx: RX, tx: TX)
-    where
-        RXF: Future<Output = O>,
-        RX: DMA<Future = RXF>,
-        TXF: Future<Output = O>,
-        TX: DMA<Future = TXF>,
-    {
+    pub async fn run(mut self) {
         let mut hud = AsciiHud::<29, 15>::new(self.reader, Ratio(12, 18).into());
         loop {
             let buffer = self.bd.try_get_buffer().unwrap();
@@ -94,7 +95,7 @@ impl<'a, E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaMAX7456<'a, CS
             let mut writer = LinesWriter::new(screen, Default::default());
             let size = writer.write(buffer).0.len();
             self.cs.set_low().ok();
-            tx.tx(&self.bd, TransferOption::sized(size)).await;
+            self.tx.tx(&self.bd, TransferOption::sized(size)).await;
         }
     }
 }

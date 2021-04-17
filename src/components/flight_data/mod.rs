@@ -18,8 +18,10 @@ use crate::datastructures::{
     },
     GNSSFixed,
 };
-use crate::sync::singular::{SingularData, SingularDataSource};
-use crate::sync::DataReader;
+use crate::{
+    sync::singular::{SingularData, SingularDataSource},
+    sync::DataReader,
+};
 
 pub use aviation::Aviation;
 pub use data::FlightData;

@@ -11,14 +11,15 @@ use chips::stm32f4::{
     rtc,
     softint::{make_soft_int, TryPoll},
     spi::BaudrateControl,
-    systick, usb_serial,
+    systick,
 };
 use drivers::{
     barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
     led::LED,
     max7456::{self, DmaMAX7456, HashFont},
+    mpu6000::{IntoDMA, MPU6000Init, SpiBus, MPU6000},
     nvram::NVRAM,
-    stm32::voltage_adc,
+    stm32::{usb_serial, voltage_adc},
 };
 use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
@@ -55,7 +56,6 @@ use stm32f4xx_hal::{
 
 use crate::{
     board_name,
-    mpu6000::DmaSpiMPU6000,
     spi::{Spi1, Spi3},
     thread,
     thread::ThrsInit,
@@ -81,6 +81,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let rcc_cir = reg.rcc_cir.into_copy();
     let regs = (reg.rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
     clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
+    systick::init(periph_sys_tick!(reg), thread.sys_tick);
 
     let mut peripherals = stm32::Peripherals::take().unwrap();
     let (usb_global, usb_device, usb_pwrclk) =
@@ -96,7 +97,6 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     }));
     thread.otg_fs.enable_int();
 
-    systick::init(periph_sys_tick!(reg), thread.sys_tick);
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
     reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en().set_crcen());
@@ -143,18 +143,21 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
-    let mpu6000 = DmaSpiMPU6000 {
-        spi: Spi1::new(periph_spi1!(reg), pins, baudrate, mpu6000::SPI_MODE),
-        cs: gpio_a.pa4.into_push_pull_output(),
-        int: into_interrupt!(syscfg, peripherals, gpio_c.pc4),
-        rx: dma::Stream::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0),
-        tx: dma::Stream::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3),
-        thread: thread.exti_4,
-    };
+    let spi = Spi1::new(periph_spi1!(reg), pins, baudrate, mpu6000::SPI_MODE);
+    let cs = gpio_a.pa4.into_push_pull_output();
+    let mut mpu6000 = MPU6000::new(SpiBus::new(spi, cs, TickDelay {}));
+    match mpu6000.init(1000) {
+        Ok(_) => info!("MPU6000 init OK"),
+        Err(_) => error!("MPU6000 init failed"),
+    }
+
+    let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0);
+    let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3);
+    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
     let (accelerometer, gyroscope) = (&hub.accelerometer, &hub.gyroscope);
     let (quat, speed) = (&hub.imu, &hub.speedometer);
     let (position, displacement) = (&hub.positioning, &hub.displacement);
-    mpu6000.init(move |accel, gyro| {
+    mpu6000.set_handler(move |accel, gyro| {
         accelerometer.write(accel);
         gyroscope.write(gyro);
         if imu.update_imu(&accel, &gyro) {
@@ -166,6 +169,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
             displacement.write(d)
         }
     });
+    let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
+    thread.exti_4.add_fib(new_fn(move || {
+        int.clear_interrupt_pending_bit();
+        mpu6000.trigger();
+        Yielded::<(), ()>(())
+    }));
+    thread.exti_4.enable_int();
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
     let battery = &hub.battery;
@@ -202,7 +212,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma_1_stream_5);
     tx.setup_peripheral(0, &mut spi);
 
-    let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader).run(rx.clone(), tx.clone()));
+    let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader, rx.clone(), tx.clone()).run());
     let int = make_soft_int(thread.exti_3, periph_exti3!(reg), move || future.try_poll());
     let mut max7456 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(20));
     let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));

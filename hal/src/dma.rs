@@ -66,8 +66,12 @@ impl<W: Copy + Default, const N: usize> BufferDescriptor<W, N> {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub fn set_transfer_done(&mut self, closure: impl FnMut(&[W]) + Send + 'static) {
-        self.meta.transfer_done = Some(Box::new(closure));
+    pub fn set_transfer_done(&mut self, closure: impl FnMut(&[W]) + Send + 'static) -> bool {
+        if self.meta.owner.load(Ordering::Relaxed) == Owner::CPU.into() {
+            self.meta.transfer_done = Some(Box::new(closure));
+            return true;
+        }
+        false
     }
 
     pub fn try_get_buffer(&mut self) -> Option<&mut [W]> {
@@ -115,6 +119,8 @@ impl TransferOption {
     }
 }
 
+pub type Channel = u8;
+
 /// Whenever tx or rx with buffer-descriptor, DMA does not take ownership of BD,
 /// but requires BD lifetime lives no less than DMA lifetime,
 /// when DMA lifetime ends, it should immediately stop and drop reference to BD
@@ -122,7 +128,7 @@ impl TransferOption {
 pub trait DMA: Send + Sync + 'static {
     type Future;
 
-    fn setup_peripheral(&mut self, channel: u8, periph: &mut dyn Peripheral);
+    fn setup_peripheral(&mut self, channel: Channel, periph: &mut dyn Peripheral);
     fn is_busy(&self) -> bool;
     fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> Self::Future
     where
