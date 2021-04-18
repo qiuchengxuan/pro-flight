@@ -17,6 +17,7 @@ pub mod tasks;
 pub mod thread;
 
 use drone_core::heap;
+use drone_core::heap::Allocator;
 #[prelude_import]
 #[allow(unused_imports)]
 use drone_core::prelude::*;
@@ -53,6 +54,18 @@ heap! {
 /// The global allocator.
 #[global_allocator]
 pub static HEAP: Heap = Heap::new();
+
+#[no_mangle]
+fn heap_statistics() {
+    let (mut total, mut free) = (0, 0);
+    for pool in HEAP.get_statistics().iter() {
+        let (block_size, capacity, remain) = (pool.block_size, pool.capacity, pool.remain);
+        println!("Slab {}: capacity {} remain {}", block_size, capacity, remain);
+        total += capacity * block_size;
+        free += remain * block_size;
+    }
+    println!("Total: {}, free: {}", total, free);
+}
 
 #[no_mangle]
 fn board_name() -> &'static str {

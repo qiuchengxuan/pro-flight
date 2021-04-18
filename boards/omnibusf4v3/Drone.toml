@@ -14,14 +14,13 @@ pools = []
 origin = 0x20000000
 size = "128K"
 pools = [
-    { block = "4", capacity = 1511 },
-    { block = "36", capacity = 415 },
-    { block = "216", capacity = 96 },
-    { block = "644", capacity = 39 },
-    { block = "1412", capacity = 17 },
-    { block = "2600", capacity = 8 },
-    { block = "4292", capacity = 3 },
-    { block = "6556", capacity = 1 },
+    { block = "32", capacity = 256 },
+    { block = "256", capacity = 96 },
+    { block = "512", capacity = 48 },
+    { block = "1024", capacity = 24 },
+    { block = "2048", capacity = 8 },
+    { block = "4096", capacity = 4 },
+    { block = "8192", capacity = 2 },
 ]
 
 [linker]

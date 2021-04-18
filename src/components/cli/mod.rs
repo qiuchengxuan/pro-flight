@@ -20,8 +20,9 @@ pub struct FnCommand {
 }
 
 extern "Rust" {
-    pub fn reboot();
     fn board_name() -> &'static str;
+    fn heap_statistics();
+    pub fn reboot();
 }
 
 macro_rules! __builtin_commands {
@@ -30,9 +31,10 @@ macro_rules! __builtin_commands {
     };
 }
 
-const BUILTIN_CMDS: [FnCommand; 13] = __builtin_commands!(
+const BUILTIN_CMDS: [FnCommand; 14] = __builtin_commands!(
     ("date", "Show date", |line| datetime::date(line)),
     ("dump", "Dump memory address", |line| memory::dump(line)),
+    ("free", "Show memory allocation statistics", |_| unsafe { heap_statistics() }),
     ("logread", "Read log", |_| print!("{}", logger::get())),
     ("read", "Read memory address", |line| memory::read(line)),
     ("readx", "Read memory address in hex", |line| memory::readx(line)),
