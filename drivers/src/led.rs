@@ -4,29 +4,29 @@ use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::timer::CountDown;
 use hal::event::Notifier;
 
-pub struct LED<P, T> {
+pub struct LED<P, C> {
     pin: P,
-    timer: T,
+    count_down: C,
     on: bool,
 }
 
-impl<E, P: OutputPin<Error = E>, T: CountDown<Time = Duration>> LED<P, T> {
-    pub fn new(mut pin: P, timer: T) -> Self {
+impl<E, T: From<Duration>, P: OutputPin<Error = E>, C: CountDown<Time = T>> LED<P, C> {
+    pub fn new(mut pin: P, count_down: C) -> Self {
         pin.set_low().ok();
-        Self { pin, timer, on: true }
+        Self { pin, count_down, on: true }
     }
 }
 
-impl<E, P: OutputPin<Error = E>, T: CountDown<Time = Duration>> Notifier for LED<P, T> {
+impl<E, T: From<Duration>, P: OutputPin<Error = E>, C: CountDown<Time = T>> Notifier for LED<P, C> {
     fn notify(&mut self) {
-        if !self.timer.wait().is_ok() {
+        if !self.count_down.wait().is_ok() {
             return;
         }
         if self.on {
-            self.timer.start(Duration::from_millis(980));
+            self.count_down.start(Duration::from_millis(980));
             self.pin.set_high().ok();
         } else {
-            self.timer.start(Duration::from_millis(20));
+            self.count_down.start(Duration::from_millis(20));
             self.pin.set_low().ok();
         }
         self.on = !self.on;

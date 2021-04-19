@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::mem::MaybeUninit;
 
 use drone_core::prelude::*;
 use embedded_hal::blocking::delay::DelayUs;
@@ -9,8 +9,25 @@ use usb_device::bus::UsbBusAllocator;
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, UsbError};
 
+static mut USB_DEVICE: MaybeUninit<UsbDevice<'static, UsbBus<USB>>> = MaybeUninit::uninit();
 static mut SERIAL_PORT: Option<SerialPort<'static, UsbBus<USB>>> = None;
-static SERIAL_FAIL: AtomicUsize = AtomicUsize::new(4);
+
+fn poll() -> bool {
+    let device = unsafe { &mut *USB_DEVICE.as_mut_ptr() };
+    let serial_port = unsafe { SERIAL_PORT.as_mut() }.unwrap();
+    cortex_m::interrupt::free(|_| device.poll(&mut [serial_port]))
+}
+
+fn flush() -> bool {
+    let mut delay = SysTimer::new();
+    for _ in 0..4 {
+        if poll() {
+            return true;
+        }
+        delay.delay_us(250u32);
+    }
+    false
+}
 
 fn write_bytes(mut bytes: &[u8]) {
     let serial_port = match unsafe { SERIAL_PORT.as_mut() } {
@@ -18,13 +35,13 @@ fn write_bytes(mut bytes: &[u8]) {
         None => return,
     };
 
-    let mut delay = SysTimer::new();
-    while bytes.len() > 0 && SERIAL_FAIL.load(Ordering::Relaxed) < 4 {
+    while bytes.len() > 0 {
         match cortex_m::interrupt::free(|_| serial_port.write(bytes)) {
             Ok(size) => bytes = &bytes[size..],
             Err(UsbError::WouldBlock) => {
-                delay.delay_us(250u32);
-                SERIAL_FAIL.fetch_add(1, Ordering::Relaxed);
+                if !flush() {
+                    return;
+                }
             }
             Err(_) => return,
         }
@@ -32,34 +49,34 @@ fn write_bytes(mut bytes: &[u8]) {
 }
 
 #[no_mangle]
-extern "C" fn drone_log_is_enabled(_port: u8) -> bool {
+fn drone_log_is_enabled(_port: u8) -> bool {
     unsafe { SERIAL_PORT.is_some() }
 }
 
 #[no_mangle]
-extern "C" fn drone_log_write_bytes(_port: u8, buffer: *const u8, count: usize) {
-    write_bytes(unsafe { core::slice::from_raw_parts(buffer, count) })
+fn drone_log_write_bytes(_port: u8, bytes: &[u8]) {
+    write_bytes(bytes)
 }
 
 #[no_mangle]
-extern "C" fn drone_log_write_u8(_port: u8, value: u8) {
+fn drone_log_write_u8(_port: u8, value: u8) {
     write_bytes(&value.to_be_bytes())
 }
 
 #[no_mangle]
-extern "C" fn drone_log_write_u16(_port: u8, value: u16) {
+fn drone_log_write_u16(_port: u8, value: u16) {
     write_bytes(&value.to_be_bytes())
 }
 
 #[no_mangle]
-extern "C" fn drone_log_write_u32(_port: u8, value: u32) {
+fn drone_log_write_u32(_port: u8, value: u32) {
     write_bytes(&value.to_be_bytes())
 }
 
 #[no_mangle]
-extern "C" fn drone_log_flush() {
-    if let Some(serial_port) = unsafe { SERIAL_PORT.as_mut() } {
-        cortex_m::interrupt::free(|_| serial_port.flush().ok());
+fn drone_log_flush() {
+    if unsafe { SERIAL_PORT.is_some() } {
+        poll();
     }
 }
 
@@ -71,27 +88,16 @@ pub fn read(buffer: &mut [u8]) -> &[u8] {
     })
 }
 
-pub struct UsbPoller(UsbDevice<'static, UsbBus<USB>>);
-
-impl UsbPoller {
-    pub fn poll(&mut self) {
-        cortex_m::interrupt::free(|_| {
-            let serial_port = unsafe { SERIAL_PORT.as_mut() }.unwrap();
-            if self.0.poll(&mut [serial_port]) {
-                SERIAL_FAIL.store(0, Ordering::Relaxed);
-            }
-        });
-    }
-}
-
 type Allocator = UsbBusAllocator<UsbBus<USB>>;
 
-pub fn init(alloc: Allocator, board_name: &'static str) -> UsbPoller {
+pub fn init(alloc: Allocator, board_name: &'static str) -> impl Fn() -> bool {
     let allocator: &'static mut Allocator = Box::leak(Box::new(alloc));
     unsafe { SERIAL_PORT = Some(SerialPort::new(allocator)) }
     let device = UsbDeviceBuilder::new(allocator, UsbVidPid(0x0403, 0x6001))
         .product(board_name)
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();
-    UsbPoller(device)
+    unsafe { USB_DEVICE = MaybeUninit::new(device) }
+
+    poll
 }

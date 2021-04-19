@@ -54,11 +54,14 @@ const BUILTIN_CMDS: [FnCommand; 14] = __builtin_commands!(
 pub struct Command {
     name: &'static str,
     description: &'static str,
-    action: Box<dyn FnMut(&str)>,
+    action: Box<dyn FnMut(&str) + Send + 'static>,
 }
 
 impl Command {
-    pub fn new(name: &'static str, desc: &'static str, action: impl FnMut(&str) + 'static) -> Self {
+    pub fn new<A>(name: &'static str, desc: &'static str, action: A) -> Self
+    where
+        A: FnMut(&str) + Send + 'static,
+    {
         Self { name, description: desc, action: Box::new(action) }
     }
 }
@@ -95,17 +98,17 @@ macro_rules! commands {
     };
 }
 
-pub struct CLI<'a> {
+pub struct CLI<CMDS> {
     terminal: terminal::Terminal,
-    commands: &'a mut [Command],
+    commands: CMDS,
 }
 
 fn prompt() {
     print!("\r{}", PROMPT);
 }
 
-impl<'a> CLI<'a> {
-    pub fn new(commands: &'a mut [Command]) -> Self {
+impl<CMDS: AsMut<[Command]>> CLI<CMDS> {
+    pub fn new(commands: CMDS) -> Self {
         CLI { terminal: terminal::Terminal::new(), commands }
     }
 
@@ -118,29 +121,29 @@ impl<'a> CLI<'a> {
             return prompt();
         }
         let mut split = line.splitn(2, ' ');
-        let first_word = match split.next() {
+        let cmd_name = match split.next() {
             Some(word) => word,
             None => return prompt(),
         };
         let remain = split.next().unwrap_or("");
-        match first_word {
+        match cmd_name {
             "" => return prompt(),
             "help" => {
                 for command in BUILTIN_CMDS.iter() {
                     println!("{}\t\t{}", command.name, command.description);
                 }
-                for command in self.commands.iter() {
+                for command in self.commands.as_mut().iter() {
                     println!("{}\t\t{}", command.name, command.description);
                 }
             }
             _ => {}
         };
-        if let Some(cmd) = BUILTIN_CMDS.iter().find(|cmd| cmd.name == first_word) {
+        if let Some(cmd) = BUILTIN_CMDS.iter().find(|cmd| cmd.name == cmd_name) {
             (cmd.action)(remain);
-        } else if let Some(cmd) = self.commands.iter_mut().find(|cmd| cmd.name == first_word) {
+        } else if let Some(cmd) = self.commands.as_mut().iter_mut().find(|c| c.name == cmd_name) {
             (cmd.action)(remain);
         } else {
-            println!("Unknown command: {}", first_word);
+            println!("Unknown command: {}", cmd_name);
         }
         print!("\r{}", PROMPT);
     }

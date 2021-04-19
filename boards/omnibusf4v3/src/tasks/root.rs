@@ -89,12 +89,14 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let gpio_a = peripherals.GPIOA.split();
     let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
     let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
-    let bus = UsbBus::new(usb, Box::leak(Box::new([0u32; 1024])));
-    let mut poller = usb_serial::init(bus, board_name());
+    static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
+    let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
+    let poll = usb_serial::init(bus, board_name());
     thread.otg_fs.add_fib(new_fn(move || {
-        poller.poll();
+        poll();
         Yielded::<(), ()>(())
     }));
+    thread.otg_fs.set_priority(74);
     thread.otg_fs.enable_int();
 
     logger::init(Box::leak(Box::new([0u8; 1024])));
@@ -218,12 +220,16 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
     let mut bmp280 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(100));
 
-    let mut commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
-    let mut cli = CLI::new(&mut commands);
-    let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
-    while let Some(_) = stream.next().root_wait() {
+    let commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
+    let mut cli = CLI::new(commands);
+    thread.otg_fs.add_fib(new_fn(move || {
         let mut buffer = [0u8; 80];
         cli.receive(usb_serial::read(&mut buffer[..]));
+        Yielded::<(), ()>(())
+    }));
+
+    let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
+    while let Some(_) = stream.next().root_wait() {
         led.notify();
         max7456.notify();
         bmp280.notify();

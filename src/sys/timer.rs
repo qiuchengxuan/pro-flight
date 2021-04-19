@@ -7,7 +7,7 @@ use void::Void;
 
 use super::jiffies;
 
-pub struct SysTimer(Duration);
+pub struct SysTimer(jiffies::Jiffies);
 
 impl SysTimer {
     pub fn new() -> Self {
@@ -16,9 +16,9 @@ impl SysTimer {
 }
 
 impl CountDown for SysTimer {
-    type Time = Duration;
+    type Time = jiffies::Jiffies;
 
-    fn start<T: Into<Duration>>(&mut self, duration: T) {
+    fn start<T: Into<jiffies::Jiffies>>(&mut self, duration: T) {
         self.0 = jiffies::get() + duration.into();
     }
 

@@ -12,7 +12,7 @@ pub struct TimedNotifier<C, N> {
     interval: Duration,
 }
 
-impl<C: CountDown<Time = Duration>, N: Notifier> TimedNotifier<C, N> {
+impl<T: From<Duration>, C: CountDown<Time = T>, N: Notifier> TimedNotifier<C, N> {
     pub fn new(notifier: N, count_down: C, interval: Duration) -> Self {
         Self { count_down, notifier, interval }
     }
@@ -22,7 +22,7 @@ impl<C: CountDown<Time = Duration>, N: Notifier> TimedNotifier<C, N> {
     }
 }
 
-impl<C: CountDown<Time = Duration>, N: Notifier> Notifier for TimedNotifier<C, N> {
+impl<T: From<Duration>, C: CountDown<Time = T>, N: Notifier> Notifier for TimedNotifier<C, N> {
     fn notify(&mut self) {
         if !self.count_down.wait().is_ok() {
             return;
