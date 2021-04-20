@@ -31,7 +31,6 @@ embedded-hal = "0.2"
 futures = { version = "0.3.0", default-features = false }
 hal = { path = "../../hal" }
 mpu6000 = "0.2.1"
-pro-flight = { path = "../..", default-features = false, features = ["log-level-debug"] }
 usb-device = "0.2"
 usbd-serial = "0.1"
 
@@ -42,6 +41,11 @@ features = ["bit-band", "floating-point-unit", "memory-protection-unit"]
 [dependencies.drone-stm32-map]
 path = "../../drone-os/drone-stm32-map"
 features = ["dma", "exti", "flash", "rtc", "spi"]
+
+[dependencies.pro-flight]
+path = "../.."
+default-features = false
+features = ["log-level-debug", "sleep-ms"]
 
 [dependencies.stm32f4xx-hal]
 git = "https://github.com/stm32-rs/stm32f4xx-hal"

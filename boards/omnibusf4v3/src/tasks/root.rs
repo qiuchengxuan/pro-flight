@@ -44,7 +44,7 @@ use pro_flight::{
     },
     config,
     sync::DataWriter,
-    sys::{time, timer},
+    sys::{time, timer::SysTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
 use stm32f4xx_hal::{
@@ -76,6 +76,7 @@ macro_rules! into_interrupt {
 #[inline(never)]
 pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut thread = thread::init(thr_init);
+    thread::setup_priority(&mut thread);
     thread.hard_fault.add_once(|| panic!("Hard Fault"));
     thread.rcc.enable_int();
     let rcc_cir = reg.rcc_cir.into_copy();
@@ -92,11 +93,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
     let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
     let poll = usb_serial::init(bus, board_name());
-    thread.otg_fs.add_fib(new_fn(move || {
+    thread.otg_fs.add_fn(move || {
         poll();
         Yielded::<(), ()>(())
-    }));
-    thread.otg_fs.set_priority(74);
+    });
     thread.otg_fs.enable_int();
 
     logger::init(Box::leak(Box::new([0u8; 1024])));
@@ -121,7 +121,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut syscfg = peripherals.SYSCFG.constrain();
     let (gpio_b, gpio_c) = (peripherals.GPIOB.split(), peripherals.GPIOC.split());
 
-    let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), timer::SysTimer::new());
+    let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), SysTimer::default());
 
     let reader = rtc.reader();
     time::init(reader, rtc);
@@ -172,12 +172,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         }
     });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    thread.exti_4.add_fib(new_fn(move || {
+    thread.mpu_6000.add_fn(move || {
         int.clear_interrupt_pending_bit();
         mpu6000.trigger();
         Yielded::<(), ()>(())
-    }));
-    thread.exti_4.enable_int();
+    });
+    thread.mpu_6000.enable_int();
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
     let battery = &hub.battery;
@@ -215,18 +215,18 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     tx.setup_peripheral(0, &mut spi);
 
     let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader, rx.clone(), tx.clone()).run());
-    let int = make_soft_int(thread.exti_3, periph_exti3!(reg), move || future.try_poll());
-    let mut max7456 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(20));
-    let int = make_soft_int(thread.exti_2, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
-    let mut bmp280 = TimedNotifier::new(int, timer::SysTimer::new(), Duration::from_millis(100));
+    let int = make_soft_int(thread.max_7456, periph_exti3!(reg), move || future.try_poll());
+    let mut max7456 = TimedNotifier::new(int, SysTimer::default(), Duration::from_millis(20));
+    let int = make_soft_int(thread.bmp_280, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
+    let mut bmp280 = TimedNotifier::new(int, SysTimer::default(), Duration::from_millis(100));
 
     let commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
     let mut cli = CLI::new(commands);
-    thread.otg_fs.add_fib(new_fn(move || {
+    thread.otg_fs.add_fn(move || {
         let mut buffer = [0u8; 80];
         cli.receive(usb_serial::read(&mut buffer[..]));
         Yielded::<(), ()>(())
-    }));
+    });
 
     let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
     while let Some(_) = stream.next().root_wait() {

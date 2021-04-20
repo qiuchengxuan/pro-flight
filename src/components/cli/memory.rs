@@ -70,7 +70,7 @@ pub fn writex(line: &str) {
         if let Some(value) = iter.next() {
             if unsafe { memory_valid_address(address) } {
                 unsafe { *(address as *mut usize) = value };
-                let mut count_down = SysTimer::new();
+                let mut count_down = SysTimer::default();
                 count_down.start(Duration::from_millis(1));
                 nb::block!(count_down.wait()).ok();
                 let value = unsafe { *(address as *const usize) };

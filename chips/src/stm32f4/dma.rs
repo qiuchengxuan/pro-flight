@@ -3,8 +3,8 @@ use core::mem;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use drone_core::fib::{new_fn, Yielded};
-use drone_cortexm::{reg::prelude::*, reg::Reg as _, thr::ThrNvic};
+use drone_core::fib::Yielded;
+use drone_cortexm::{reg::prelude::*, reg::Reg as _, thr::prelude::*, thr::ThrNvic};
 use drone_stm32_map::periph::dma::ch::*;
 
 use hal::dma::{BufferDescriptor, DMAFuture, Meta, Peripheral, TransferOption, DMA};
@@ -97,7 +97,7 @@ impl<M: DmaChMap> Stream<M> {
     pub fn new<INT: ThrNvic>(raw: DmaChPeriph<M>, int: INT) -> Self {
         let reg: Reg<M> = raw.into();
         let (address_reg, transfer_complete) = (reg.memory0_address, reg.transfer_complete);
-        int.add_fib(new_fn(move || {
+        int.add_fn(move || {
             transfer_complete.set_bit();
             let address = address_reg.load_bits() as usize;
             let meta = unsafe { Meta::<u8>::from_raw(address) };
@@ -105,7 +105,7 @@ impl<M: DmaChMap> Stream<M> {
             meta.release();
             unsafe { meta.get_transfer_done() }.map(|f| f(data));
             Yielded::<(), ()>(())
-        }));
+        });
         int.enable_int();
         reg.configuration.tcie().set_bit();
         Self { reg }

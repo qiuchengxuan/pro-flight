@@ -31,6 +31,8 @@ log-level-debug = []
 log-level-info = []
 log-level-warning = []
 log-level-error = []
+sleep-ms = []
+sleep-us = []
 default = ["log-level-info"]
 
 [dev-dependencies]

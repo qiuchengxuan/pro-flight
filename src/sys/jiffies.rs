@@ -8,7 +8,7 @@ extern "Rust" {
     fn get_jiffies() -> u64; // nano seconds
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Jiffies(u64);
 
 impl Jiffies {

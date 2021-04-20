@@ -63,7 +63,7 @@ pub trait MPU6000Init<E> {
 
 impl<E, BUS: RegAccess<Error = E>> MPU6000Init<E> for MPU6000<BUS> {
     fn init(&mut self, sample_rate: u16) -> Result<(), E> {
-        let mut delay = SysTimer::new();
+        let mut delay = SysTimer::default();
         self.reset(&mut delay)?;
         self.set_sleep(false)?;
         delay.delay_us(15u8);

@@ -39,7 +39,7 @@ pub trait BMP280Init<E> {
 
 impl<E, BUS: Bus<Error = E>> BMP280Init<E> for BMP280<BUS> {
     fn init(&mut self) -> Result<(), E> {
-        let mut delay = SysTimer::new();
+        let mut delay = SysTimer::default();
         self.reset(&mut delay)?;
         self.set_pressure_oversampling(PressureOversampling::StandardResolution)?;
         self.set_temperature_oversampling(TemperatureOversampling::UltraLowPower)?;

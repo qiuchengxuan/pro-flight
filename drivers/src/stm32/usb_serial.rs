@@ -19,7 +19,7 @@ fn poll() -> bool {
 }
 
 fn flush() -> bool {
-    let mut delay = SysTimer::new();
+    let mut delay = SysTimer::default();
     for _ in 0..4 {
         if poll() {
             return true;

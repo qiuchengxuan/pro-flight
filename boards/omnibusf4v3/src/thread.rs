@@ -1,9 +1,9 @@
 //! The threads.
 
+use drone_cortexm::thr::{self, ThrNvic};
 pub use drone_cortexm::thr::{init, init_extended};
 pub use drone_stm32_map::thr::*;
-
-use drone_cortexm::thr;
+use pro_flight::task::Priority;
 
 thr::nvic! {
     /// The thread data.
@@ -28,9 +28,9 @@ thr::nvic! {
         };
         interrupts => {
             5: pub rcc;
-            8: pub exti2;
-            9: pub exti3;
-            10: pub exti4;
+            8: pub bmp280;
+            9: pub max7456;
+            10: pub mpu6000;
             11: pub dma1_stream0;
             16: pub dma1_stream5;
             56: pub dma2_stream0;
@@ -39,4 +39,22 @@ thr::nvic! {
             67: pub otg_fs;
         }
     };
+}
+
+macro_rules! priority {
+    ($pri:expr) => {{
+        let pri: u8 = $pri.into();
+        20u8 + pri
+    }};
+}
+
+pub fn setup_priority(thread: &mut Thrs) {
+    thread.dma_1_stream_0.set_priority(priority!(Priority::System));
+    thread.dma_1_stream_5.set_priority(priority!(Priority::System));
+    thread.dma_2_stream_0.set_priority(priority!(Priority::System));
+    thread.dma_2_stream_3.set_priority(priority!(Priority::System));
+    thread.bmp_280.set_priority(priority!(Priority::Sensor));
+    thread.mpu_6000.set_priority(priority!(Priority::Sensor));
+    thread.max_7456.set_priority(priority!(Priority::Telemetry));
+    thread.otg_fs.set_priority(priority!(Priority::Interactive));
 }

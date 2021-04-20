@@ -1,9 +1,9 @@
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use drone_core::fib::{new_fn, Yielded};
+use drone_core::fib::Yielded;
 use drone_core::thr::ThrToken;
-use drone_cortexm::reg::prelude::*;
+use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::sys_tick::SysTickPeriph;
 
 use super::clock::SYSCLK;
@@ -29,8 +29,8 @@ pub fn init(systick: SysTickPeriph, thread: impl ThrToken) {
     systick.stk_load.store(|r| r.write_reload(SYSCLK / RATE - 1));
     systick.stk_ctrl.store(|r| r.set_clksource().set_tickint().set_enable());
     unsafe { SYS_TICK_PERIPH = MaybeUninit::new(systick) };
-    thread.add_fib(new_fn(move || {
+    thread.add_fn(move || {
         COUNTER.fetch_add(1, Ordering::Release);
         Yielded::<(), ()>(())
-    }));
+    });
 }

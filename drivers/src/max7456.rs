@@ -45,7 +45,7 @@ where
 {
     let config = &config::get().osd;
     let mut max7456 = MAX7456::new(bus, cs);
-    let mut delay = SysTimer::new();
+    let mut delay = SysTimer::default();
     max7456.reset(&mut delay)?;
     let standard = match config.standard {
         config::Standard::PAL => Standard::PAL,
