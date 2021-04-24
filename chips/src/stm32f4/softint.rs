@@ -5,10 +5,10 @@ use core::{
     task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
-use drone_core::fib::{new_fn, Yielded};
+use drone_core::fib::Yielded;
 use drone_cortexm::reg::field::WRwRegFieldBitAtomic;
-use drone_cortexm::reg::prelude::*;
 use drone_cortexm::thr::ThrNvic;
+use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::exti::{
     ExtiMap, ExtiPeriph, ExtiPrPif, ExtiSwierSwi, ExtiSwierSwiOpt,
 };
@@ -59,11 +59,11 @@ where
 {
     regs.exti_imr_im.set_bit();
     let pending = regs.exti_pr_pif;
-    thread.add_fib(new_fn(move || {
+    thread.add_fn(move || {
         pending.set_bit();
         f();
         Yielded::<(), ()>(())
-    }));
+    });
     thread.enable_int();
     SoftIntNotifier(regs.exti_swier_swi)
 }

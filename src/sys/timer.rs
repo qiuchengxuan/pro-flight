@@ -40,9 +40,9 @@ extern "Rust" {
     fn timer_sleep_us();
 }
 
-impl<T: Into<u64>> DelayMs<T> for SysTimer {
+impl<T: Into<u32>> DelayMs<T> for SysTimer {
     fn delay_ms(&mut self, ms: T) {
-        self.start(Duration::from_millis(ms.into()));
+        self.start(Duration::from_millis(ms.into().into()));
         match () {
             #[cfg(feature = "sleep-ms")]
             _ => {
@@ -56,9 +56,9 @@ impl<T: Into<u64>> DelayMs<T> for SysTimer {
     }
 }
 
-impl<T: Into<u64>> DelayUs<T> for SysTimer {
+impl<T: Into<u32>> DelayUs<T> for SysTimer {
     fn delay_us(&mut self, us: T) {
-        self.start(Duration::from_micros(us.into()));
+        self.start(Duration::from_micros(us.into().into()));
         match () {
             #[cfg(feature = "sleep-us")]
             _ => {

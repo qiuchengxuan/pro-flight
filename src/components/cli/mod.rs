@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 use git_version::git_version;
 
 use crate::components::logger;
+use crate::io::{self, Read};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const REVISION: &'static str = git_version!();
@@ -76,17 +77,17 @@ macro_rules! __command {
             unsafe { $crate::components::cli::reboot() };
         })
     };
-    (telemetry, [$reader:ident]) => {
-        $crate::components::cli::Command::new("telemetry", "Show flight data", move |_| {
-            println!("{}", $reader.read())
-        })
-    };
     (save, [$nvram:ident]) => {
         $crate::components::cli::Command::new("save", "Save configuration", move |_| {
             if let Some(err) = $nvram.store(config::get()).err() {
                 println!("Save configuration failed: {:?}", err);
                 $nvram.reset().ok();
             }
+        })
+    };
+    (telemetry, [$reader:ident]) => {
+        $crate::components::cli::Command::new("telemetry", "Show flight data", move |_| {
+            println!("{}", $reader.read())
         })
     };
 }
@@ -112,8 +113,10 @@ impl<CMDS: AsMut<[Command]>> CLI<CMDS> {
         CLI { terminal: terminal::Terminal::new(), commands }
     }
 
-    pub fn receive(&mut self, bytes: &[u8]) {
-        let line = match self.terminal.receive(bytes) {
+    pub fn run(&mut self) {
+        let mut buffer = [0u8; 80];
+        let size = io::stdin().read(&mut buffer[..]).ok().unwrap_or(0);
+        let line = match self.terminal.receive(&buffer[..size]) {
             Some(line) => line,
             None => return,
         };

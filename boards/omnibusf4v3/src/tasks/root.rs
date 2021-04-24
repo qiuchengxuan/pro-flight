@@ -21,7 +21,7 @@ use drivers::{
     nvram::NVRAM,
     stm32::{usb_serial, voltage_adc},
 };
-use drone_core::fib::{new_fn, ThrFiberStreamPulse, Yielded};
+use drone_core::fib::{FiberState, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
     dma::{periph_dma1_ch0, periph_dma1_ch5, periph_dma2_ch0, periph_dma2_ch2, periph_dma2_ch3},
@@ -31,7 +31,6 @@ use drone_stm32_map::periph::{
     spi::{periph_spi1, periph_spi3},
     sys_tick::periph_sys_tick,
 };
-use futures::prelude::*;
 use hal::{
     dma::DMA,
     event::{Notifier, TimedNotifier},
@@ -70,6 +69,13 @@ macro_rules! into_interrupt {
         int.trigger_on_edge(&mut $peripherals.EXTI, Edge::FALLING);
         int
     }};
+}
+
+fn never_complete(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
+    move || {
+        f();
+        Yielded::<(), ()>(())
+    }
 }
 
 /// The root task handler.
@@ -172,11 +178,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         }
     });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    thread.mpu_6000.add_fn(move || {
+    thread.mpu_6000.add_fn(never_complete(move || {
         int.clear_interrupt_pending_bit();
         mpu6000.trigger();
-        Yielded::<(), ()>(())
-    });
+    }));
     thread.mpu_6000.enable_int();
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
@@ -222,18 +227,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
     let mut cli = CLI::new(commands);
-    thread.otg_fs.add_fn(move || {
-        let mut buffer = [0u8; 80];
-        cli.receive(usb_serial::read(&mut buffer[..]));
-        Yielded::<(), ()>(())
-    });
+    thread.otg_fs.add_fn(never_complete(move || cli.run()));
 
-    let mut stream = thread.sys_tick.add_saturating_pulse_stream(new_fn(move || Yielded(Some(1))));
-    while let Some(_) = stream.next().root_wait() {
-        led.notify();
+    loop {
+        SysTimer::default().delay_ms(1u32);
         max7456.notify();
         bmp280.notify();
+        led.notify();
     }
-
-    reg.scb_scr.sleeponexit.set_bit(); // Enter a sleep state on ISR exit.
 }

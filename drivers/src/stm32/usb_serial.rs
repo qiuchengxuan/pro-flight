@@ -3,6 +3,7 @@ use core::mem::MaybeUninit;
 
 use drone_core::prelude::*;
 use embedded_hal::blocking::delay::DelayUs;
+use pro_flight::io::Error;
 use pro_flight::sys::timer::SysTimer;
 use stm32f4xx_hal::otg_fs::{UsbBus, USB};
 use usb_device::bus::UsbBusAllocator;
@@ -80,11 +81,11 @@ fn drone_log_flush() {
     }
 }
 
-pub fn read(buffer: &mut [u8]) -> &[u8] {
+#[no_mangle]
+pub fn stdin_read_bytes(buffer: &mut [u8]) -> Result<usize, Error> {
     cortex_m::interrupt::free(move |_| {
         let serial_port = unsafe { SERIAL_PORT.as_mut() }.unwrap();
-        let size = serial_port.read(buffer).ok().unwrap_or(0);
-        &buffer[..size]
+        Ok(serial_port.read(buffer).ok().unwrap_or(0))
     })
 }
 
