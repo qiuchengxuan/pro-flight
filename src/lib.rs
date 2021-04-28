@@ -4,6 +4,7 @@
 extern crate alloc;
 extern crate ascii;
 extern crate ascii_osd_hud;
+extern crate crc16;
 #[macro_use]
 extern crate drone_core;
 extern crate heapless;
@@ -21,6 +22,7 @@ pub mod datastructures;
 pub mod algorithm;
 pub mod config;
 pub mod io;
+pub mod protocol;
 pub mod sync;
 #[macro_use]
 pub mod sys;

@@ -9,6 +9,7 @@ readme = "README.md"
 ascii = { version = "1.0", default-features = false }
 ascii-osd-hud = "0.1.5"
 chrono = { version = "0.4", default-features = false }
+crc16 = { version = "0.4", default-features = false }
 drone-core = { path = "drone-os/drone-core" }
 embedded-hal = "0.2"
 git-version = "0.3.4"

@@ -41,7 +41,7 @@ use pro_flight::{
         speedometer::Speedometer, variometer::Variometer,
     },
     config,
-    sync::DataWriter,
+    sync::{flag, DataWriter},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
@@ -204,10 +204,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         vertical_speed.write(vs.update(v.into()));
     });
 
+    let (setter, receiver) = flag();
     let max7456 = max7456::init(spi, cs_osd).unwrap();
-    let max7456 = max7456.into_dma(tx.clone(), reader).unwrap();
+    let max7456 = max7456.into_dma(receiver, tx.clone(), reader).unwrap();
     thread.max7456.add_exec(max7456.run());
-    let mut max7456 = make_trigger(thread.max7456, periph_exti3!(reg));
+    let int = make_trigger(thread.max7456, periph_exti3!(reg));
+    let standard = config::get().osd.standard;
+    let mut max7456 = TimedNotifier::new(int, TickTimer::default(), standard.refresh_interval());
     thread.bmp280.add_fn(never_complete(move || bmp280.trigger(&rx, &tx)));
     let int = make_trigger(thread.bmp280, periph_exti2!(reg));
     let mut bmp280 = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(100));
@@ -217,7 +220,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         bmp280.notify();
     }));
 
-    let commands = commands!((bootloader, [persist]), (save, [nvram]), (telemetry, [reader]));
+    let commands =
+        commands!((bootloader, [persist]), (osd, [setter]), (save, [nvram]), (telemetry, [reader]));
     let mut cli = CLI::new(commands);
     loop {
         TickTimer::default().delay_ms(1u32);

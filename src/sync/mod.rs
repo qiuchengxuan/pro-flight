@@ -1,4 +1,6 @@
+use alloc::sync::Arc;
 use core::marker::PhantomData;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 pub trait DataWriter<T> {
     fn write(&self, t: T);
@@ -47,6 +49,35 @@ impl<T: Default> AgingDataReader<T> for NoDataSource<T> {
     fn get_aging_last(&mut self, _: usize) -> Option<T> {
         None
     }
+}
+
+pub struct FlagSetter(Arc<AtomicBool>);
+
+impl FlagSetter {
+    pub fn set(&self) {
+        self.0.as_ref().store(true, Ordering::Relaxed)
+    }
+
+    pub fn get(&self) -> bool {
+        self.0.as_ref().load(Ordering::Relaxed)
+    }
+}
+
+pub struct FlagReceiver(Arc<AtomicBool>);
+
+impl FlagReceiver {
+    pub fn get(&self) -> bool {
+        self.0.as_ref().load(Ordering::Relaxed)
+    }
+
+    pub fn clear(&self) {
+        self.0.as_ref().store(false, Ordering::Relaxed)
+    }
+}
+
+pub fn flag() -> (FlagSetter, FlagReceiver) {
+    let v = Arc::new(AtomicBool::new(false));
+    (FlagSetter(v.clone()), FlagReceiver(v))
 }
 
 pub mod overwriting;

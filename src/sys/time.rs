@@ -49,6 +49,14 @@ pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
 #[derive(Default)]
 pub struct TickTimer(jiffies::Jiffies);
 
+impl TickTimer {
+    pub fn after<T: Into<jiffies::Jiffies>>(duration: T) -> Self {
+        let mut timer = Self::default();
+        timer.start(duration);
+        timer
+    }
+}
+
 impl Future for TickTimer {
     type Output = ();
 

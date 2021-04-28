@@ -19,6 +19,10 @@ is a bit of outdated, and besides:
 In conclusion, I want to customize my own flight-control software while not willing to
 use C/C++.
 
+Here's a sample OSD output:
+
+![OSD](docs/OSD.png)
+
 Progress
 ========
 
@@ -36,11 +40,12 @@ Progress
   - [x] DMA buffer descriptor
 * HAL
   - [x] Gyroscope/Accelerometer
+* OSD
+  - [x] MAX7456 (With XMODEM font upload)
 * Sensor
   - [x] MPU6000
   - [x] Battery Voltage ADC
   - [x] Barometer
-  - [x] DMA based OSD/HUD
 
 **WIP**
   - [ ] SBUS Receiver

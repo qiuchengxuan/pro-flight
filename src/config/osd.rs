@@ -1,5 +1,6 @@
 use core::fmt::{Display, Formatter, Write};
 use core::str::Split;
+use core::time::Duration;
 
 use crate::datastructures::Ratio;
 
@@ -10,6 +11,15 @@ use super::yaml::ToYAML;
 pub enum Standard {
     PAL,
     NTSC,
+}
+
+impl Standard {
+    pub fn refresh_interval(self) -> Duration {
+        match self {
+            Self::PAL => Duration::from_millis(20),
+            Self::NTSC => Duration::from_millis(16),
+        }
+    }
 }
 
 impl Default for Standard {
