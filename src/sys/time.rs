@@ -1,9 +1,17 @@
 use alloc::boxed::Box;
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use core::time::Duration;
 
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::timer::CountDown;
 use hal::rtc::{RTCReader, RTCWriter};
+use nb;
+use void::Void;
 
-use crate::sys::jiffies;
+use super::jiffies;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Error {
@@ -36,6 +44,50 @@ pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
         None => return Err(Error::NotInitialized),
     }
     Ok(())
+}
+
+#[derive(Default)]
+pub struct TickTimer(jiffies::Jiffies);
+
+impl Future for TickTimer {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _ctx: &mut Context) -> Poll<Self::Output> {
+        return if jiffies::get() >= self.0 { Poll::Ready(()) } else { Poll::Pending };
+    }
+}
+
+impl CountDown for TickTimer {
+    type Time = jiffies::Jiffies;
+
+    fn start<T: Into<jiffies::Jiffies>>(&mut self, duration: T) {
+        self.0 = jiffies::get() + duration.into();
+    }
+
+    fn wait(&mut self) -> Result<(), nb::Error<Void>> {
+        return if jiffies::get() >= self.0 { Ok(()) } else { Err(nb::Error::WouldBlock) };
+    }
+}
+
+impl<T: Into<u32>> DelayMs<T> for TickTimer {
+    fn delay_ms(&mut self, ms: T) {
+        self.start(Duration::from_millis(ms.into().into()));
+        nb::block!(self.wait()).unwrap();
+    }
+}
+
+impl<T: Into<u32>> DelayUs<T> for TickTimer {
+    fn delay_us(&mut self, us: T) {
+        self.start(Duration::from_micros(us.into().into()));
+        nb::block!(self.wait()).unwrap();
+    }
+}
+
+#[inline]
+pub fn async_sleep(d: Duration) -> TickTimer {
+    let mut timer = TickTimer::default();
+    timer.start(d);
+    timer
 }
 
 pub fn init(reader: impl RTCReader + 'static, writer: impl RTCWriter + 'static) {

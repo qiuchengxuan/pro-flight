@@ -1,51 +1,25 @@
 use alloc::boxed::Box;
 use core::future::Future;
 
-use crc::Hasher32;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 use hal::dma::{BufferDescriptor, TransferOption, DMA};
-use max7456::character_memory::{CharData, CHAR_DATA_SIZE};
-use max7456::lines_writer::LinesWriter;
-use max7456::registers::Standard;
-use max7456::MAX7456;
-use pro_flight::components::{ascii_hud::AsciiHud, flight_data::FlightDataReader};
-use pro_flight::config;
-use pro_flight::datastructures::Ratio;
-use pro_flight::sys::timer::SysTimer;
+use max7456::{lines_writer::LinesWriter, registers::Standard, MAX7456};
+use pro_flight::{
+    components::{ascii_hud::AsciiHud, flight_data::FlightDataReader},
+    config,
+    datastructures::Ratio,
+    sys::time::TickTimer,
+};
 
-pub trait HashFont {
-    type Error;
-    fn hash_font_crc32<CRC: Hasher32>(&mut self, crc: &mut CRC) -> Result<u32, Self::Error>;
-}
-
-impl<E, PE, BUS, CS> HashFont for MAX7456<BUS, CS>
+pub fn init<E, PE, SPI, CS>(spi: SPI, cs: CS) -> Result<MAX7456<SPI, CS>, E>
 where
-    BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
-    CS: OutputPin<Error = PE>,
-{
-    type Error = E;
-    fn hash_font_crc32<CRC: Hasher32>(&mut self, crc: &mut CRC) -> Result<u32, E> {
-        self.enable_display(false)?;
-        crc.reset();
-        let mut char_data: CharData = [0u8; CHAR_DATA_SIZE];
-        for i in 0..256 {
-            self.load_char(i as u8, &mut char_data)?;
-            crc.write(&char_data);
-        }
-        self.enable_display(true)?;
-        Ok(crc.sum32())
-    }
-}
-
-pub fn init<E, PE, BUS, CS>(bus: BUS, cs: CS) -> Result<MAX7456<BUS, CS>, E>
-where
-    BUS: Write<u8, Error = E> + Transfer<u8, Error = E>,
+    SPI: Write<u8, Error = E> + Transfer<u8, Error = E>,
     CS: OutputPin<Error = PE>,
 {
     let config = &config::get().osd;
-    let mut max7456 = MAX7456::new(bus, cs);
-    let mut delay = SysTimer::default();
+    let mut max7456 = MAX7456::new(spi, cs);
+    let mut delay = TickTimer::default();
     max7456.reset(&mut delay)?;
     let standard = match config.standard {
         config::Standard::PAL => Standard::PAL,
@@ -62,31 +36,51 @@ where
     Ok(max7456)
 }
 
-pub struct DmaMAX7456<'a, CS, RX, TX> {
+pub struct DmaMAX7456<'a, CS, TX> {
     cs: CS,
+    tx: TX,
     reader: FlightDataReader<'a>,
     bd: Box<BufferDescriptor<u8, 800>>,
-    _rx: RX,
-    tx: TX,
 }
 
-impl<'a, E, O, CS, RXF, RX, TXF, TX> DmaMAX7456<'a, CS, RX, TX>
+pub trait IntoDMA<'a, O, CS, TXF, TX>
 where
-    CS: OutputPin<Error = E> + Send + 'static,
-    RXF: Future<Output = O>,
-    RX: DMA<Future = RXF>,
     TXF: Future<Output = O>,
     TX: DMA<Future = TXF>,
 {
-    pub fn new(cs: CS, reader: FlightDataReader<'a>, rx: RX, tx: TX) -> Self {
+    type Error;
+    fn into_dma(
+        self,
+        tx: TX,
+        reader: FlightDataReader<'a>,
+    ) -> Result<DmaMAX7456<'a, CS, TX>, Self::Error>;
+}
+
+impl<'a, E, PE, SPI, CS, O, TXF, TX> IntoDMA<'a, O, CS, TXF, TX> for MAX7456<SPI, CS>
+where
+    SPI: Write<u8, Error = E> + Transfer<u8, Error = E>,
+    CS: OutputPin<Error = PE> + Send + 'static,
+    TXF: Future<Output = O>,
+    TX: DMA<Future = TXF>,
+{
+    type Error = E;
+    fn into_dma(self, tx: TX, reader: FlightDataReader<'a>) -> Result<DmaMAX7456<'a, CS, TX>, E> {
         let mut bd = Box::new(BufferDescriptor::<u8, 800>::default());
+        let (_, cs) = self.free();
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
         bd.set_transfer_done(move |_bytes| {
             cs_.set_high().ok();
         });
-        Self { cs, reader, bd, _rx: rx, tx }
+        Ok(DmaMAX7456 { cs, tx, reader, bd })
     }
+}
 
+impl<'a, E, O, CS, TXF, TX> DmaMAX7456<'a, CS, TX>
+where
+    CS: OutputPin<Error = E> + Send + 'static,
+    TXF: Future<Output = O>,
+    TX: DMA<Future = TXF>,
+{
     pub async fn run(mut self) {
         let mut hud = AsciiHud::<29, 15>::new(self.reader, Ratio(12, 18).into());
         loop {

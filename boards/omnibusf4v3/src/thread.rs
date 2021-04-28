@@ -28,9 +28,9 @@ thr::nvic! {
         };
         interrupts => {
             5: pub rcc;
-            8: pub bmp280;
-            9: pub max7456;
-            10: pub mpu6000;
+            8: pub bmp280; // exti2
+            9: pub max7456; // exti3
+            10: pub mpu6000; // exti4
             11: pub dma1_stream0;
             16: pub dma1_stream5;
             56: pub dma2_stream0;
@@ -44,17 +44,17 @@ thr::nvic! {
 macro_rules! priority {
     ($pri:expr) => {{
         let pri: u8 = $pri.into();
-        20u8 + pri
+        0x10 + (pri << 4)
     }};
 }
 
 pub fn setup_priority(thread: &mut Thrs) {
-    thread.dma_1_stream_0.set_priority(priority!(Priority::System));
-    thread.dma_1_stream_5.set_priority(priority!(Priority::System));
-    thread.dma_2_stream_0.set_priority(priority!(Priority::System));
-    thread.dma_2_stream_3.set_priority(priority!(Priority::System));
-    thread.bmp_280.set_priority(priority!(Priority::Sensor));
-    thread.mpu_6000.set_priority(priority!(Priority::Sensor));
-    thread.max_7456.set_priority(priority!(Priority::Telemetry));
-    thread.otg_fs.set_priority(priority!(Priority::Interactive));
+    thread.otg_fs.set_priority(priority!(Priority::Immediate));
+    thread.dma1_stream0.set_priority(priority!(Priority::System));
+    thread.dma1_stream5.set_priority(priority!(Priority::System));
+    thread.dma2_stream0.set_priority(priority!(Priority::System));
+    thread.dma2_stream3.set_priority(priority!(Priority::System));
+    thread.bmp280.set_priority(priority!(Priority::Sensor));
+    thread.mpu6000.set_priority(priority!(Priority::Sensor));
+    thread.max7456.set_priority(priority!(Priority::Telemetry));
 }

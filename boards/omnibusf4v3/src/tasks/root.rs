@@ -4,20 +4,19 @@ use core::time::Duration;
 
 use chips::stm32f4::{
     clock,
-    crc::CRC,
     delay::TickDelay,
     dfu, dma,
     flash::{Flash, Sector},
     rtc,
-    softint::{make_soft_int, TryPoll},
+    softint::make_trigger,
     spi::BaudrateControl,
     systick,
 };
 use drivers::{
     barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
     led::LED,
-    max7456::{self, DmaMAX7456, HashFont},
-    mpu6000::{IntoDMA, MPU6000Init, SpiBus, MPU6000},
+    max7456::{self, IntoDMA as _},
+    mpu6000::{self, IntoDMA as _, MPU6000Init, SpiBus, MPU6000},
     nvram::NVRAM,
     stm32::{usb_serial, voltage_adc},
 };
@@ -43,7 +42,7 @@ use pro_flight::{
     },
     config,
     sync::DataWriter,
-    sys::{time, timer::SysTimer},
+    sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
 use stm32f4xx_hal::{
@@ -82,13 +81,13 @@ fn never_complete(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
 #[inline(never)]
 pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut thread = thread::init(thr_init);
-    thread::setup_priority(&mut thread);
     thread.hard_fault.add_once(|| panic!("Hard Fault"));
     thread.rcc.enable_int();
-    let rcc_cir = reg.rcc_cir.into_copy();
-    let regs = (reg.rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
+    let (rcc_cir, rcc_cfgr) = (reg.rcc_cir.into_copy(), reg.rcc_cfgr.into_copy());
+    let regs = (rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
     clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
+    thread::setup_priority(&mut thread);
 
     let mut peripherals = stm32::Peripherals::take().unwrap();
     let (usb_global, usb_device, usb_pwrclk) =
@@ -98,11 +97,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
     static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
     let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
-    let poll = usb_serial::init(bus, board_name());
-    thread.otg_fs.add_fn(move || {
-        poll();
-        Yielded::<(), ()>(())
-    });
+    usb_serial::init(&mut thread.otg_fs, bus, board_name());
     thread.otg_fs.enable_int();
 
     logger::init(Box::leak(Box::new([0u8; 1024])));
@@ -111,9 +106,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
     reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
 
-    reg.pwr_cr.modify(|r| r.set_dbp());
-    reg.rcc_bdcr.modify(|r| r.set_rtcsel1().set_rtcsel0().set_rtcen()); // select HSE
-    let (rtc, mut persist) = rtc::init(periph_rtc!(reg));
+    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), rcc_cfgr);
     let mut sysinfo: SystemInfo = persist.load();
     match sysinfo.reboot_reason {
         RebootReason::Bootloader => {
@@ -127,7 +120,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut syscfg = peripherals.SYSCFG.constrain();
     let (gpio_b, gpio_c) = (peripherals.GPIOB.split(), peripherals.GPIOC.split());
 
-    let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), SysTimer::default());
+    let mut led = LED::new(gpio_b.pb5.into_push_pull_output(), TickTimer::default());
 
     let reader = rtc.reader();
     time::init(reader, rtc);
@@ -159,8 +152,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Err(_) => error!("MPU6000 init failed"),
     }
 
-    let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma_2_stream_0);
-    let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma_2_stream_3);
+    let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
+    let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
     let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
     let (accelerometer, gyroscope) = (&hub.accelerometer, &hub.gyroscope);
     let (quat, speed) = (&hub.imu, &hub.speedometer);
@@ -178,19 +171,24 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         }
     });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    thread.mpu_6000.add_fn(never_complete(move || {
+    thread.mpu6000.add_fn(never_complete(move || {
         int.clear_interrupt_pending_bit();
         mpu6000.trigger();
     }));
-    thread.mpu_6000.enable_int();
+    thread.mpu6000.enable_int();
 
-    let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma_2_stream_2);
+    let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma2_stream2);
     let battery = &hub.battery;
     voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
 
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
-    let spi3 = Spi3::new(periph_spi3!(reg), pins, baudrate, bmp280::SPI_MODE);
+    let mut spi3 = Spi3::new(periph_spi3!(reg), pins, baudrate, bmp280::SPI_MODE);
+    let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), thread.dma1_stream0);
+    rx.setup_peripheral(0, &mut spi3);
+    let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma1_stream5);
+    tx.setup_peripheral(0, &mut spi3);
+
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
     cs_osd.set_high().ok();
     let cs_baro = gpio_b.pb3.into_push_pull_output();
@@ -206,33 +204,24 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         vertical_speed.write(vs.update(v.into()));
     });
 
-    let mut max7456 = max7456::init(spi, cs_osd).unwrap();
-    let mut crc32 = CRC(peripherals.CRC);
-    match max7456.hash_font_crc32(&mut crc32) {
-        Ok(crc32) => info!("MAX7456 font crc32 = {:x}", crc32),
-        Err(e) => warn!("Hash MAX7456 font fail: {:?}", e),
-    }
+    let max7456 = max7456::init(spi, cs_osd).unwrap();
+    let max7456 = max7456.into_dma(tx.clone(), reader).unwrap();
+    thread.max7456.add_exec(max7456.run());
+    let mut max7456 = make_trigger(thread.max7456, periph_exti3!(reg));
+    thread.bmp280.add_fn(never_complete(move || bmp280.trigger(&rx, &tx)));
+    let int = make_trigger(thread.bmp280, periph_exti2!(reg));
+    let mut bmp280 = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(100));
 
-    let (mut spi, cs_osd) = max7456.free();
-    let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), thread.dma_1_stream_0);
-    rx.setup_peripheral(0, &mut spi);
-    let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma_1_stream_5);
-    tx.setup_peripheral(0, &mut spi);
-
-    let mut future = Box::pin(DmaMAX7456::new(cs_osd, reader, rx.clone(), tx.clone()).run());
-    let int = make_soft_int(thread.max_7456, periph_exti3!(reg), move || future.try_poll());
-    let mut max7456 = TimedNotifier::new(int, SysTimer::default(), Duration::from_millis(20));
-    let int = make_soft_int(thread.bmp_280, periph_exti2!(reg), move || bmp280.trigger(&rx, &tx));
-    let mut bmp280 = TimedNotifier::new(int, SysTimer::default(), Duration::from_millis(100));
-
-    let commands = commands!((bootloader, [persist]), (telemetry, [reader]), (save, [nvram]));
-    let mut cli = CLI::new(commands);
-    thread.otg_fs.add_fn(never_complete(move || cli.run()));
-
-    loop {
-        SysTimer::default().delay_ms(1u32);
+    thread.sys_tick.add_fn(never_complete(move || {
         max7456.notify();
         bmp280.notify();
+    }));
+
+    let commands = commands!((bootloader, [persist]), (save, [nvram]), (telemetry, [reader]));
+    let mut cli = CLI::new(commands);
+    loop {
+        TickTimer::default().delay_ms(1u32);
         led.notify();
+        cli.run();
     }
 }

@@ -6,6 +6,7 @@ mod terminal;
 use alloc::boxed::Box;
 
 use git_version::git_version;
+use indoc::indoc;
 
 use crate::components::logger;
 use crate::io::{self, Read};
@@ -67,6 +68,11 @@ impl Command {
     }
 }
 
+pub const OSD_CMD_USAGE: &str = indoc! {"
+Usage:
+    osd upload-font: Upload font
+"};
+
 #[macro_export]
 macro_rules! __command {
     (bootloader, [$persist:ident]) => {
@@ -75,6 +81,18 @@ macro_rules! __command {
             sysinfo.reboot_reason = RebootReason::Bootloader;
             $persist.save(&sysinfo);
             unsafe { $crate::components::cli::reboot() };
+        })
+    };
+    (osd, [$setter:ident]) => {
+        $crate::components::cli::Command::new("osd", "OSD related command", move |cmd| {
+            if cmd.trim() != "upload-font" {
+                println!("{}", $crate::components::cli::OSD_CMD_USAGE);
+                return;
+            }
+            $setter.set();
+            while $setter.get() {
+                $crate::sys::time::TickTimer::default().delay_ms(1u32);
+            }
         })
     };
     (save, [$nvram:ident]) => {
@@ -133,11 +151,12 @@ impl<CMDS: AsMut<[Command]>> CLI<CMDS> {
             "" => return prompt(),
             "help" => {
                 for command in BUILTIN_CMDS.iter() {
-                    println!("{}\t\t{}", command.name, command.description);
+                    println!("{:<10} {}", command.name, command.description);
                 }
                 for command in self.commands.as_mut().iter() {
-                    println!("{}\t\t{}", command.name, command.description);
+                    println!("{:<10} {}", command.name, command.description);
                 }
+                return prompt();
             }
             _ => {}
         };
@@ -148,6 +167,6 @@ impl<CMDS: AsMut<[Command]>> CLI<CMDS> {
         } else {
             println!("Unknown command: {}", cmd_name);
         }
-        print!("\r{}", PROMPT);
+        prompt()
     }
 }

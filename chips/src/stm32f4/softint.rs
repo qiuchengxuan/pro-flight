@@ -1,10 +1,3 @@
-use core::{
-    future::Future,
-    pin::Pin,
-    ptr,
-    task::{Context, RawWaker, RawWakerVTable, Waker},
-};
-
 use drone_core::fib::Yielded;
 use drone_cortexm::reg::field::WRwRegFieldBitAtomic;
 use drone_cortexm::thr::ThrNvic;
@@ -25,43 +18,15 @@ where
     }
 }
 
-struct NoWaitWaker; // We don't really need a waker
-
-fn raw_waker() -> RawWaker {
-    RawWaker::new(ptr::null(), &VTABLE)
-}
-
-impl NoWaitWaker {
-    fn to_waker(&self) -> Waker {
-        unsafe { Waker::from_raw(raw_waker()) }
-    }
-}
-
-const VTABLE: RawWakerVTable = RawWakerVTable::new(|_| raw_waker(), |_w| {}, |_w| {}, |_w| {});
-
-pub trait TryPoll: Future {
-    fn try_poll(&mut self);
-}
-
-impl<T: Future + Unpin> TryPoll for T {
-    fn try_poll(&mut self) {
-        let waker = NoWaitWaker.to_waker();
-        let mut context = Context::from_waker(&waker);
-        let _ = { Pin::new(self) }.poll(&mut context);
-    }
-}
-
-pub fn make_soft_int<T, M, F>(thread: T, regs: ExtiPeriph<M>, mut f: F) -> impl Notifier
+pub fn make_trigger<T, M>(thread: T, regs: ExtiPeriph<M>) -> impl Notifier
 where
     T: ThrNvic,
     M: ExtiMap + ExtiPrPif + ExtiSwierSwiOpt + ExtiSwierSwi,
-    F: FnMut() + Send + 'static,
 {
     regs.exti_imr_im.set_bit();
     let pending = regs.exti_pr_pif;
     thread.add_fn(move || {
         pending.set_bit();
-        f();
         Yielded::<(), ()>(())
     });
     thread.enable_int();

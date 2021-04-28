@@ -5,10 +5,10 @@ use embedded_hal::digital::v2::OutputPin;
 use hal::dma::{BufferDescriptor, Channel, Peripheral, TransferOption, DMA};
 use mpu6000::registers::{AccelerometerSensitive, GyroSensitive, Register};
 use mpu6000::{self, bus::RegAccess, ClockSource, IntPinConfig, Interrupt};
-pub use mpu6000::{bus::SpiBus, MPU6000};
+pub use mpu6000::{bus::SpiBus, MPU6000, SPI_MODE};
 use pro_flight::config;
 use pro_flight::datastructures::measurement::{Acceleration, Axes, Measurement, Rotation};
-use pro_flight::sys::timer::SysTimer;
+use pro_flight::sys::time::TickTimer;
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 pub const NUM_MEASUREMENT_REGS: usize = 14;
@@ -63,7 +63,7 @@ pub trait MPU6000Init<E> {
 
 impl<E, BUS: RegAccess<Error = E>> MPU6000Init<E> for MPU6000<BUS> {
     fn init(&mut self, sample_rate: u16) -> Result<(), E> {
-        let mut delay = SysTimer::default();
+        let mut delay = TickTimer::default();
         self.reset(&mut delay)?;
         self.set_sleep(false)?;
         delay.delay_us(15u8);

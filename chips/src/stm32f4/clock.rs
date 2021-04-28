@@ -10,11 +10,10 @@ pub const PCLK2: u32 = 84_000_000;
 const HPRE: u32 = 1; // = SYSCLK
 const PPRE1: u32 = 0b101; // SYSCLK / 4 = 42MHz
 const PPRE2: u32 = 0b100; // SYSCLK / 2 = 84MHz
-const RTCPRE: u32 = 8; // HSE / 8 = 1MHz
 const PLL_SELECTED: u32 = 0b10;
 const FLASH_LATENCY: u32 = (SYSCLK - 1) / 30_000_000;
 
-type RccRegs = (reg::rcc::Cfgr<Srt>, reg::rcc::Cr<Srt>, reg::rcc::Pllcfgr<Srt>);
+type RccRegs = (reg::rcc::Cfgr<Crt>, reg::rcc::Cr<Srt>, reg::rcc::Pllcfgr<Srt>);
 
 pub async fn setup_pll(
     thread: &mut impl ThrFiberFuture,
@@ -55,6 +54,6 @@ pub async fn setup_pll(
     }));
     pll_ready.await;
 
-    cfgr.modify(|r| r.write_hpre(HPRE).write_ppre1(PPRE1).write_ppre2(PPRE2).write_rtcpre(RTCPRE));
+    cfgr.modify(|r| r.write_hpre(HPRE).write_ppre1(PPRE1).write_ppre2(PPRE2));
     cfgr.modify(|r| r.write_sw(PLL_SELECTED));
 }

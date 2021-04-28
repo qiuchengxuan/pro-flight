@@ -5,6 +5,7 @@ use drone_stm32_map::periph::rtc::RtcPeriph;
 use drone_stm32_map::reg;
 use hal::{self, persist::PersistDatastore};
 
+const RTCPRE: u32 = 8; // HSE / 8 = 1MHz
 const PREDIV_A: u32 = 0x7F;
 const PREDIV_S: u32 = 0x1FFF;
 
@@ -102,29 +103,34 @@ pub struct RTC {
     dr: reg::rtc::Dr<Crt>,
     isr: reg::rtc::Isr<Srt>,
     ssr: reg::rtc::Ssr<Crt>,
+    prer: reg::rtc::Prer<Srt>,
+    rcc_apb1enr_pwren: reg::rcc::apb1enr::Pwren<Srt>,
+    rcc_bdcr_rtcen: reg::rcc::bdcr::Rtcen<Srt>,
+    rcc_bdcr_rtcsel0: reg::rcc::bdcr::Rtcsel0<Srt>,
+    rcc_bdcr_rtcsel1: reg::rcc::bdcr::Rtcsel1<Srt>,
+    pwr_cr_dbp: reg::pwr::cr::Dbp<Srt>,
     write_protect: WriteProtect,
 }
 
 impl RTC {
-    fn init(&mut self, prer: reg::rtc::Prer<Srt>) {
+    fn init(&mut self, cfgr: reg::rcc::Cfgr<Crt>) {
+        self.rcc_apb1enr_pwren.set_bit();
+        self.pwr_cr_dbp.set_bit();
+
+        // select HSE
+        self.rcc_bdcr_rtcsel0.set_bit();
+        self.rcc_bdcr_rtcsel1.set_bit();
+        self.rcc_bdcr_rtcen.set_bit();
+
+        cfgr.modify(|r| r.write_rtcpre(RTCPRE));
         self.write_protect.disable();
         self.enter_init();
-        prer.modify(|r| r.write_prediv_s(PREDIV_S)); // 1MHz / 128 / 8192 = 1Hz
-        prer.modify(|r| r.write_prediv_a(PREDIV_A)); // NOTE: two sperate accesses must be performed
+        // 1MHz / 128 / 8192 = 1Hz
+        self.prer.modify(|r| r.write_prediv_s(PREDIV_S));
+        // NOTE: two sperate accesses must be performed
+        self.prer.modify(|r| r.write_prediv_a(PREDIV_A));
         self.exit_init();
         self.write_protect.enable();
-    }
-
-    pub fn new(regs: RtcPeriph) -> Self {
-        let mut rtc = Self {
-            tr: regs.rtc_tr.into_copy(),
-            dr: regs.rtc_dr.into_copy(),
-            isr: regs.rtc_isr,
-            ssr: regs.rtc_ssr.into_copy(),
-            write_protect: WriteProtect(regs.rtc_wpr.into_copy()),
-        };
-        rtc.init(regs.rtc_prer);
-        rtc
     }
 
     fn enter_init(&self) {
@@ -198,15 +204,21 @@ impl hal::rtc::RTCWriter for RTC {
     }
 }
 
-pub fn init(regs: RtcPeriph) -> (RTC, BackupRegisters) {
+pub fn init(regs: RtcPeriph, cfgr: reg::rcc::Cfgr<Crt>) -> (RTC, BackupRegisters) {
     let write_protect = WriteProtect(regs.rtc_wpr.into_copy());
     let mut rtc = RTC {
         tr: regs.rtc_tr.into_copy(),
         dr: regs.rtc_dr.into_copy(),
         isr: regs.rtc_isr,
         ssr: regs.rtc_ssr.into_copy(),
+        prer: regs.rtc_prer,
+        rcc_apb1enr_pwren: regs.rcc_apb1enr_pwren,
+        rcc_bdcr_rtcen: regs.rcc_bdcr_rtcen,
+        rcc_bdcr_rtcsel0: regs.rcc_bdcr_rtcsel0,
+        rcc_bdcr_rtcsel1: regs.rcc_bdcr_rtcsel1,
+        pwr_cr_dbp: regs.pwr_cr_dbp,
         write_protect,
     };
-    rtc.init(regs.rtc_prer);
+    rtc.init(cfgr);
     (rtc, BackupRegisters { backup: regs.rtc_bkp0r, write_protect })
 }

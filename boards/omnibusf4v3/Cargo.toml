@@ -30,9 +30,7 @@ drivers = { path = "../../drivers", features = ["stm32"] }
 embedded-hal = "0.2"
 futures = { version = "0.3.0", default-features = false }
 hal = { path = "../../hal" }
-mpu6000 = "0.2.1"
-usb-device = "0.2"
-usbd-serial = "0.1"
+synopsys-usb-otg = { version = "0.2.4", features = ["cortex-m"], optional = true }
 
 [dependencies.drone-cortexm]
 path = "../../drone-os/drone-cortexm"
@@ -48,7 +46,7 @@ default-features = false
 features = ["log-level-debug", "sleep-ms"]
 
 [dependencies.stm32f4xx-hal]
-git = "https://github.com/stm32-rs/stm32f4xx-hal"
+version = "0.9.0"
 features = ["stm32f405", "rt", "usb_fs"]
 
 [profile.release]

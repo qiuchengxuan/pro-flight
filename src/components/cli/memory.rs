@@ -1,8 +1,6 @@
-use core::time::Duration;
+use embedded_hal::blocking::delay::DelayMs;
 
-use embedded_hal::timer::CountDown;
-
-use crate::sys::timer::SysTimer;
+use crate::sys::time::TickTimer;
 
 extern "Rust" {
     fn memory_valid_address(address: usize) -> bool;
@@ -70,9 +68,7 @@ pub fn writex(line: &str) {
         if let Some(value) = iter.next() {
             if unsafe { memory_valid_address(address) } {
                 unsafe { *(address as *mut usize) = value };
-                let mut count_down = SysTimer::default();
-                count_down.start(Duration::from_millis(1));
-                nb::block!(count_down.wait()).ok();
+                TickTimer::default().delay_ms(1u32);
                 let value = unsafe { *(address as *const usize) };
                 println!("Write result: {:x?}", value);
             }

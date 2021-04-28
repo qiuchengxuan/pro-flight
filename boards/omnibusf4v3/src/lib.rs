@@ -76,8 +76,3 @@ fn board_name() -> &'static str {
 fn reboot() {
     cortex_m::peripheral::SCB::sys_reset()
 }
-
-#[no_mangle]
-fn timer_sleep_ms() {
-    cortex_m::asm::wfe()
-}

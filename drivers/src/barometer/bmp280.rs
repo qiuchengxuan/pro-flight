@@ -10,7 +10,7 @@ use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 use hal::dma::{BufferDescriptor, TransferOption, DMA};
 use pro_flight::datastructures::measurement::Pressure;
-use pro_flight::sys::timer::SysTimer;
+use pro_flight::sys::time::TickTimer;
 
 pub const SAMPLE_RATE: usize = 10; // actually 16
 
@@ -39,7 +39,7 @@ pub trait BMP280Init<E> {
 
 impl<E, BUS: Bus<Error = E>> BMP280Init<E> for BMP280<BUS> {
     fn init(&mut self) -> Result<(), E> {
-        let mut delay = SysTimer::default();
+        let mut delay = TickTimer::default();
         self.reset(&mut delay)?;
         self.set_pressure_oversampling(PressureOversampling::StandardResolution)?;
         self.set_temperature_oversampling(TemperatureOversampling::UltraLowPower)?;

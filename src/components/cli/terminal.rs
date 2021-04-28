@@ -19,20 +19,9 @@ impl Terminal {
             self.eol = false;
             self.buffer.truncate(0);
         }
-        let mut skip = false;
         for &b in bytes.iter() {
-            if skip {
-                skip = false;
-                continue;
-            }
-            let ch = unsafe { b.to_ascii_char_unchecked() };
-            match ch {
-                AsciiChar::BackSpace => {
-                    if let Some(_) = self.buffer.pop() {
-                        print!("{}", &BACKSPACE);
-                    }
-                }
-                AsciiChar::DEL => {
+            match unsafe { b.to_ascii_char_unchecked() } {
+                AsciiChar::BackSpace | AsciiChar::DEL => {
                     if let Some(_) = self.buffer.pop() {
                         print!("{}", &BACKSPACE);
                     }
@@ -51,13 +40,11 @@ impl Terminal {
                         print!("{}", &BACKSPACE);
                     }
                 }
-                AsciiChar::ESC => {
-                    skip = true;
-                }
-                _ => {
+                ch if ch.is_ascii_printable() => {
                     self.buffer.push(b);
                     print!("{}", ch);
                 }
+                _ => (),
             }
         }
         None

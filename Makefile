@@ -47,4 +47,8 @@ endif
 gdb:
 	$(GDB) $(TARGET)
 
+.PHONY: bloat
+bloat:
+	@(cd boards/$(BOARD); cargo bloat --release -n 10)
+
 .DEFAULT_GOAL := $(BOARD).dfu

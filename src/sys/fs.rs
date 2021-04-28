@@ -152,6 +152,10 @@ impl Write for File {
             Ok(0)
         }
     }
+
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl fmt::Write for File {
