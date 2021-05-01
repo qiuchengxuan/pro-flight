@@ -108,7 +108,7 @@ impl ToYAML for Speedometer {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Config {
     version: u8,
-    iteration: u8,
+    iteration: u32,
     pub aircraft: Aircraft,
     pub battery: Battery,
     pub board: Board,
@@ -120,7 +120,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn iteration(&self) -> u8 {
+    pub fn iteration(&self) -> u32 {
         self.iteration
     }
 }

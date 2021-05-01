@@ -97,7 +97,12 @@ macro_rules! __command {
     };
     (save, [$nvram:ident]) => {
         $crate::components::cli::Command::new("save", "Save configuration", move |_| {
-            if let Some(err) = $nvram.store(config::get()).err() {
+            let running = config::get();
+            let saved: $crate::config::Config = $nvram.load().ok().flatten().unwrap_or_default();
+            if running.iteration() == saved.iteration() {
+                return;
+            }
+            if let Some(err) = $nvram.store(running).err() {
                 println!("Save configuration failed: {:?}", err);
                 $nvram.reset().ok();
             }

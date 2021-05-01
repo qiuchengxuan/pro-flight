@@ -3,6 +3,7 @@
 use core::time::Duration;
 
 use chips::stm32f4::{
+    adc::IntoDMA as _,
     clock,
     delay::TickDelay,
     dfu, dma,
@@ -36,16 +37,14 @@ use hal::{
     persist::PersistDatastore,
 };
 use pro_flight::{
-    components::{
-        cli::CLI, flight_data::FlightDataHUB, imu::IMU, logger, positioning::Positioning,
-        speedometer::Speedometer, variometer::Variometer,
-    },
+    components::{cli::CLI, flight_data::FlightDataHUB, logger, variometer::Variometer},
     config,
     sync::{flag, DataWriter},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
 use stm32f4xx_hal::{
+    adc::Adc,
     gpio::{Edge, ExtiPin},
     otg_fs::{UsbBus, USB},
     prelude::*,
@@ -82,19 +81,17 @@ fn never_complete(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
 pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut thread = thread::init(thr_init);
     thread.hard_fault.add_once(|| panic!("Hard Fault"));
-    thread.rcc.enable_int();
-    let (rcc_cir, rcc_cfgr) = (reg.rcc_cir.into_copy(), reg.rcc_cfgr.into_copy());
-    let regs = (rcc_cfgr, reg.rcc_cr, reg.rcc_pllcfgr);
-    clock::setup_pll(&mut thread.rcc, rcc_cir, regs, &reg.flash_acr).root_wait();
+    let mut peripherals = stm32::Peripherals::take().unwrap();
+    let rcc = peripherals.RCC.constrain();
+    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
     thread::setup_priority(&mut thread);
 
-    let mut peripherals = stm32::Peripherals::take().unwrap();
     let (usb_global, usb_device, usb_pwrclk) =
         (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
     let gpio_a = peripherals.GPIOA.split();
     let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
-    let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clock::HCLK.into() };
+    let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clocks.hclk() };
     static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
     let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
     usb_serial::init(&mut thread.otg_fs, bus, board_name());
@@ -106,7 +103,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
     reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
 
-    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), rcc_cfgr);
+    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), reg.rcc_cfgr.into_copy());
     let mut sysinfo: SystemInfo = persist.load();
     match sysinfo.reboot_reason {
         RebootReason::Bootloader => {
@@ -134,13 +131,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Err(error) => error!("Load config failed: {:?}", error),
     }
 
-    let hub = Box::leak(Box::new(FlightDataHUB::default()));
+    let hub: &'static FlightDataHUB = Box::leak(Box::new(FlightDataHUB::default()));
     let mut reader = hub.reader();
-
-    let (heading, course) = (reader.gnss_heading, reader.gnss_course);
-    let mut imu = IMU::new(reader.magnetometer, heading, course, 1000, 1000 / 10);
-    let mut speedometer = Speedometer::new(reader.vertical_speed, reader.gnss_velocity, 1000, 10);
-    let mut positioning = Positioning::new(reader.altimeter, reader.gnss_position, 1000);
 
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
@@ -155,31 +147,19 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
     let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
-    let (accelerometer, gyroscope) = (&hub.accelerometer, &hub.gyroscope);
-    let (quat, speed) = (&hub.imu, &hub.speedometer);
-    let (position, displacement) = (&hub.positioning, &hub.displacement);
-    mpu6000.set_handler(move |accel, gyro| {
-        accelerometer.write(accel);
-        gyroscope.write(gyro);
-        if imu.update_imu(&accel, &gyro) {
-            quat.write(imu.quaternion());
-            let v = speedometer.update(imu.acceleration());
-            speed.write(v);
-            let (p, d) = positioning.update(v);
-            position.write(p);
-            displacement.write(d)
-        }
-    });
+    mpu6000.set_handler(pro_flight::components::imu_handler(&hub));
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    thread.mpu6000.add_fn(never_complete(move || {
-        int.clear_interrupt_pending_bit();
-        mpu6000.trigger();
-    }));
+    thread.mpu6000.add_fn(never_complete(move || int.clear_interrupt_pending_bit()));
+    thread.mpu6000.add_fn(never_complete(move || mpu6000.trigger()));
     thread.mpu6000.enable_int();
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma2_stream2);
     let battery = &hub.battery;
-    voltage_adc::init(peripherals.ADC2, gpio_c.pc2, dma_rx, move |voltage| battery.write(voltage));
+    let mut adc = Adc::adc2(peripherals.ADC2, true, voltage_adc::adc_config());
+    let vbat = gpio_c.pc2.into_analog();
+    adc.configure_channel(&vbat, voltage_adc::SEQUENCE, voltage_adc::SAMPLE_TIME);
+    adc.start_conversion();
+    voltage_adc::init(adc.into_dma(), dma_rx, move |voltage| battery.write(voltage));
 
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
@@ -224,7 +204,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         commands!((bootloader, [persist]), (osd, [setter]), (save, [nvram]), (telemetry, [reader]));
     let mut cli = CLI::new(commands);
     loop {
-        TickTimer::default().delay_ms(1u32);
+        TickTimer::after(Duration::from_millis(1)).root_wait();
         led.notify();
         cli.run();
     }

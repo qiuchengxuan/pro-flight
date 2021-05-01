@@ -3,12 +3,7 @@ use alloc::boxed::Box;
 use hal::dma::{BufferDescriptor, Peripheral, TransferOption, DMA};
 use pro_flight::algorithm::lpf::LPF;
 use pro_flight::datastructures::measurement::battery::Battery;
-use stm32f4xx_hal::{
-    adc::config::{AdcConfig, Continuous, Dma, SampleTime, Sequence},
-    adc::Adc,
-    gpio::{gpioc::PC2, Floating, Input},
-    stm32,
-};
+use stm32f4xx_hal::adc::config::{AdcConfig, Continuous, Dma, SampleTime, Sequence};
 
 pub struct VoltageADC(LPF<u16>);
 
@@ -17,6 +12,9 @@ impl Default for VoltageADC {
         Self(LPF::<u16>::new(1.0, 5.0))
     }
 }
+
+pub const SAMPLE_TIME: SampleTime = SampleTime::Cycles_480;
+pub const SEQUENCE: Sequence = Sequence::One;
 
 const VOLTAGE_SCALE_X100: usize = 1100;
 const SAMPLE_SIZE: usize = 16;
@@ -31,38 +29,21 @@ impl VoltageADC {
     }
 }
 
-pub struct ADCWrapper(Adc<stm32::ADC2>);
-
-impl Peripheral for ADCWrapper {
-    fn enable_dma(&mut self) {}
-
-    fn address(&mut self) -> usize {
-        self.0.data_register_address() as usize
-    }
-
-    fn word_size(&self) -> usize {
-        core::mem::size_of::<u16>()
-    }
+pub fn adc_config() -> AdcConfig {
+    AdcConfig::default().dma(Dma::Continuous).continuous(Continuous::Continuous)
 }
 
-pub fn init<F, D, H>(adc2: stm32::ADC2, pc2: PC2<Input<Floating>>, mut dma: D, mut handler: H)
+pub fn init<F, D, H>(mut adc: impl Peripheral, mut dma: D, mut handler: H)
 where
     D: DMA<Future = F>,
     H: FnMut(Battery) + Send + 'static,
 {
-    let config = AdcConfig::default().dma(Dma::Continuous).continuous(Continuous::Continuous);
-    let mut adc = Adc::adc2(adc2, true, config);
-    let vbat = pc2.into_analog();
-    adc.configure_channel(&vbat, Sequence::One, SampleTime::Cycles_480);
-    adc.start_conversion();
-
     let mut rx_bd = Box::new(BufferDescriptor::<u16, SAMPLE_SIZE>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
     debug!("Init voltage ADC DMA address at 0x{:x}", address as usize);
     let mut voltage_adc = VoltageADC::default();
     rx_bd.set_transfer_done(move |data| handler(voltage_adc.convert(data)));
 
-    let mut adc = ADCWrapper(adc);
     dma.setup_peripheral(1, &mut adc);
     dma.rx(&rx_bd, TransferOption::circle());
 }

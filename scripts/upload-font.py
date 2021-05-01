@@ -27,6 +27,7 @@ def main():
         return
 
     with open(path, 'rb') as f:
+
         def getc(size, timeout=0):
             return serial.read(size)
 
@@ -35,6 +36,7 @@ def main():
 
         def xmodem_callback(total_packets, _success_count, _fail_count):
             print('%d packets sent' % total_packets, end='\r')
+
         XMODEM(getc, putc).send(f, retry=0, timeout=1, callback=xmodem_callback)
     print('\nTransfer complete')
 

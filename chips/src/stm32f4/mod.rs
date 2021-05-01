@@ -1,3 +1,4 @@
+pub mod adc;
 pub mod clock;
 pub mod crc;
 pub mod delay;
