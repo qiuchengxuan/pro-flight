@@ -976,6 +976,7 @@ dependencies = [
  "micromath",
  "nalgebra",
  "nb 1.0.0",
+ "sbus-parser",
  "serde",
  "serde-json-core-fmt",
  "void",
@@ -1099,6 +1100,11 @@ name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
+
+[[package]]
+name = "sbus-parser"
+version = "0.0.2"
+source = "git+https://github.com/qiuchengxuan/sbus#32b4272c4531d8db6c02e0c73c0f53c2fe9b198e"
 
 [[package]]
 name = "semver"

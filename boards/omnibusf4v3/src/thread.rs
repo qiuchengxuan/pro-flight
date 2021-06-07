@@ -34,8 +34,10 @@ thr::nvic! {
             11: pub dma1_stream0;
             16: pub dma1_stream5;
             56: pub dma2_stream0;
+            57: pub dma2_stream1;
             58: pub dma2_stream2;
             59: pub dma2_stream3;
+            61: pub dma2_stream5;
             67: pub otg_fs;
         }
     };
@@ -53,7 +55,9 @@ pub fn setup_priority(thread: &mut Thrs) {
     thread.dma1_stream0.set_priority(priority!(Priority::System));
     thread.dma1_stream5.set_priority(priority!(Priority::System));
     thread.dma2_stream0.set_priority(priority!(Priority::System));
+    thread.dma2_stream1.set_priority(priority!(Priority::Sensor));
     thread.dma2_stream3.set_priority(priority!(Priority::System));
+    thread.dma2_stream5.set_priority(priority!(Priority::Sensor));
     thread.bmp280.set_priority(priority!(Priority::Sensor));
     thread.mpu6000.set_priority(priority!(Priority::Sensor));
     thread.max7456.set_priority(priority!(Priority::Telemetry));

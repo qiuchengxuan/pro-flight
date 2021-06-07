@@ -2,8 +2,7 @@ use nalgebra::UnitQuaternion;
 use serde::ser::SerializeMap;
 
 use crate::datastructures::{
-    input::ControlInput,
-    input::RSSI,
+    input::{ControlInput, RSSI},
     measurement::{battery::Battery, displacement::DistanceVector, unit},
 };
 

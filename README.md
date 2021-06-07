@@ -46,16 +46,17 @@ Progress
   - [x] MPU6000
   - [x] Battery Voltage ADC
   - [x] Barometer
+* protocol
+  - [x] SBUS Receiver
 
 **WIP**
-  - [ ] SBUS Receiver
+  - [ ] GNSS NMEA Protocol
+  - [ ] GNSS UBX Protocol
   - [ ] PWM & ESC
 
 **Future**
 
 * navigation
-  - [ ] GNSS NMEA Protocol
-  - [ ] GNSS UBX Protocol
   - [ ] Magnetometer
   - [ ] DMA based I2C
   - [ ] QMC5883L

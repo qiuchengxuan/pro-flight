@@ -12,6 +12,7 @@ use chips::stm32f4::{
     softint::make_trigger,
     spi::BaudrateControl,
     systick,
+    usart::IntoDMA as _,
 };
 use drivers::{
     barometer::bmp280::{self, bmp280_spi, BMP280Init, Compensator, DmaBMP280},
@@ -19,12 +20,12 @@ use drivers::{
     max7456::{self, IntoDMA as _},
     mpu6000::{self, IntoDMA as _, MPU6000Init, SpiBus, MPU6000},
     nvram::NVRAM,
-    stm32::{usb_serial, voltage_adc},
+    stm32::{usart, usb_serial, voltage_adc},
 };
 use drone_core::fib::{FiberState, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
-    dma::{periph_dma1_ch0, periph_dma1_ch5, periph_dma2_ch0, periph_dma2_ch2, periph_dma2_ch3},
+    dma::*,
     exti::{periph_exti2, periph_exti3},
     flash::periph_flash,
     rtc::periph_rtc,
@@ -38,7 +39,8 @@ use hal::{
 };
 use pro_flight::{
     components::{cli::CLI, flight_data::FlightDataHUB, logger, variometer::Variometer},
-    config,
+    config::{self, peripherals::serial::Config as SerialConfig},
+    protocol::make_serial_receiver,
     sync::{flag, DataWriter},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
@@ -48,6 +50,7 @@ use stm32f4xx_hal::{
     gpio::{Edge, ExtiPin},
     otg_fs::{UsbBus, USB},
     prelude::*,
+    serial::Serial,
     stm32,
 };
 
@@ -194,6 +197,34 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     thread.bmp280.add_fn(never_complete(move || bmp280.trigger(&rx, &tx)));
     let int = make_trigger(thread.bmp280, periph_exti2!(reg));
     let mut bmp280 = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(100));
+
+    if let Some(config) = config::get().peripherals.serials.get("USART1") {
+        let pins = (gpio_a.pa9.into_alternate_af7(), gpio_a.pa10.into_alternate_af7());
+        let serial_config = usart::to_serial_config(&config);
+        let usart1 = Serial::usart1(peripherals.USART1, pins, serial_config, clocks).unwrap();
+        let dma_rx = dma::Stream::new(periph_dma2_ch5!(reg), thread.dma2_stream5);
+        if let Some(receiver) = make_serial_receiver(config, &hub) {
+            usart::init(usart1.into_dma(), dma_rx, 4, receiver);
+        }
+    }
+
+    // TODO: USART3 or I2C-2
+
+    if let Some(config) = config::get().peripherals.serials.get("USART6") {
+        if let SerialConfig::SBUS(sbus_config) = config {
+            if sbus_config.rx_inverted {
+                gpio_c.pc8.into_push_pull_output().set_high().ok();
+                debug!("USART6 rx inverted");
+            }
+        }
+        let pins = (gpio_c.pc6.into_alternate_af8(), gpio_c.pc7.into_alternate_af8());
+        let serial_config = usart::to_serial_config(&config);
+        let usart6 = Serial::usart6(peripherals.USART6, pins, serial_config, clocks).unwrap();
+        let dma_rx = dma::Stream::new(periph_dma2_ch1!(reg), thread.dma2_stream1);
+        if let Some(receiver) = make_serial_receiver(config, &hub) {
+            usart::init(usart6.into_dma(), dma_rx, 5, receiver);
+        }
+    }
 
     thread.sys_tick.add_fn(never_complete(move || {
         max7456.notify();

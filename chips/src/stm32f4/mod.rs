@@ -9,6 +9,7 @@ pub mod rtc;
 pub mod softint;
 pub mod spi;
 pub mod systick;
+pub mod usart;
 
 #[no_mangle]
 pub fn memory_valid_address(address: usize) -> bool {
