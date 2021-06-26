@@ -21,6 +21,7 @@ max7456 = "0.1"
 micromath = "1.0"
 nalgebra = { version = "0.21", default-features = false }
 nb = "1"
+nmea0183-core = { git = "https://github.com/qiuchengxuan/nmea0183" }
 sbus-parser = { git = "https://github.com/qiuchengxuan/sbus" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-core-fmt = "0.1"

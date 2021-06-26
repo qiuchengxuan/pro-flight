@@ -40,7 +40,7 @@ use hal::{
 use pro_flight::{
     components::{cli::CLI, flight_data::FlightDataHUB, logger, variometer::Variometer},
     config::{self, peripherals::serial::Config as SerialConfig},
-    protocol::make_serial_receiver,
+    protocol::serial,
     sync::{flag, DataWriter},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
@@ -203,7 +203,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let serial_config = usart::to_serial_config(&config);
         let usart1 = Serial::usart1(peripherals.USART1, pins, serial_config, clocks).unwrap();
         let dma_rx = dma::Stream::new(periph_dma2_ch5!(reg), thread.dma2_stream5);
-        if let Some(receiver) = make_serial_receiver(config, &hub) {
+        if let Some(receiver) = serial::make_receiver(config, &hub) {
             usart::init(usart1.into_dma(), dma_rx, 4, receiver);
         }
     }
@@ -221,7 +221,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let serial_config = usart::to_serial_config(&config);
         let usart6 = Serial::usart6(peripherals.USART6, pins, serial_config, clocks).unwrap();
         let dma_rx = dma::Stream::new(periph_dma2_ch1!(reg), thread.dma2_stream1);
-        if let Some(receiver) = make_serial_receiver(config, &hub) {
+        if let Some(receiver) = serial::make_receiver(config, &hub) {
             usart::init(usart6.into_dma(), dma_rx, 5, receiver);
         }
     }

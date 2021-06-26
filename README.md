@@ -48,10 +48,10 @@ Progress
   - [x] Barometer
 * protocol
   - [x] SBUS Receiver
+  - [x] GNSS NMEA Protocol
+  - [x] GNSS UBX Protocol
 
 **WIP**
-  - [ ] GNSS NMEA Protocol
-  - [ ] GNSS UBX Protocol
   - [ ] PWM & ESC
 
 **Future**
