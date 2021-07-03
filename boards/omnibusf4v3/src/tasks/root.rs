@@ -83,7 +83,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     thread.hard_fault.add_once(|| panic!("Hard Fault"));
     let mut peripherals = stm32::Peripherals::take().unwrap();
     let rcc = peripherals.RCC.constrain();
-    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).freeze();
+    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).require_pll48clk().freeze();
     systick::init(periph_sys_tick!(reg), thread.sys_tick);
     thread::setup_priority(&mut thread);
 
@@ -103,7 +103,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
     reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
 
-    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), reg.rcc_cfgr.into_copy());
+    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), rtc::ClockSource::HSE);
     let mut sysinfo: SystemInfo = persist.load();
     match sysinfo.reboot_reason {
         RebootReason::Bootloader => {

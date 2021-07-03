@@ -116,7 +116,7 @@ pub fn init(thread: &mut impl ThrFiberClosure, alloc: Allocator, board_name: &'s
     let allocator: &'static mut Allocator = Box::leak(Box::new(alloc));
     let serial_port = SerialPort::new(allocator);
     unsafe { SERIAL_PORT = Some(serial_port) }
-    let device = UsbDeviceBuilder::new(allocator, UsbVidPid(0x0403, 0x6001))
+    let device = UsbDeviceBuilder::new(allocator, UsbVidPid(0x16c0, 0x27dd))
         .product(board_name)
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();

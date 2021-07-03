@@ -98,6 +98,13 @@ impl PersistDatastore for BackupRegisters {
     }
 }
 
+pub enum ClockSource {
+    /// bypass
+    LSE(bool),
+    LSI,
+    HSE,
+}
+
 pub struct RTC {
     tr: reg::rtc::Tr<Crt>,
     dr: reg::rtc::Dr<Crt>,
@@ -105,24 +112,50 @@ pub struct RTC {
     ssr: reg::rtc::Ssr<Crt>,
     prer: reg::rtc::Prer<Srt>,
     rcc_apb1enr_pwren: reg::rcc::apb1enr::Pwren<Srt>,
+    rcc_cfgr_rtcpre: reg::rcc::cfgr::Rtcpre<Srt>,
+    rcc_csr_lsi_rdy: reg::rcc::csr::Lsirdy<Srt>,
+    rcc_csr_lsi_on: reg::rcc::csr::Lsion<Srt>,
+    rcc_bdcr_bdrst: reg::rcc::bdcr::Bdrst<Srt>,
     rcc_bdcr_rtcen: reg::rcc::bdcr::Rtcen<Srt>,
     rcc_bdcr_rtcsel0: reg::rcc::bdcr::Rtcsel0<Srt>,
     rcc_bdcr_rtcsel1: reg::rcc::bdcr::Rtcsel1<Srt>,
+    rcc_bdcr_lse_bypass: reg::rcc::bdcr::Lsebyp<Srt>,
+    rcc_bdcr_lse_rdy: reg::rcc::bdcr::Lserdy<Srt>,
+    rcc_bdcr_lse_on: reg::rcc::bdcr::Lseon<Srt>,
     pwr_cr_dbp: reg::pwr::cr::Dbp<Srt>,
     write_protect: WriteProtect,
 }
 
 impl RTC {
-    fn init(&mut self, cfgr: reg::rcc::Cfgr<Crt>) {
+    fn init(&mut self, clock_source: ClockSource) {
         self.rcc_apb1enr_pwren.set_bit();
         self.pwr_cr_dbp.set_bit();
 
-        // select HSE
-        self.rcc_bdcr_rtcsel0.set_bit();
-        self.rcc_bdcr_rtcsel1.set_bit();
+        self.rcc_bdcr_bdrst.set_bit();
+        self.rcc_bdcr_bdrst.clear_bit();
+
+        match clock_source {
+            ClockSource::HSE => {
+                self.rcc_cfgr_rtcpre.write_bits(RTCPRE);
+                // FIXME: workaround: rtcsel0 and rtcsel1 cannot be written sperately
+                unsafe { *(0x40023870 as *mut u32) |= 0x300 };
+            }
+            ClockSource::LSE(bypass) => {
+                if bypass {
+                    self.rcc_bdcr_lse_bypass.set_bit();
+                }
+                self.rcc_bdcr_lse_on.set_bit();
+                while !self.rcc_bdcr_lse_rdy.read_bit() {}
+                self.rcc_bdcr_rtcsel0.set_bit();
+            }
+            ClockSource::LSI => {
+                self.rcc_csr_lsi_on.set_bit();
+                while !self.rcc_csr_lsi_rdy.read_bit() {}
+                self.rcc_bdcr_rtcsel1.set_bit();
+            }
+        }
         self.rcc_bdcr_rtcen.set_bit();
 
-        cfgr.modify(|r| r.write_rtcpre(RTCPRE));
         self.write_protect.disable();
         self.enter_init();
         // 1MHz / 128 / 8192 = 1Hz
@@ -204,7 +237,7 @@ impl hal::rtc::RTCWriter for RTC {
     }
 }
 
-pub fn init(regs: RtcPeriph, cfgr: reg::rcc::Cfgr<Crt>) -> (RTC, BackupRegisters) {
+pub fn init(regs: RtcPeriph, clock_source: ClockSource) -> (RTC, BackupRegisters) {
     let write_protect = WriteProtect(regs.rtc_wpr.into_copy());
     let mut rtc = RTC {
         tr: regs.rtc_tr.into_copy(),
@@ -213,12 +246,19 @@ pub fn init(regs: RtcPeriph, cfgr: reg::rcc::Cfgr<Crt>) -> (RTC, BackupRegisters
         ssr: regs.rtc_ssr.into_copy(),
         prer: regs.rtc_prer,
         rcc_apb1enr_pwren: regs.rcc_apb1enr_pwren,
+        rcc_cfgr_rtcpre: regs.rcc_cfgr_rtcpre,
+        rcc_csr_lsi_rdy: regs.rcc_csr_lsirdy,
+        rcc_csr_lsi_on: regs.rcc_csr_lsion,
+        rcc_bdcr_bdrst: regs.rcc_bdcr_bdrst,
         rcc_bdcr_rtcen: regs.rcc_bdcr_rtcen,
         rcc_bdcr_rtcsel0: regs.rcc_bdcr_rtcsel0,
         rcc_bdcr_rtcsel1: regs.rcc_bdcr_rtcsel1,
+        rcc_bdcr_lse_bypass: regs.rcc_bdcr_lsebyp,
+        rcc_bdcr_lse_rdy: regs.rcc_bdcr_lserdy,
+        rcc_bdcr_lse_on: regs.rcc_bdcr_lseon,
         pwr_cr_dbp: regs.pwr_cr_dbp,
         write_protect,
     };
-    rtc.init(cfgr);
+    rtc.init(clock_source);
     (rtc, BackupRegisters { backup: regs.rtc_bkp0r, write_protect })
 }
