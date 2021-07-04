@@ -1,3 +1,5 @@
+use core::mem;
+
 use hal::flash::Flash;
 
 #[cfg(target_endian = "big")]
@@ -14,9 +16,9 @@ fn locate(sector: &[u32]) -> (usize, usize) {
     let mut read = 1;
     let mut index = 1;
     while index < sector.len() && sector[index] != EMPTY {
-        let length = sector[index] as usize;
-        let bytes = &sector[index + 1..];
-        if bytes[length - 1] != EMPTY {
+        let length = sector[index] as usize / 4;
+        let words = &sector[index + 1..];
+        if words[length - 1] != EMPTY {
             read = index;
         }
         index += 1 + length;
@@ -69,20 +71,24 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         self.active_sector = active_sector;
         self.read_offset = read_offset;
         self.write_offset = write_offset;
+        debug!("NVRAM address 0x{:x}", &sectors[active_sector][read_offset] as *const _ as usize);
         Ok(())
     }
 
     pub fn load<'a, T: From<&'a [u32]> + Default>(&'a self) -> Result<Option<T>, E> {
         if self.read_offset == 0 {
+            debug!("NVRAM empty");
             return Ok(None);
         }
         let sector = &self.sectors[self.active_sector];
-        let length = sector[self.read_offset];
-        if length as usize != core::mem::size_of::<T>() {
+        let size = sector[self.read_offset] as usize;
+        if size != mem::size_of::<T>() {
+            debug!("NVRAM ignored, expected size {} actual {}", mem::size_of::<T>(), size);
             return Ok(None);
         }
         let sector = &sector[self.read_offset + 1..];
-        Ok(Some(T::from(&sector[..length as usize])))
+        debug!("Loading from NVRAM address 0x{:x}", sector.as_ptr() as *const _ as usize);
+        Ok(Some(T::from(&sector[..size / 4])))
     }
 
     pub fn store<'a, T: AsRef<[u32]>>(&mut self, t: T) -> Result<(), E> {
@@ -92,15 +98,17 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         if offset + 1 + words.len() > sector.len() {
             self.active_sector = self.active_sector ^ 1;
             let new_sector = &self.sectors[self.active_sector];
+            debug!("Programming to address 0x{:x}", &new_sector[0] as *const _ as usize);
             self.flash.program(&new_sector[0] as *const _ as usize, &[ACTIVE])?;
-            self.flash.program(&new_sector[1] as *const _ as usize, &[words.len() as u32])?;
+            self.flash.program(&new_sector[1] as *const _ as usize, &[words.len() as u32 * 4])?;
             self.flash.program(&new_sector[2] as *const _ as usize, words)?;
             self.flash.erase(&sector[0] as *const _ as usize)?;
             self.read_offset = 1;
             self.write_offset = 1 + words.len();
         } else {
             let buffer = &sector[offset..];
-            self.flash.program(buffer.as_ptr() as *const _ as usize, &[words.len() as u32])?;
+            debug!("Programming to address 0x{:x}", &buffer[0] as *const _ as usize);
+            self.flash.program(&buffer[0] as *const _ as usize, &[words.len() as u32 * 4])?;
             self.flash.program(&buffer[1] as *const _ as usize, words)?;
             self.read_offset = self.write_offset;
             self.write_offset += 1 + words.len();

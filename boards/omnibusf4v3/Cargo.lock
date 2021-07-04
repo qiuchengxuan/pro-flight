@@ -237,7 +237,6 @@ version = "0.0.1"
 dependencies = [
  "bmp280-core",
  "cortex-m 0.6.7",
- "crc",
  "drone-core",
  "drone-cortexm",
  "embedded-hal",

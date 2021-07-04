@@ -37,11 +37,10 @@ clean:
 .PHONY: dfu
 dfu: $(BOARD).dfu
 ifeq ($(mass-erase),true)
-	$(SUDO) dfu-util -d 0483:df11 -a 0 -s 0x08000000:mass-erase:force
+	$(SUDO) dfu-util -d 0483:df11 -a 0 -s :mass-erase:force:leave -D $(BOARD).dfu
+else
+	$(SUDO) dfu-util -d 0483:df11 -a 0 -s :leave -D $(BOARD).dfu
 endif
-	$(SUDO) dfu-util -d 0483:df11 -a 0 -D $(BOARD).dfu
-	@$(SUDO) dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -Z 0 -U empty.bin > /dev/null
-	@rm -f empty.bin
 
 .PHONY: gdb
 gdb:

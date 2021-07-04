@@ -7,7 +7,6 @@ version = "0.0.1"
 
 [dependencies]
 bmp280-core = "0.1"
-crc = { version = "1.8", default-features = false }
 cortex-m = { version = "0.6", optional = true }
 drone-core = { path = "../drone-os/drone-core" }
 drone-cortexm = { path = "../drone-os/drone-cortexm", optional = true }
