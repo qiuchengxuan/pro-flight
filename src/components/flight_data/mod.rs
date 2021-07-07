@@ -8,6 +8,8 @@ pub mod sensor;
 use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
 
+use core::cmp;
+
 use crate::datastructures::{
     coordinate::{Displacement, Position},
     input::{ControlInput, RSSI},
@@ -16,7 +18,6 @@ use crate::datastructures::{
         euler::{Euler, DEGREE_PER_DAG},
         unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
-    GNSSFixed,
 };
 use crate::{
     sync::singular::{SingularData, SingularDataSource},
@@ -27,7 +28,7 @@ pub use aviation::Aviation;
 pub use data::FlightData;
 pub use misc::Misc;
 pub use navigation::Navigation;
-pub use sensor::Sensor;
+pub use sensor::{Sensor, GNSS};
 
 macro_rules! flight_data {
     ($($names:ident : $types:ty),+) => {
@@ -66,7 +67,7 @@ flight_data! {
     control_input: ControlInput,
     magnetometer: Magnetism,
 
-    gnss_fixed: GNSSFixed,
+    gnss_fixed: bool,
     gnss_heading: Heading,
     gnss_course: Course,
     gnss_position: Position,
@@ -75,37 +76,42 @@ flight_data! {
 
 impl<'a> FlightDataReader<'a> {
     pub fn read(&mut self) -> FlightData {
-        let quaternion = self.imu.get().unwrap_or_default();
-        let euler: Euler = quaternion.into();
-        let euler = euler * DEGREE_PER_DAG;
-        let heading = -euler.yaw as isize;
-        let altitude = self.altimeter.get();
-        let battery = self.battery.get().unwrap_or_default();
-        let battery_cells = core::cmp::min(battery.0 / 4200 + 1, 8) as u16;
-        let aviation = Aviation {
-            attitude: euler.into(),
-            altitude: altitude.unwrap_or_default(),
-            heading: if heading >= 0 { heading } else { 360 + heading } as u16,
-            ..Default::default()
+        let acceleration = self.accelerometer.get().unwrap_or_default();
+        let gyro = self.gyroscope.get().unwrap_or_default();
+        let magnetism = self.magnetometer.get();
+        let course = self.gnss_course.get().unwrap_or_default();
+        let gnss = match self.gnss_fixed.get() {
+            Some(fixed) => Some(GNSS { fixed, course }),
+            None => None,
         };
+        let sensor = Sensor { acceleration, gyro, magnetism, gnss };
 
         let position = self.positioning.get().unwrap_or_default();
         let speed_vector = self.speedometer.get().unwrap_or_default();
         let navigation = Navigation { position, speed_vector, ..Default::default() };
 
-        let acceleration = self.accelerometer.get().unwrap_or_default();
-        let gyro = self.gyroscope.get().unwrap_or_default();
-        let magnetism = self.magnetometer.get();
-        let sensor = Sensor { acceleration, gyro, magnetism, ..Default::default() };
-
-        let displacement = self.displacement.get().unwrap_or_default();
-        let input = self.control_input.get().unwrap_or_default();
+        let battery = self.battery.get().unwrap_or_default();
+        let battery_cells = cmp::max(1, cmp::min(battery.0 / 4200 + 1, 8)) as u16;
         let misc = Misc {
             battery: battery / battery_cells as u16,
-            displacement,
-            input,
-            quaternion,
-            ..Default::default()
+            displacement: self.displacement.get().unwrap_or_default(),
+            input: self.control_input.get().unwrap_or_default(),
+            quaternion: self.imu.get().unwrap_or_default(),
+            rssi: self.rssi.get().unwrap_or_default(),
+        };
+
+        let euler: Euler = misc.quaternion.into();
+        let euler = euler * DEGREE_PER_DAG;
+        let heading = -euler.yaw as isize;
+        let altitude = self.altimeter.get();
+        let aviation = Aviation {
+            attitude: euler.into(),
+            altitude: altitude.unwrap_or_default(),
+            heading: if heading >= 0 { heading } else { 360 + heading } as u16,
+            height: altitude.unwrap_or_default(),
+            g_force: acceleration.g_force(),
+            airspeed: speed_vector.to_unit(unit::Knot).scalar().value() as u16,
+            vario: self.vertical_speed.get().unwrap_or_default().to_unit(unit::FTpM).value() as i16,
         };
 
         FlightData { aviation, navigation, sensor, misc }

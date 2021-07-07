@@ -5,13 +5,12 @@ use crate::config::peripherals::serial::{GNSSConfig, GNSSProtocol};
 use crate::datastructures::{
     coordinate::Position,
     measurement::{unit, Course, Heading, VelocityVector},
-    GNSSFixed,
 };
 use crate::protocol::serial::Receiver;
 use crate::sync::singular::SingularData;
 
 pub struct DataSource<'a> {
-    pub fixed: &'a SingularData<GNSSFixed>,
+    pub fixed: &'a SingularData<bool>,
     pub position: &'a SingularData<Position>,
     pub velocity: &'a SingularData<VelocityVector<i32, unit::MMpS>>,
     pub heading: &'a SingularData<Heading>,

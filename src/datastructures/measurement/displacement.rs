@@ -81,7 +81,7 @@ impl<U: Copy> Into<(f32, f32, f32)> for DistanceVector<f32, U> {
 }
 
 impl<U: Copy + Default> DistanceVector<i32, U> {
-    pub fn distance(&self) -> Distance<u32, U> {
+    pub fn scalar(&self) -> Distance<u32, U> {
         let (x, y, z) = (self.x.value(), self.y.value(), self.z.value());
         Distance::new((x * x + y * y + z * z).integer_sqrt() as u32, U::default())
     }
@@ -93,7 +93,7 @@ impl<U: Copy + Default> DistanceVector<f32, U> {
         (if theta >= 0 { theta % 360 } else { 360 + theta }) as u16
     }
 
-    pub fn distance(&self) -> Distance<f32, U> {
+    pub fn scalar(&self) -> Distance<f32, U> {
         let (x, y, z) = (self.x.value(), self.y.value(), self.z.value());
         Distance::new((x * x + y * y + z * z).sqrt(), U::default())
     }

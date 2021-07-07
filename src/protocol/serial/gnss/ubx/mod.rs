@@ -8,7 +8,6 @@ use crate::datastructures::{
     coordinate::Position,
     fixed_point::FixedPoint,
     measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
-    GNSSFixed,
 };
 use crate::protocol::serial;
 use crate::protocol::serial::gnss::DataSource;
@@ -34,7 +33,7 @@ pub enum State {
 
 pub struct UBX<'a> {
     state: State,
-    fixed: &'a SingularData<GNSSFixed>,
+    fixed: &'a SingularData<bool>,
     position: &'a SingularData<Position>,
     velocity: &'a SingularData<VelocityVector<i32, unit::MMpS>>,
     heading: &'a SingularData<Heading>,
@@ -64,8 +63,8 @@ impl<'a> UBX<'a> {
         let payload = &pvt_message.payload;
 
         self.fixed.write(match payload.fix_type {
-            UBXFixType::TwoDemension | UBXFixType::ThreeDemension => GNSSFixed(true),
-            _ => GNSSFixed(false),
+            UBXFixType::TwoDemension | UBXFixType::ThreeDemension => true,
+            _ => false,
         });
 
         if payload.fix_type == UBXFixType::ThreeDemension {

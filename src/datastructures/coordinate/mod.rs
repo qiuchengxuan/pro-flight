@@ -22,7 +22,7 @@ pub struct SphericalCoordinate<U: Copy> {
 
 impl<U: Copy + Default> From<DistanceVector<f32, U>> for SphericalCoordinate<U> {
     fn from(vector: DistanceVector<f32, U>) -> SphericalCoordinate<U> {
-        let rho = vector.distance();
+        let rho = vector.scalar();
         if rho.value().classify() == FpCategory::Zero {
             return SphericalCoordinate { rho: rho.convert(|v| v as u32), theta: 0, phi: 0 };
         }

@@ -20,8 +20,9 @@ impl core::fmt::Display for FlightData {
 mod test {
     #[test]
     fn test_flight_data() {
-        use super::FlightData;
         use serde_json::json;
+
+        use super::FlightData;
 
         let expected = json!({
             "aviation": {

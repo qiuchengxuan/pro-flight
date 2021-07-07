@@ -13,7 +13,6 @@ use crate::datastructures::{
     coordinate::{latitude, longitude, Position},
     fixed_point::FixedPoint,
     measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
-    GNSSFixed,
 };
 use crate::protocol::serial;
 use crate::protocol::serial::gnss::DataSource;
@@ -48,7 +47,7 @@ impl From<nmea0183::types::IntegerDecimal> for FixedPoint<i32, 1> {
 
 pub struct NMEA<'a> {
     parser: Parser,
-    fixed: &'a SingularData<GNSSFixed>,
+    fixed: &'a SingularData<bool>,
     position: &'a SingularData<Position>,
     velocity: &'a SingularData<VelocityVector<i32, unit::MMpS>>,
     heading: &'a SingularData<Heading>,
@@ -99,7 +98,7 @@ impl<'a> NMEA<'a> {
             Quality::Autonomous | Quality::Differential => true,
             _ => false,
         };
-        self.fixed.write(GNSSFixed(fixed));
+        self.fixed.write(fixed);
         if !fixed {
             return;
         }
