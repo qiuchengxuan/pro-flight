@@ -85,11 +85,12 @@ impl<M: DmaChMap> DMAFuture for DMABusy<M> {}
 
 pub struct Stream<M: DmaChMap> {
     reg: Reg<M>,
+    persist: bool,
 }
 
 impl<M: DmaChMap> Clone for Stream<M> {
     fn clone(&self) -> Self {
-        Self { reg: self.reg.clone() }
+        Self { reg: self.reg.clone(), persist: self.persist }
     }
 }
 
@@ -108,9 +109,15 @@ impl<M: DmaChMap> Stream<M> {
         });
         int.enable_int();
         reg.configuration.tcie().set_bit();
-        Self { reg }
+        Self { reg, persist: false }
+    }
+
+    pub unsafe fn set_persist(&mut self) {
+        self.persist = true
     }
 }
+
+type BD<W, const N: usize> = BufferDescriptor<W, N>;
 
 impl<M: DmaChMap> DMA for Stream<M> {
     type Future = DMABusy<M>;
@@ -128,12 +135,11 @@ impl<M: DmaChMap> DMA for Stream<M> {
         self.reg.configuration.en().read_bit()
     }
 
-    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> DMABusy<M>
+    fn tx<'a, W, const N: usize>(&'a self, bd: &'a BD<W, N>, option: TransferOption) -> DMABusy<M>
     where
         W: Copy + Default,
-        BD: AsRef<BufferDescriptor<W, N>> + 'a,
     {
-        let bytes = bd.as_ref().take();
+        let bytes = bd.take();
         self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.clear_interrupts();
@@ -151,12 +157,11 @@ impl<M: DmaChMap> DMA for Stream<M> {
         DMABusy(self.reg.configuration)
     }
 
-    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> DMABusy<M>
+    fn rx<'a, W, const N: usize>(&'a self, bd: &'a BD<W, N>, option: TransferOption) -> DMABusy<M>
     where
         W: Copy + Default,
-        BD: AsRef<BufferDescriptor<W, N>> + 'a,
     {
-        let buffer = bd.as_ref().take();
+        let buffer = bd.take();
         self.reg.memory0_address.store_bits(buffer.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.clear_interrupts();
@@ -175,6 +180,14 @@ impl<M: DmaChMap> DMA for Stream<M> {
         DMABusy(self.reg.configuration)
     }
 
+    fn setup_rx<W, const N: usize>(mut self, bd: &'static BD<W, N>, option: TransferOption)
+    where
+        W: Copy + Default,
+    {
+        self.persist = true;
+        self.rx(bd, option);
+    }
+
     fn stop(&self) {
         self.reg.configuration.tcie().clear_bit();
         if self.reg.configuration.en().read_bit() {
@@ -185,6 +198,14 @@ impl<M: DmaChMap> DMA for Stream<M> {
         if address > 0 {
             unsafe { Meta::<u8>::from_raw(address as usize).release() }
             self.reg.memory0_address.store_bits(0);
+        }
+    }
+}
+
+impl<M: DmaChMap> Drop for Stream<M> {
+    fn drop(&mut self) {
+        if !self.persist && self.is_busy() {
+            panic!("DMA dropped while busy")
         }
     }
 }

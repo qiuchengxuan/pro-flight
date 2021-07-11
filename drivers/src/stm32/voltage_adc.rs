@@ -45,5 +45,5 @@ where
     rx_bd.set_transfer_done(move |data| handler(voltage_adc.convert(data)));
 
     dma.setup_peripheral(1, &mut adc);
-    dma.rx(&rx_bd, TransferOption::circle());
+    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle());
 }

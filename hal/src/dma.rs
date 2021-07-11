@@ -121,6 +121,8 @@ impl TransferOption {
 
 pub type Channel = u8;
 
+type BD<W, const N: usize> = BufferDescriptor<W, N>;
+
 /// Whenever tx or rx with buffer-descriptor, DMA does not take ownership of BD,
 /// but requires BD lifetime lives no less than DMA lifetime,
 /// when DMA lifetime ends, it should immediately stop and drop reference to BD
@@ -130,13 +132,25 @@ pub trait DMA: Send + Sync + 'static {
 
     fn setup_peripheral(&mut self, channel: Channel, periph: &mut dyn Peripheral);
     fn is_busy(&self) -> bool;
-    fn tx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> Self::Future
+    fn tx<'a, W, const N: usize>(
+        &'a self,
+        bd: &'a BD<W, N>,
+        option: TransferOption,
+    ) -> Self::Future
     where
-        W: Copy + Default,
-        BD: AsRef<BufferDescriptor<W, N>> + 'a;
-    fn rx<'a, W, BD, const N: usize>(&'a self, bd: BD, option: TransferOption) -> Self::Future
+        W: Copy + Default;
+    fn rx<'a, W, const N: usize>(
+        &'a self,
+        bd: &'a BD<W, N>,
+        option: TransferOption,
+    ) -> Self::Future
     where
-        W: Copy + Default,
-        BD: AsRef<BufferDescriptor<W, N>> + 'a;
+        W: Copy + Default;
+    fn setup_rx<W, const N: usize>(
+        self,
+        bd: &'static BufferDescriptor<W, N>,
+        option: TransferOption,
+    ) where
+        W: Copy + Default;
     fn stop(&self);
 }

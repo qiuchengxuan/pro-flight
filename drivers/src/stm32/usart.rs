@@ -33,5 +33,5 @@ where
     rx_bd.set_transfer_done(move |bytes| rx.receive(bytes));
 
     dma.setup_peripheral(channel, &mut usart);
-    dma.rx(&rx_bd, TransferOption::circle());
+    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle());
 }
