@@ -199,6 +199,8 @@ pub fn get() -> &'static Config {
     unsafe { CONFIG.as_ref().unwrap() }
 }
 
+static mut CONFIG_ITERATION: usize = 0;
+
 pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     let mut buffer = [0u8; 2048];
     let size = reader.read(&mut buffer).ok().unwrap_or(0);

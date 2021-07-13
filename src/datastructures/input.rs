@@ -3,6 +3,7 @@ use core::str::FromStr;
 pub type RSSI = u16;
 
 #[derive(Copy, Clone, Eq, Debug, PartialEq)]
+#[repr(u8)]
 pub enum InputType {
     Throttle = 0,
     Roll,

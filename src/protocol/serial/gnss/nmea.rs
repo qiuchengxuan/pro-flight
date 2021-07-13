@@ -118,6 +118,10 @@ impl<'a> NMEA<'a> {
 }
 
 impl<'a> serial::Receiver for NMEA<'a> {
+    fn receive_size(&self) -> usize {
+        79 // max message size
+    }
+
     fn receive(&mut self, bytes: &[u8]) {
         let messages: Vec<Message> = self.parser.parse_bytes(&bytes).collect();
         for message in messages.iter() {

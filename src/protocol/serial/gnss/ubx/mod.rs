@@ -93,6 +93,10 @@ impl<'a> UBX<'a> {
 }
 
 impl<'a> serial::Receiver for UBX<'a> {
+    fn receive_size(&self) -> usize {
+        MAX_MESSAGE_SIZE
+    }
+
     fn receive(&mut self, mut bytes: &[u8]) {
         let mut message: &mut Message<()> = unsafe { transmute(&mut self.buffer) };
         while bytes.len() > 0 {

@@ -1,13 +1,15 @@
 use core::future::Future;
-use core::mem;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use core::{cmp, mem};
 
 use drone_core::fib::Yielded;
 use drone_cortexm::{reg::prelude::*, reg::Reg as _, thr::prelude::*, thr::ThrNvic};
 use drone_stm32_map::periph::dma::ch::*;
 
-use hal::dma::{BufferDescriptor, DMAFuture, Meta, Peripheral, TransferOption, DMA};
+use hal::dma::{
+    BufferDescriptor, DMAFuture, Meta, Peripheral, TransferOption, TransferResult, DMA,
+};
 
 pub enum Direction {
     PeripheralToMemory = 0b00,
@@ -21,15 +23,51 @@ pub enum Burst {
     Incr16 = 0b11,
 }
 
-pub struct Reg<M: DmaChMap> {
-    configuration: M::CDmaCcr,
-    memory0_address: M::CDmaCm0Ar,
-    number_of_data: M::CDmaCndtr,
-    peripheral_address: M::CDmaCpar,
+struct InterruptClear<M: DmaChMap> {
     transfer_complete: M::CDmaIfcrCtcif,
     half_transfer: M::CDmaIfcrChtif,
     transfer_error: M::CDmaIfcrCteif,
     direct_mode_error: M::CDmaIfcrCdmeif,
+}
+
+impl<M: DmaChMap> InterruptClear<M> {
+    fn clear_all(&self) {
+        self.transfer_complete.set_bit();
+        self.half_transfer.set_bit();
+        self.transfer_error.set_bit();
+        self.direct_mode_error.set_bit();
+    }
+}
+
+impl<M: DmaChMap> Clone for InterruptClear<M> {
+    fn clone(&self) -> Self {
+        Self {
+            transfer_complete: self.transfer_complete,
+            half_transfer: self.half_transfer,
+            transfer_error: self.transfer_error,
+            direct_mode_error: self.direct_mode_error,
+        }
+    }
+}
+
+struct InterruptStatus<M: DmaChMap> {
+    transfer_complete: M::CDmaIsrTcif,
+    half_transfer: M::CDmaIsrHtif,
+}
+
+impl<M: DmaChMap> Clone for InterruptStatus<M> {
+    fn clone(&self) -> Self {
+        Self { transfer_complete: self.transfer_complete, half_transfer: self.half_transfer }
+    }
+}
+
+struct Reg<M: DmaChMap> {
+    configuration: M::CDmaCcr,
+    memory0_address: M::CDmaCm0Ar,
+    number_of_data: M::CDmaCndtr,
+    peripheral_address: M::CDmaCpar,
+    interrupt_clear: InterruptClear<M>,
+    interrupt_status: InterruptStatus<M>,
 }
 
 impl<M: DmaChMap> Clone for Reg<M> {
@@ -39,20 +77,9 @@ impl<M: DmaChMap> Clone for Reg<M> {
             memory0_address: self.memory0_address,
             number_of_data: self.number_of_data,
             peripheral_address: self.peripheral_address,
-            transfer_complete: self.transfer_complete,
-            half_transfer: self.half_transfer,
-            transfer_error: self.transfer_error,
-            direct_mode_error: self.direct_mode_error,
+            interrupt_clear: self.interrupt_clear.clone(),
+            interrupt_status: self.interrupt_status.clone(),
         }
-    }
-}
-
-impl<M: DmaChMap> Reg<M> {
-    fn clear_interrupts(&self) {
-        self.transfer_complete.set_bit();
-        self.half_transfer.set_bit();
-        self.transfer_error.set_bit();
-        self.direct_mode_error.set_bit();
     }
 }
 
@@ -63,10 +90,16 @@ impl<M: DmaChMap> From<DmaChPeriph<M>> for Reg<M> {
             memory0_address: reg.dma_cm0ar.into_copy(),
             number_of_data: reg.dma_cndtr.into_copy(),
             peripheral_address: reg.dma_cpar.into_copy(),
-            transfer_complete: reg.dma_ifcr_ctcif.into_copy(),
-            half_transfer: reg.dma_ifcr_chtif.into_copy(),
-            transfer_error: reg.dma_ifcr_cteif.into_copy(),
-            direct_mode_error: reg.dma_ifcr_cdmeif.into_copy(),
+            interrupt_clear: InterruptClear {
+                transfer_complete: reg.dma_ifcr_ctcif.into_copy(),
+                half_transfer: reg.dma_ifcr_chtif.into_copy(),
+                transfer_error: reg.dma_ifcr_cteif.into_copy(),
+                direct_mode_error: reg.dma_ifcr_cdmeif.into_copy(),
+            },
+            interrupt_status: InterruptStatus {
+                transfer_complete: reg.dma_isr_tcif.into_copy(),
+                half_transfer: reg.dma_isr_htif.into_copy(),
+            },
         }
     }
 }
@@ -97,14 +130,25 @@ impl<M: DmaChMap> Clone for Stream<M> {
 impl<M: DmaChMap> Stream<M> {
     pub fn new<INT: ThrNvic>(raw: DmaChPeriph<M>, int: INT) -> Self {
         let reg: Reg<M> = raw.into();
-        let (address_reg, transfer_complete) = (reg.memory0_address, reg.transfer_complete);
+        let address_reg = reg.memory0_address;
+        let status = reg.interrupt_status.clone();
+        let clear = reg.interrupt_clear.clone();
         int.add_fn(move || {
-            transfer_complete.set_bit();
             let address = address_reg.load_bits() as usize;
+            let half = status.half_transfer.read_bit();
             let meta = unsafe { Meta::<u8>::from_raw(address) };
-            let data = unsafe { meta.get_data() };
-            meta.release();
-            unsafe { meta.get_transfer_done() }.map(|f| f(data));
+            let buffer = unsafe { meta.get_buffer() };
+            let result =
+                if half { TransferResult::Half(buffer) } else { TransferResult::Complete(buffer) };
+            if half {
+                clear.half_transfer.set_bit();
+            }
+            if status.transfer_complete.read_bit() {
+                meta.release();
+                clear.transfer_complete.set_bit();
+            }
+            let handler = unsafe { meta.get_handler() };
+            handler.map(|f| f(result));
             Yielded::<(), ()>(())
         });
         int.enable_int();
@@ -142,8 +186,9 @@ impl<M: DmaChMap> DMA for Stream<M> {
         let bytes = bd.take();
         self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
-        self.reg.clear_interrupts();
-        self.reg.number_of_data.store_bits(option.size.unwrap_or(bytes.len()) as u32);
+        self.reg.interrupt_clear.clear_all();
+        let num_of_data = cmp::min(bytes.len(), option.size.unwrap_or(bytes.len()));
+        self.reg.number_of_data.store_bits(num_of_data as u32);
         self.reg.configuration.modify_reg(|r, v| {
             if option.fixed {
                 r.minc().clear(v)
@@ -157,15 +202,21 @@ impl<M: DmaChMap> DMA for Stream<M> {
         DMABusy(self.reg.configuration)
     }
 
-    fn rx<'a, W, const N: usize>(&'a self, bd: &'a BD<W, N>, option: TransferOption) -> DMABusy<M>
+    fn rx<'a, W, const N: usize>(
+        &'a self,
+        bd: &'a mut BD<W, N>,
+        option: TransferOption,
+    ) -> DMABusy<M>
     where
         W: Copy + Default,
     {
         let buffer = bd.take();
         self.reg.memory0_address.store_bits(buffer.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
-        self.reg.clear_interrupts();
-        self.reg.number_of_data.store_bits(buffer.len() as u32);
+        self.reg.interrupt_clear.clear_all();
+        let num_of_data = cmp::min(buffer.len(), option.size.unwrap_or(buffer.len()));
+        bd.set_size(num_of_data);
+        self.reg.number_of_data.store_bits(num_of_data as u32);
         self.reg.configuration.modify_reg(|r, v| {
             r.minc().set(v);
             r.msize().write(v, msize);
@@ -176,11 +227,16 @@ impl<M: DmaChMap> DMA for Stream<M> {
             }
             r.dir().write(v, Direction::PeripheralToMemory as u32);
             r.en().set(v);
+            if option.enable_half {
+                r.htie().set(v);
+            } else {
+                r.htie().clear(v);
+            }
         });
         DMABusy(self.reg.configuration)
     }
 
-    fn setup_rx<W, const N: usize>(mut self, bd: &'static BD<W, N>, option: TransferOption)
+    fn setup_rx<W, const N: usize>(mut self, bd: &'static mut BD<W, N>, option: TransferOption)
     where
         W: Copy + Default,
     {

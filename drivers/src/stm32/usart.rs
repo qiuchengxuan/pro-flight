@@ -27,11 +27,12 @@ pub fn init<F, D>(mut usart: impl Peripheral, mut dma: D, channel: u8, mut rx: B
 where
     D: DMA<Future = F>,
 {
+    let receive_size = rx.receive_size();
     let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
     debug!("Init USART DMA address at 0x{:x}", address as usize);
-    rx_bd.set_transfer_done(move |bytes| rx.receive(bytes));
+    rx_bd.set_handler(move |result| rx.receive(result.into()));
 
     dma.setup_peripheral(channel, &mut usart);
-    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle());
+    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle().size(receive_size));
 }

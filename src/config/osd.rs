@@ -8,6 +8,7 @@ use super::setter::{Error, Setter, Value};
 use super::yaml::ToYAML;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(u8)]
 pub enum Standard {
     PAL,
     NTSC,

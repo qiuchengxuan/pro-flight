@@ -3,7 +3,9 @@ pub mod cli;
 pub mod flight_data;
 #[macro_use]
 pub mod logger;
+pub mod configuration;
 pub mod imu;
+pub mod mixer;
 pub mod positioning;
 pub mod speedometer;
 pub mod variometer;

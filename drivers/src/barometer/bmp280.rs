@@ -64,9 +64,9 @@ impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
         debug!("Init BMP280 DMA address at 0x{:x}", address as usize);
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
-        rx_bd.set_transfer_done(move |bytes| {
+        rx_bd.set_handler(move |result| {
             cs_.set_high().ok();
-            handler(compensator.convert(&bytes[..]))
+            handler(compensator.convert(result.into()))
         });
         let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new([Register::PressureMsb as u8 | 0x80]));
         Self { rx_bd, tx_bd, cs }
@@ -81,7 +81,7 @@ impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
         if rx.is_busy() || tx.is_busy() {
             return;
         }
-        rx.rx(&self.rx_bd, Default::default());
-        tx.tx(&self.tx_bd, TransferOption::repeat(8));
+        rx.rx(&mut self.rx_bd, Default::default());
+        tx.tx(&self.tx_bd, TransferOption::repeat().size(8));
     }
 }

@@ -26,7 +26,7 @@ use drone_core::fib::{FiberState, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
     dma::*,
-    exti::{periph_exti2, periph_exti3},
+    exti::{periph_exti1, periph_exti2, periph_exti3},
     flash::periph_flash,
     rtc::periph_rtc,
     spi::{periph_spi1, periph_spi3},
@@ -38,10 +38,13 @@ use hal::{
     persist::PersistDatastore,
 };
 use pro_flight::{
-    components::{cli::CLI, flight_data::FlightDataHUB, logger, variometer::Variometer},
+    components::{
+        cli::CLI, configuration::make_control_surface, flight_data::FlightDataHUB, logger,
+        mixer::ControlMixer, variometer::Variometer,
+    },
     config::{self, peripherals::serial::Config as SerialConfig},
     protocol::serial,
-    sync::{flag, DataWriter},
+    sync::{flag, DataWriter, NoDataSource},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
@@ -227,9 +230,21 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         }
     }
 
+    info!("Initialize PWMs");
+    let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
+    let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
+    let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
+    let mixer = ControlMixer::new(reader.control_input, NoDataSource::new(), 50);
+    let mut control_surface = make_control_surface(mixer, pwms);
+    thread.servo.add_fn(never_complete(move || control_surface.update()));
+
+    let int = make_trigger(thread.servo, periph_exti1!(reg));
+    let mut servos = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(20));
+
     thread.sys_tick.add_fn(never_complete(move || {
         max7456.notify();
         bmp280.notify();
+        servos.notify();
     }));
 
     let commands =

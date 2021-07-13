@@ -13,6 +13,7 @@ extern crate hal;
 #[macro_use]
 extern crate pro_flight;
 
+pub mod pwm;
 pub mod tasks;
 pub mod thread;
 

@@ -87,7 +87,7 @@ where
         let mut bd = Box::new(BufferDescriptor::<u8, 800>::default());
         let (_, cs) = self.free();
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
-        bd.set_transfer_done(move |_bytes| {
+        bd.set_handler(move |_bytes| {
             cs_.set_high().ok();
         });
         Ok(DmaMAX7456 { cs, rx, tx, reader, video_mode_0, bd })
@@ -108,7 +108,7 @@ where
         buffer[1] = video_mode_0.value;
         core::mem::drop(buffer);
         self.cs.set_low().ok();
-        self.tx.tx(&self.bd, TransferOption::sized(2)).await;
+        self.tx.tx(&self.bd, TransferOption::default().size(2)).await;
     }
 
     async fn upload_char(&mut self, bytes: &[u8], index: u8) {
@@ -119,7 +119,7 @@ where
         core::mem::drop(buffer);
         let timer = TickTimer::after(Duration::from_millis(13));
         self.cs.set_low().ok();
-        self.tx.tx(&self.bd, TransferOption::sized(STORE_CHAR_BUFFER_SIZE)).await;
+        self.tx.tx(&self.bd, TransferOption::default().size(STORE_CHAR_BUFFER_SIZE)).await;
         timer.await;
     }
 
@@ -156,7 +156,7 @@ where
             let mut writer = LinesWriter::new(screen, Default::default());
             let size = writer.write(buffer).0.len();
             self.cs.set_low().ok();
-            self.tx.tx(&self.bd, TransferOption::sized(size)).await;
+            self.tx.tx(&self.bd, TransferOption::default().size(size)).await;
         }
     }
 }

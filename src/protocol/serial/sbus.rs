@@ -47,6 +47,10 @@ where
     R: DataWriter<RSSI> + Sync,
     C: DataWriter<ControlInput> + Sync,
 {
+    fn receive_size(&self) -> usize {
+        sbus_parser::SBUS_PACKET_SIZE
+    }
+
     fn receive(&mut self, bytes: &[u8]) {
         let packet = match self.receiver.receive(bytes) {
             Some(packet) => packet,

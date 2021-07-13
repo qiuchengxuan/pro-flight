@@ -4,6 +4,7 @@ use crate::components::flight_data::FlightDataHUB;
 use crate::config::peripherals::serial::Config;
 
 pub trait Receiver: Send {
+    fn receive_size(&self) -> usize;
     fn receive(&mut self, bytes: &[u8]);
 }
 

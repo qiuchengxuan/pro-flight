@@ -18,10 +18,35 @@ impl Into<bool> for Owner {
     }
 }
 
+pub enum TransferResult<'a, W> {
+    Complete(&'a [W]),
+    Half(&'a [W]),
+}
+
+impl<'a, W> TransferResult<'a, W> {
+    pub fn half(self) -> &'a [W] {
+        match self {
+            Self::Half(data) => &data[..data.len() / 2],
+            Self::Complete(data) => &data[data.len() / 2..],
+        }
+    }
+}
+
+impl<'a, W> Into<&'a [W]> for TransferResult<'a, W> {
+    fn into(self) -> &'a [W] {
+        match self {
+            Self::Half(data) => data,
+            Self::Complete(data) => data,
+        }
+    }
+}
+
+type Handler<W> = dyn FnMut(TransferResult<W>) + Send + 'static;
+
 #[repr(C)]
 #[derive(Default)]
 pub struct Meta<W> {
-    transfer_done: Option<Box<dyn FnMut(&[W]) + Send + 'static>>,
+    handler: Option<Box<Handler<W>>>,
     pub owner: AtomicBool,
     pub size: usize,
 }
@@ -32,14 +57,14 @@ impl<W> Meta<W> {
         &mut *(address as *mut Self)
     }
 
-    pub unsafe fn get_data<'a>(&self) -> &'a [W] {
+    pub unsafe fn get_buffer<'a>(&self) -> &'a [W] {
         let address = self as *const _ as usize + mem::size_of::<Self>();
         slice::from_raw_parts(address as *const W, self.size)
     }
 
     // unsafe because Sync
-    pub unsafe fn get_transfer_done(&mut self) -> Option<&mut (dyn FnMut(&[W]) + Send + 'static)> {
-        self.transfer_done.as_mut().map(|f| f.as_mut())
+    pub unsafe fn get_handler(&mut self) -> Option<&mut Handler<W>> {
+        self.handler.as_mut().map(|f| f.as_mut())
     }
 
     pub fn release(&mut self) {
@@ -66,9 +91,9 @@ impl<W: Copy + Default, const N: usize> BufferDescriptor<W, N> {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub fn set_transfer_done(&mut self, closure: impl FnMut(&[W]) + Send + 'static) -> bool {
+    pub fn set_handler(&mut self, handler: impl FnMut(TransferResult<W>) + Send + 'static) -> bool {
         if self.meta.owner.load(Ordering::Relaxed) == Owner::CPU.into() {
-            self.meta.transfer_done = Some(Box::new(closure));
+            self.meta.handler = Some(Box::new(handler));
             return true;
         }
         false
@@ -79,6 +104,10 @@ impl<W: Copy + Default, const N: usize> BufferDescriptor<W, N> {
             return Some(&mut self.buffer[..]);
         }
         None
+    }
+
+    pub fn set_size(&mut self, size: usize) {
+        self.meta.size = size
     }
 
     pub fn take(&self) -> &[W] {
@@ -97,25 +126,33 @@ pub trait DMAFuture: Future<Output = ()> {}
 
 #[derive(Copy, Clone, Default)]
 pub struct TransferOption {
-    /// if not specified, default to buffer-descriptor size
+    /// If not specified, default to buffer-descriptor size
     pub size: Option<usize>,
-    /// memory address won't increase
+    /// Memory address won't increase
     pub fixed: bool,
-    /// restart another transfer when transfer completes
+    /// Restart another transfer when transfer completes
     pub circle: bool,
+    /// Immediatly retrieve data when half buffer filled
+    pub enable_half: bool,
 }
 
 impl TransferOption {
-    pub fn sized(size: usize) -> Self {
-        Self { size: Some(size), ..Default::default() }
-    }
-
-    pub fn repeat(size: usize) -> Self {
-        Self { size: Some(size), fixed: true, ..Default::default() }
+    pub fn repeat() -> Self {
+        Self { fixed: true, ..Default::default() }
     }
 
     pub fn circle() -> Self {
         Self { circle: true, ..Default::default() }
+    }
+
+    pub fn size(mut self, size: usize) -> Self {
+        self.size = Some(size);
+        self
+    }
+
+    pub fn enable_half(mut self) -> Self {
+        self.enable_half = true;
+        self
     }
 }
 
@@ -141,16 +178,13 @@ pub trait DMA: Send + Sync + 'static {
         W: Copy + Default;
     fn rx<'a, W, const N: usize>(
         &'a self,
-        bd: &'a BD<W, N>,
+        bd: &'a mut BD<W, N>,
         option: TransferOption,
     ) -> Self::Future
     where
         W: Copy + Default;
-    fn setup_rx<W, const N: usize>(
-        self,
-        bd: &'static BufferDescriptor<W, N>,
-        option: TransferOption,
-    ) where
+    fn setup_rx<W, const N: usize>(self, bd: &'static mut BD<W, N>, option: TransferOption)
+    where
         W: Copy + Default;
     fn stop(&self);
 }

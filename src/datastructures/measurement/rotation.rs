@@ -1,6 +1,7 @@
 use core::str::FromStr;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(u8)]
 pub enum Rotation {
     NoRotation,
     Degree90,

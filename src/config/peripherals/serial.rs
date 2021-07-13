@@ -8,6 +8,7 @@ use crate::config::setter::{Error, Setter, Value};
 use crate::config::yaml::ToYAML;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum Identifier {
     UART(u8),
     USART(u8),
@@ -45,6 +46,7 @@ impl core::fmt::Display for Identifier {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(u8)]
 pub enum GNSSProtocol {
     UBX,
     NMEA,
@@ -107,6 +109,7 @@ impl SbusConfig {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(u8)]
 pub enum Config {
     GNSS(GNSSConfig),
     SBUS(SbusConfig),
