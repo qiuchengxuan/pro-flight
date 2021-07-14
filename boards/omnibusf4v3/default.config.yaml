@@ -1,0 +1,61 @@
+aircraft:
+  configuration: airplane
+battery:
+  cells: 3
+  min-cell-voltage: 3.3
+  max-cell-voltage: 4.2
+  warning-cell-voltage: 3.5
+imu:
+  mahony:
+    kp: 0.25
+    ki: 0.005
+osd:
+  aspect-ratio: '16:9'
+  fov: 145
+  offset:
+    horizental: 8
+    vertical: 0
+  refresh-rate: 50
+  standard: PAL
+receiver:
+  inputs:
+    roll:
+      channel: 1
+    pitch:
+      channel: 2
+    throttle:
+      channel: 3
+    yaw:
+      channel: 4
+speedometer:
+  kp: 0.25
+peripherals:
+  serial:
+    USART1:
+      type: GNSS
+      baudrate: 9600
+      protocol: NMEA
+    USART6:
+      type: SBUS
+      fast: false
+      rx-inverted: true
+      half-duplex: false
+  pwm:
+    PWM1:
+      type: motor
+      index: 0
+      protocol: PWM
+      rate: 400
+    PWM2:
+      type: motor
+      index: 1
+      protocol: PWM
+      rate: 400
+    PWM3:
+      type: elevator
+    PWM4:
+      type: aileron-right
+    PWM5:
+      type: aileron-left
+    PWM6:
+      type: rudder

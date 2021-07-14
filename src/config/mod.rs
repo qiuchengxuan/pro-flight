@@ -211,8 +211,28 @@ pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     get()
 }
 
-pub fn replace(config: Config) {
-    unsafe { CONFIG = Some(config) }
+pub fn replace(config: &Config) {
+    unsafe { CONFIG_ITERATION += 1 }
+    unsafe { CONFIG = Some(config.clone()) }
+}
+
+pub fn iteration() -> usize {
+    unsafe { CONFIG_ITERATION }
+}
+
+#[cfg(feature = "default-config")]
+extern "Rust" {
+    fn default_config() -> Config;
+}
+
+pub fn reset() {
+    let config = match () {
+        #[cfg(feature = "default-config")]
+        () => unsafe { default_config() },
+        #[cfg(not(feature = "default-config"))]
+        () => Config::default(),
+    };
+    replace(&config);
 }
 
 mod test {

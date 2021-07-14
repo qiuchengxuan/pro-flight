@@ -15,12 +15,12 @@ pub fn set(line: &str) {
             Ok(()) => (),
             Err(e) => println!("{}", e),
         }
-        config::replace(config);
+        config::replace(&config);
     }
 }
 
 pub fn reset() {
-    config::replace(config::Config::default());
+    config::reset();
 }
 
 pub fn import(line: &str) {

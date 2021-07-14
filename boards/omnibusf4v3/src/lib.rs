@@ -22,6 +22,7 @@ use drone_core::heap::Allocator;
 #[allow(unused_imports)]
 use drone_core::prelude::*;
 use drone_stm32_map::stm32_reg_tokens;
+use pro_flight::config::{yaml::YamlParser, Config};
 
 mod spi {
     define_spis! {
@@ -75,4 +76,12 @@ fn board_name() -> &'static str {
 #[no_mangle]
 fn reboot() {
     cortex_m::peripheral::SCB::sys_reset()
+}
+
+const DEFAULT_CONFIG: &'static [u8] = core::include_bytes!("../default.config.yaml");
+
+#[no_mangle]
+fn default_config() -> Config {
+    let config_str = unsafe { core::str::from_utf8_unchecked(DEFAULT_CONFIG) };
+    YamlParser::new(config_str).parse()
 }
