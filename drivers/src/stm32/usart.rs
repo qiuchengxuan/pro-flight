@@ -17,20 +17,21 @@ pub fn to_serial_config(config: &SerialConfig) -> Config {
             baudrate: sbus.baudrate().bps(),
             stopbits: StopBits::STOP2,
             parity: Parity::ParityEven,
-            wordlength: WordLength::DataBits9,
+            wordlength: WordLength::DataBits8,
             dma: DmaConfig::TxRx,
         },
     }
 }
 
-pub fn init<F, D>(mut usart: impl Peripheral, mut dma: D, channel: u8, mut rx: Box<dyn Receiver>)
+pub fn init<F, D>(mut usart: USART, mut dma: D, channel: u8, mut rx: Box<dyn Receiver>)
 where
+    USART: Peripheral + Display,
     D: DMA<Future = F>,
 {
     let receive_size = rx.receive_size();
     let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-    debug!("Init USART DMA address at 0x{:x}", address as usize);
+    debug!("Init {} DMA address at 0x{:x}", usart, address as usize);
     rx_bd.set_handler(move |result| rx.receive(result.into()));
 
     dma.setup_peripheral(channel, &mut usart);

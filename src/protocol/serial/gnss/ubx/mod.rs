@@ -4,6 +4,8 @@ pub mod nav_pos_pvt;
 use core::mem::size_of;
 use core::mem::transmute;
 
+use chrono::naive::NaiveDateTime;
+
 use crate::datastructures::{
     coordinate::Position,
     fixed_point::FixedPoint,
@@ -13,6 +15,7 @@ use crate::protocol::serial;
 use crate::protocol::serial::gnss::DataSource;
 use crate::sync::singular::SingularData;
 use crate::sync::DataWriter;
+use crate::sys::time;
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
@@ -61,6 +64,13 @@ impl<'a> UBX<'a> {
         }
 
         let payload = &pvt_message.payload;
+
+        match (payload.date(), payload.time()) {
+            (Some(date), Some(time)) => {
+                time::update(&NaiveDateTime::new(date, time)).ok();
+            }
+            _ => (),
+        }
 
         self.fixed.write(match payload.fix_type {
             UBXFixType::TwoDemension | UBXFixType::ThreeDemension => true,

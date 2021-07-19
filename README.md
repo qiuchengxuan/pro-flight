@@ -35,6 +35,7 @@ Progress
   - [x] Displacement integral
   - [x] Complementary filter
   - [x] software interrupt based event
+  - [x] PWM & ESC
 * IO
   - [x] USB console serial
   - [x] DMA buffer descriptor
@@ -52,7 +53,11 @@ Progress
   - [x] GNSS UBX Protocol
 
 **WIP**
-  - [ ] PWM & ESC
+
+* logging
+  - [ ] SDCARD read & write
+  - [ ] DMA based SDCARD read & write
+  - [ ] Blackbox
 
 **Future**
 
@@ -66,14 +71,22 @@ Progress
   - [ ] EKF filter
 * fight-control
   - [ ] PID & Stabilizer
-* logging
-  - [ ] SDCARD read & write
-  - [ ] DMA based SDCARD read & write
-  - [ ] Blackbox
 * protocol
   - [ ] Mavlink
 * misc
   - [ ] Camera distortion adaption
+  
+Priority map
+============
+
+| Priority  | Module                         |
+|-----------|--------------------------------|
+| Systick   | Software interrupts            |
+| Immediate | Serial RX, ESC and Servo       |
+| Sensor    | USART DMA and Sensor Interrupt |
+| System    | SPI/I²C DMA                    |
+| Telemtry  | OSD                            |
+| Main      | LED/CLI                        |
 
 data-flow
 =========

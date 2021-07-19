@@ -1,3 +1,5 @@
+use chrono::naive::{NaiveDate, NaiveTime};
+
 use crate::datastructures::coordinate;
 use crate::datastructures::coordinate::{latitude, longitude};
 
@@ -140,6 +142,26 @@ pub struct NavPositionVelocityTime {
     pub heading_of_vehicle: i32,   // 1e-5 degree
     pub magnetic_declination: i16, // 1e-2 degree
     pub magnetic_accuracy: u16,    // 1e-2 degree
+}
+
+impl NavPositionVelocityTime {
+    pub fn date(&self) -> Option<NaiveDate> {
+        if self.valid.valid_date() {
+            return Some(NaiveDate::from_ymd(self.year.into(), self.month.into(), self.day.into()));
+        }
+        None
+    }
+
+    pub fn time(&self) -> Option<NaiveTime> {
+        if self.valid.valid_time() {
+            return Some(NaiveTime::from_hms(
+                self.hour.into(),
+                self.minute.into(),
+                self.second.into(),
+            ));
+        }
+        None
+    }
 }
 
 mod test {

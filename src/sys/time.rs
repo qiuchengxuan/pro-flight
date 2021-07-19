@@ -11,6 +11,8 @@ use hal::rtc::{RTCReader, RTCWriter};
 use nb;
 use void::Void;
 
+pub const STEP_THRESHOLD: Duration = Duration::from_secs(5);
+
 use super::jiffies;
 
 #[derive(Copy, Clone, Debug)]
@@ -39,9 +41,13 @@ pub fn now() -> NaiveDateTime {
 }
 
 pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
-    match unsafe { RTC_WRITER.as_ref() } {
-        Some(w) => w.set_datetime(datetime),
-        None => return Err(Error::NotInitialized),
+    let now = now();
+    let delta = (datetime.time() - now.time()).abs().to_std().unwrap_or_default();
+    if datetime.date() != now.date() || delta > STEP_THRESHOLD {
+        match unsafe { RTC_WRITER.as_ref() } {
+            Some(w) => w.set_datetime(datetime),
+            None => return Err(Error::NotInitialized),
+        }
     }
     Ok(())
 }

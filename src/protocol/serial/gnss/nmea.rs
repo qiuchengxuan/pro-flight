@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 
+use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 use nmea0183::{
@@ -18,6 +19,7 @@ use crate::protocol::serial;
 use crate::protocol::serial::gnss::DataSource;
 use crate::sync::singular::SingularData;
 use crate::sync::DataWriter;
+use crate::sys::time;
 
 impl Into<longitude::Longitude> for Longitude {
     fn into(self) -> longitude::Longitude {
@@ -45,6 +47,13 @@ impl From<nmea0183::types::IntegerDecimal> for FixedPoint<i32, 1> {
     }
 }
 
+pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
+    NaiveDateTime::new(
+        NaiveDate::from_ymd(rmc.date.year.into(), rmc.date.month.into(), rmc.date.day.into()),
+        NaiveTime::from_hms(rmc.time.hour.into(), rmc.time.minute.into(), rmc.time.seconds.into()),
+    )
+}
+
 pub struct NMEA<'a> {
     parser: Parser,
     fixed: &'a SingularData<bool>,
@@ -67,6 +76,8 @@ impl<'a> NMEA<'a> {
     }
 
     fn handle_rmc(&mut self, rmc: &RMC) {
+        time::update(&rmc_to_datetime(rmc)).ok();
+
         match rmc.position_mode {
             PositionMode::Autonomous | PositionMode::Differential => (),
             _ => return,

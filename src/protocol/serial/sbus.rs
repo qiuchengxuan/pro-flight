@@ -1,4 +1,4 @@
-use sbus_parser::Receiver;
+use sbus_parser::receiver::Receiver;
 
 use crate::config;
 use crate::datastructures::input::{ControlInput, InputType, RSSI};
@@ -48,7 +48,7 @@ where
     C: DataWriter<ControlInput> + Sync,
 {
     fn receive_size(&self) -> usize {
-        sbus_parser::SBUS_PACKET_SIZE
+        sbus_parser::packet::SBUS_PACKET_SIZE
     }
 
     fn receive(&mut self, bytes: &[u8]) {

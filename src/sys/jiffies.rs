@@ -4,8 +4,14 @@ const NANOS_PER_SEC: u32 = 1_000_000_000;
 const NANOS_PER_MILLI: u32 = 1_000_000;
 const MILLIS_PER_SEC: u32 = 1_000;
 
+#[cfg(not(test))]
 extern "Rust" {
     fn get_jiffies() -> u64; // nano seconds
+}
+
+#[cfg(test)]
+unsafe fn get_jiffies() -> u64 {
+    0
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
