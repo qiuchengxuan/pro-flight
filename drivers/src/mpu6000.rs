@@ -111,7 +111,7 @@ where
         tx.setup_peripheral(ch, &mut spi);
         let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
-        rx_bd.set_handler(move |_bytes| {
+        rx_bd.set_callback(move |_bytes| {
             cs_.set_high().ok();
         });
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
@@ -128,14 +128,14 @@ where
     TX: DMA<Future = TXF>,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
 {
-    pub fn set_handler<F>(&mut self, mut handler: F)
+    pub fn set_callback<F>(&mut self, mut handler: F)
     where
         F: FnMut(Acceleration, Measurement) + Send + 'static,
     {
         let mut cs = unsafe { core::ptr::read(&self.cs as *const _ as *const CS) };
         let convertor = Converter::default();
         let rotation = config::get().board.rotation;
-        self.rx_bd.set_handler(move |result| {
+        self.rx_bd.set_callback(move |result| {
             cs.set_high().ok();
             let bytes: &[u8] = result.into();
             let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);

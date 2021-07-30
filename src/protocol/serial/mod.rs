@@ -6,6 +6,7 @@ use crate::config::peripherals::serial::Config;
 pub trait Receiver: Send {
     fn receive_size(&self) -> usize;
     fn receive(&mut self, bytes: &[u8]);
+    fn reset(&mut self);
 }
 
 pub mod gnss;
@@ -18,7 +19,7 @@ pub fn make_receiver<'a>(
     hub: &'a FlightDataHUB,
 ) -> Option<Box<dyn Receiver + 'a>> {
     match config {
-        Config::SBUS(_) => Some(Box::new(SBUS::new(&hub.rssi, &hub.control_input))),
-        Config::GNSS(config) => gnss::make_receiver(config, hub),
+        Config::SBUS(sbus) => Some(Box::new(SBUS::new(&hub.rssi, sbus.fast, &hub.control_input))),
+        Config::GNSS(gnss) => gnss::make_receiver(gnss, hub),
     }
 }

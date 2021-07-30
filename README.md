@@ -54,13 +54,15 @@ Progress
 
 **WIP**
 
+* misc
+  - [ ] Simulator
+
+**Future**
+
 * logging
   - [ ] SDCARD read & write
   - [ ] DMA based SDCARD read & write
   - [ ] Blackbox
-
-**Future**
-
 * navigation
   - [ ] Magnetometer
   - [ ] DMA based I2C

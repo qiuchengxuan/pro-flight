@@ -14,6 +14,7 @@ embedded-hal = "0.2"
 hal = { path = "../hal" }
 max7456 = { git = "https://github.com/qiuchengxuan/max7456.git" }
 mpu6000 = { git = "https://github.com/qiuchengxuan/mpu6000.git" }
+nb = "0.1"
 peripheral-register = "0.1.4"
 pro-flight = { path = "../", default-features = false }
 usb-device = "0.2.8"

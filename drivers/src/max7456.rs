@@ -87,7 +87,7 @@ where
         let mut bd = Box::new(BufferDescriptor::<u8, 800>::default());
         let (_, cs) = self.free();
         let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
-        bd.set_handler(move |_bytes| {
+        bd.set_callback(move |_bytes| {
             cs_.set_high().ok();
         });
         Ok(DmaMAX7456 { cs, rx, tx, reader, video_mode_0, bd })

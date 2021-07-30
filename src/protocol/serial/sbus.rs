@@ -1,9 +1,13 @@
+use core::time::Duration;
+
+use embedded_hal::timer::CountDown;
 use sbus_parser::receiver::Receiver;
 
 use crate::config;
 use crate::datastructures::input::{ControlInput, InputType, RSSI};
 use crate::protocol::serial;
 use crate::sync::DataWriter;
+use crate::sys::time::TickTimer;
 
 #[inline]
 fn to_axis(value: u16) -> i32 {
@@ -24,6 +28,8 @@ fn scale(data: u16, scale: u8) -> i16 {
 
 pub struct SBUS<'a, R, C> {
     receiver: Receiver,
+    inter_frame_gap: Duration,
+    timer: TickTimer,
     loss_bitmap: u128,
     loss_bitmap_index: usize,
     rssi: &'a R,
@@ -31,9 +37,12 @@ pub struct SBUS<'a, R, C> {
 }
 
 impl<'a, R: DataWriter<RSSI>, C: DataWriter<ControlInput>> SBUS<'a, R, C> {
-    pub fn new(rssi: &'a R, control_input: &'a C) -> Self {
+    pub fn new(rssi: &'a R, fast: bool, control_input: &'a C) -> Self {
+        let gap = Duration::from_millis(if fast { 10 } else { 20 } - 1);
         Self {
             receiver: Receiver::new(),
+            inter_frame_gap: gap,
+            timer: TickTimer::default(),
             loss_bitmap: 0u128,
             loss_bitmap_index: 0,
             rssi,
@@ -48,14 +57,19 @@ where
     C: DataWriter<ControlInput> + Sync,
 {
     fn receive_size(&self) -> usize {
-        sbus_parser::packet::SBUS_PACKET_SIZE
+        1
     }
 
     fn receive(&mut self, bytes: &[u8]) {
+        if !self.timer.wait().is_ok() {
+            return;
+        }
         let packet = match self.receiver.receive(bytes) {
             Some(packet) => packet,
             None => return,
         };
+        self.receiver.reset();
+        self.timer.start(self.inter_frame_gap);
 
         if packet.frame_lost {
             self.loss_bitmap |= 1u128 << self.loss_bitmap_index;
@@ -84,5 +98,9 @@ where
         }
         self.rssi.write(100 - self.loss_bitmap.count_ones() as u16);
         self.control_input.write(input);
+    }
+
+    fn reset(&mut self) {
+        self.receiver.reset();
     }
 }

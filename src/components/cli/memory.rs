@@ -37,7 +37,7 @@ pub fn dump(line: &str) {
         }
     }
     let slice = unsafe { core::slice::from_raw_parts(address as *const u8, size) };
-    println!("Result: {:x?}", slice)
+    println!("Result: {:02x?}", slice)
 }
 
 fn _read(line: &str) -> Option<usize> {

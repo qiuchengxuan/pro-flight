@@ -7,7 +7,7 @@ use nmea0183::{
     message::Message,
     messages::{gga::GGA, rmc::RMC},
     types::{latitude::Latitude, longitude::Longitude, position_mode::PositionMode, Quality},
-    Parser,
+    Parser, MAX_MESSAGE_SIZE,
 };
 
 use crate::datastructures::{
@@ -130,7 +130,7 @@ impl<'a> NMEA<'a> {
 
 impl<'a> serial::Receiver for NMEA<'a> {
     fn receive_size(&self) -> usize {
-        79 // max message size
+        MAX_MESSAGE_SIZE
     }
 
     fn receive(&mut self, bytes: &[u8]) {
@@ -142,5 +142,9 @@ impl<'a> serial::Receiver for NMEA<'a> {
                 _ => continue,
             }
         }
+    }
+
+    fn reset(&mut self) {
+        self.parser.reset();
     }
 }

@@ -46,7 +46,7 @@ type Handler<W> = dyn FnMut(TransferResult<W>) + Send + 'static;
 #[repr(C)]
 #[derive(Default)]
 pub struct Meta<W> {
-    handler: Option<Box<Handler<W>>>,
+    callback: Option<Box<Handler<W>>>,
     pub owner: AtomicBool,
     pub size: usize,
 }
@@ -64,7 +64,7 @@ impl<W> Meta<W> {
 
     // unsafe because Sync
     pub unsafe fn get_handler(&mut self) -> Option<&mut Handler<W>> {
-        self.handler.as_mut().map(|f| f.as_mut())
+        self.callback.as_mut().map(|f| f.as_mut())
     }
 
     pub fn release(&mut self) {
@@ -91,9 +91,9 @@ impl<W: Copy + Default, const N: usize> BufferDescriptor<W, N> {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub fn set_handler(&mut self, handler: impl FnMut(TransferResult<W>) + Send + 'static) -> bool {
+    pub fn set_callback(&mut self, f: impl FnMut(TransferResult<W>) + Send + 'static) -> bool {
         if self.meta.owner.load(Ordering::Relaxed) == Owner::CPU.into() {
-            self.meta.handler = Some(Box::new(handler));
+            self.meta.callback = Some(Box::new(f));
             return true;
         }
         false
@@ -169,18 +169,10 @@ pub trait DMA: Send + Sync + 'static {
 
     fn setup_peripheral(&mut self, channel: Channel, periph: &mut dyn Peripheral);
     fn is_busy(&self) -> bool;
-    fn tx<'a, W, const N: usize>(
-        &'a self,
-        bd: &'a BD<W, N>,
-        option: TransferOption,
-    ) -> Self::Future
+    fn tx<'a, W, const N: usize>(&'a self, bd: &'a BD<W, N>, o: TransferOption) -> Self::Future
     where
         W: Copy + Default;
-    fn rx<'a, W, const N: usize>(
-        &'a self,
-        bd: &'a mut BD<W, N>,
-        option: TransferOption,
-    ) -> Self::Future
+    fn rx<'a, W, const N: usize>(&'a self, bd: &'a mut BD<W, N>, o: TransferOption) -> Self::Future
     where
         W: Copy + Default;
     fn setup_rx<W, const N: usize>(self, bd: &'static mut BD<W, N>, option: TransferOption)

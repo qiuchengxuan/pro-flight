@@ -1,23 +1,44 @@
 use hal::dma::Peripheral;
 
+use embedded_hal::serial;
 use stm32f4xx_hal::{
     dma::traits::PeriAddress,
-    serial::{Pins, Serial},
+    serial::{Error, Pins, Rx, Serial},
     stm32,
 };
 
-pub struct UsartPeripheral {
+pub struct UsartPeripheral<RX> {
     index: usize,
     address: usize,
+    rx: RX,
 }
 
-impl core::fmt::Display for UsartPeripheral {
+impl<RX> core::fmt::Display for UsartPeripheral<RX> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "USART{}", self.index)
     }
 }
 
-impl Peripheral for UsartPeripheral {
+impl<RX> serial::Read<u8> for UsartPeripheral<RX>
+where
+    RX: serial::Read<u8, Error = Error>,
+{
+    type Error = hal::serial::Error;
+
+    fn read(&mut self) -> nb::Result<u8, Self::Error> {
+        self.rx.read().map_err(|e| {
+            e.map(|e| match e {
+                Error::Framing => hal::serial::Error::Framing,
+                Error::Noise => hal::serial::Error::Noise,
+                Error::Overrun => hal::serial::Error::Overrun,
+                Error::Parity => hal::serial::Error::Parity,
+                _ => hal::serial::Error::Unknown,
+            })
+        })
+    }
+}
+
+impl<RX> Peripheral for UsartPeripheral<RX> {
     fn enable_dma(&mut self) {}
 
     fn address(&mut self) -> usize {
@@ -29,16 +50,16 @@ impl Peripheral for UsartPeripheral {
     }
 }
 
-pub trait IntoDMA {
-    fn into_dma(self) -> UsartPeripheral;
+pub trait IntoDMA<RX: serial::Read<u8, Error = Error>> {
+    fn into_dma(self) -> UsartPeripheral<RX>;
 }
 
 macro_rules! dma_usart {
-    ($index:ident, $type:ty) => {
-        impl<PINS: Pins<$type>> IntoDMA for Serial<$type, PINS> {
-            fn into_dma(self) -> UsartPeripheral {
-                let (tx, _) = self.split();
-                UsartPeripheral{$index, tx.address() as usize}
+    ($index:expr, $type:ty) => {
+        impl<PINS: Pins<$type>> IntoDMA<Rx<$type>> for Serial<$type, PINS> {
+            fn into_dma(self) -> UsartPeripheral<Rx<$type>> {
+                let (tx, rx) = self.split();
+                UsartPeripheral { index: $index, address: tx.address() as usize, rx: rx }
             }
         }
     };

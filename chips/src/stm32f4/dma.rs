@@ -187,7 +187,10 @@ impl<M: DmaChMap> DMA for Stream<M> {
         self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();
-        let num_of_data = cmp::min(bytes.len(), option.size.unwrap_or(bytes.len()));
+        let mut num_of_data = option.size.unwrap_or(bytes.len());
+        if !option.fixed {
+            num_of_data = cmp::min(num_of_data, bytes.len());
+        }
         self.reg.number_of_data.store_bits(num_of_data as u32);
         self.reg.configuration.modify_reg(|r, v| {
             if option.fixed {

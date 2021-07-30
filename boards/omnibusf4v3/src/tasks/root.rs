@@ -154,7 +154,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
     let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
-    mpu6000.set_handler(pro_flight::components::imu_handler(&hub));
+    mpu6000.set_callback(pro_flight::components::imu_handler(&hub));
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
     thread.mpu6000.add_fn(never_complete(move || int.clear_interrupt_pending_bit()));
     thread.mpu6000.add_fn(never_complete(move || mpu6000.trigger()));

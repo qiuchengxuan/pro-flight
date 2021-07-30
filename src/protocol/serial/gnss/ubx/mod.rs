@@ -168,6 +168,10 @@ impl<'a> serial::Receiver for UBX<'a> {
             bytes = &bytes[1..];
         }
     }
+
+    fn reset(&mut self) {
+        self.state = State::WaitHeader0;
+    }
 }
 
 mod test {
