@@ -8,14 +8,14 @@ use stm32f4xx_hal::{
 };
 
 pub struct UsartPeripheral<RX> {
-    index: usize,
-    address: usize,
+    name: &'static str,
     rx: RX,
+    address: usize,
 }
 
 impl<RX> core::fmt::Display for UsartPeripheral<RX> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "USART{}", self.index)
+        write!(f, "{}", self.name.split("::").last().unwrap())
     }
 }
 
@@ -59,7 +59,8 @@ macro_rules! dma_usart {
         impl<PINS: Pins<$type>> IntoDMA<Rx<$type>> for Serial<$type, PINS> {
             fn into_dma(self) -> UsartPeripheral<Rx<$type>> {
                 let (tx, rx) = self.split();
-                UsartPeripheral { index: $index, address: tx.address() as usize, rx: rx }
+                let name = core::any::type_name::<$type>();
+                UsartPeripheral { name, rx, address: tx.address() as usize }
             }
         }
     };

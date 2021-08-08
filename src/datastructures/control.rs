@@ -23,7 +23,7 @@ impl FromStr for ControlType {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, Serialize)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Control {
     pub throttle: u16,
     pub roll: i16,

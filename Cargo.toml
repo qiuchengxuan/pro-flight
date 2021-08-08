@@ -40,6 +40,7 @@ name = "pro_flight"
 [features]
 sleep-ms = []
 sleep-us = []
+std = ["serde/std"]
 default-config = []
 default = []
 

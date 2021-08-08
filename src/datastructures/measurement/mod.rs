@@ -1,3 +1,4 @@
+use core::fmt;
 use core::ops;
 
 use fixed_point::{fixed_point, FixedPoint};
@@ -170,6 +171,39 @@ impl serde::Serialize for Measurement {
     }
 }
 
+struct MeasurementVisitor {}
+
+impl<'de> serde::de::Visitor<'de> for MeasurementVisitor {
+    type Value = Measurement;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Measurement")
+    }
+
+    fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+    where
+        M: serde::de::MapAccess<'de>,
+    {
+        let mut measurement = Measurement { sensitive: u16::MAX, ..Default::default() };
+        while let Some((key, value)) = access.next_entry::<&str, f32>()? {
+            let value = (value * u16::MAX as f32) as i32;
+            match key {
+                "x" => measurement.axes.x = value,
+                "y" => measurement.axes.y = value,
+                "z" => measurement.axes.z = value,
+                _ => continue,
+            }
+        }
+        Ok(measurement)
+    }
+}
+
+impl<'d> serde::Deserialize<'d> for Measurement {
+    fn deserialize<D: serde::Deserializer<'d>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_map(MeasurementVisitor {})
+    }
+}
+
 pub const GRAVITY: f32 = 9.80665;
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -178,6 +212,12 @@ pub struct Acceleration(pub Measurement);
 impl serde::Serialize for Acceleration {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.serialize(serializer)
+    }
+}
+
+impl<'d> serde::Deserialize<'d> for Acceleration {
+    fn deserialize<D: serde::Deserializer<'d>>(deserializer: D) -> Result<Self, D::Error> {
+        Measurement::deserialize(deserializer).map(|v| Self(v))
     }
 }
 

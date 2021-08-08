@@ -1,4 +1,4 @@
-BOARD := omnibusf4v3
+BOARD := simulator
 GDB := gdb-multiarch
 
 mass-erase := false
@@ -22,6 +22,12 @@ test: submodule
 .PHONY: $(BOARD)
 $(BOARD): submodule
 	@(cd boards/$(BOARD) && cargo build --release --target-dir ../../target)
+
+SIMULATOR := $(PWD)/target/release/simulator
+SIMULATOR_CONFIG := $(PWD)/boards/simulator/rascal.yaml
+.PHONY: jsbsim
+jsbsim: $(BOARD) simulator
+	(cd tests/jsbsim; ./run.py --simulator $(SIMULATOR) --simulator-config $(SIMULATOR_CONFIG))
 
 define TARGET
 	$(shell find target -name $(BOARD) -print -quit)
@@ -61,4 +67,12 @@ clean:
 	(cd boards/$(BOARD); cargo clean --target-dir ../../target)
 	git submodule foreach git clean -dfX
 
-.DEFAULT_GOAL := dfu
+DEFAULT_RULE := $(BOARD).dfu
+ifeq ($(BOARD),simulator)
+	DEFAULT_RULE = $(BOARD)
+endif
+
+.PHONY: default
+default: $(DEFAULT_RULE)
+
+.DEFAULT_GOAL := default

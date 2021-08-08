@@ -6,3 +6,5 @@ Cargo.lock
 target/
 __pycache__
 /*.dfu
+/build
+/tests/jsbsim/rascal_test.xml

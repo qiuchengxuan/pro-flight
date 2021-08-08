@@ -1,7 +1,9 @@
 crcmod
 jsonpath
+lxml
 numpy
 numpy-quaternion
 pexpect-serial
 pyserial
+requests-unixsocket
 xmodem

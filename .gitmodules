@@ -18,3 +18,6 @@
 	path = drone-os/drone-svd
 	url = https://github.com/drone-os/drone-svd.git
 	shallow = true
+[submodule "tests/jsbsim/FlightGear-Rascal"]
+	path = tests/jsbsim/aircraft/rascal
+	url = https://github.com/ThunderFly-aerospace/FlightGear-Rascal.git

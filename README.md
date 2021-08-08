@@ -51,11 +51,13 @@ Progress
   - [x] SBUS Receiver
   - [x] GNSS NMEA Protocol
   - [x] GNSS UBX Protocol
+* misc
+  - [x] Simulator
 
 **WIP**
 
-* misc
-  - [ ] Simulator
+* fight-control
+  - [ ] PID & Stabilizer
 
 **Future**
 
@@ -70,9 +72,7 @@ Progress
   - [ ] Waypoint navigation
 * IMU
   - [ ] INS and setup calibration for more accurate displacement integral
-  - [ ] EKF filter
-* fight-control
-  - [ ] PID & Stabilizer
+  - [ ] Extended kalman filter
 * protocol
   - [ ] Mavlink
 * misc

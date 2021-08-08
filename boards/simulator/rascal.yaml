@@ -1,0 +1,8 @@
+aircraft:
+  configuration: airplane
+imu:
+  mahony:
+    kp: 0.25
+    ki: 0.005
+speedometer:
+  kp: 0.25

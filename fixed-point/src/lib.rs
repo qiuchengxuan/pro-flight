@@ -167,6 +167,8 @@ mod test {
         assert_eq!("1.0", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "0.001".parse().unwrap();
         assert_eq!("0.001", format!("{}", decimal));
+        let decimal: FixedPoint<i32, 3> = "0.0001".parse().unwrap();
+        assert_eq!("0.000", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "-0.1".parse().unwrap();
         assert_eq!("-0.1", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "-1.1".parse().unwrap();
