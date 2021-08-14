@@ -1,3 +1,4 @@
+pub mod imu;
 pub mod lpf;
 pub mod mahony;
 

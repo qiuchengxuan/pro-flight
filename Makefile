@@ -33,6 +33,9 @@ $(BOARD).dfu: $(BOARD)
 	scripts/dfuse-pack.py -b 0x08000000:firmware0.bin -b $(TEXT_ADDRESS):firmware1.bin $(BOARD).dfu
 	rm -f firmware0.bin firmware1.bin
 
+.PHONY: dfu
+dfu: $(BOARD).dfu
+
 .PHONY: test
 test:
 	@cargo test
@@ -42,8 +45,8 @@ clean:
 	(cd boards/$(BOARD); cargo clean --target-dir ../../target)
 	git submodule foreach git clean -dfX
 
-.PHONY: dfu
-dfu: $(BOARD).dfu
+.PHONY: dfu-upload
+dfu-upload: dfu
 ifeq ($(mass-erase),true)
 	$(SUDO) dfu-util -d 0483:df11 -a 0 -s :mass-erase:force:leave -D $(BOARD).dfu
 else

@@ -1,10 +1,9 @@
 use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};
-use crate::config;
+use crate::config::imu::IMU as Config;
 use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
-use crate::datastructures::measurement::{Acceleration, Axes, Course, Gyro, Heading, Magnetism};
-use crate::sync::{AgingDataReader, DataReader};
+use crate::datastructures::measurement::{Acceleration, Axes, Gyro, Heading, Magnetism};
 
 #[derive(PartialEq)]
 pub enum Calibration {
@@ -13,38 +12,23 @@ pub enum Calibration {
     Calibrated,
 }
 
-pub struct IMU<M, H, C> {
-    magnetometer: M,
-    heading: H,
-    course: C,
-    aging: usize,
+pub struct IMU {
     ahrs: Mahony,
     accel_bias: Axes,
     accel_gain: Axes,
     gyro_bias: Axes,
     magnetometer_bias: Axes,
     magnetometer_gain: Axes,
-    calibration_loop: u16,
+    calibration_loop: usize,
     counter: usize,
     calibration: Calibration,
     acceleration: Vector3<f32>,
 }
 
-impl<M, H, C> IMU<M, H, C>
-where
-    M: DataReader<Magnetism>,
-    H: AgingDataReader<Heading>,
-    C: AgingDataReader<Course>,
-{
-    pub fn new(magnetometer: M, heading: H, course: C, sample_rate: u16, aging: usize) -> Self {
-        let config = &config::get().imu;
+impl IMU {
+    pub fn new(sample_rate: usize, config: &Config) -> Self {
         let (kp, ki) = (config.mahony.kp.into(), config.mahony.ki.into());
         Self {
-            magnetometer,
-            heading,
-            course,
-            aging,
-
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             accel_bias: config.accelerometer.bias.into(),
             accel_gain: config.accelerometer.gain.into(),
@@ -87,20 +71,17 @@ where
         }
     }
 
-    pub fn update_imu(&mut self, accel: &Acceleration, gyro: &Gyro) -> bool {
+    pub fn update_imu(
+        &mut self,
+        accel: &Acceleration,
+        gyro: &Gyro,
+        magnetism: Option<Magnetism>,
+        heading: Option<Heading>,
+    ) -> bool {
         if self.calibration != Calibration::Calibrated {
             self.calibrate(gyro);
             return false;
         }
-
-        let heading = if let Some(mag) = self.magnetometer.get_last() {
-            let (bias, gain) = (&self.magnetometer_bias, &self.magnetometer_gain);
-            Some(MagnetismOrHeading::Magnetism(mag.zero(bias).gain(gain).into()))
-        } else {
-            let aging = self.aging;
-            let option = self.heading.get_aging_last(aging).and(self.course.get_aging_last(aging));
-            option.map(|h| MagnetismOrHeading::Heading(h.into()))
-        };
 
         let acceleration = Acceleration(accel.0.zero(&self.accel_bias).gain(&self.accel_gain));
         let raw_gyro = gyro.zero(&self.gyro_bias);
@@ -108,6 +89,13 @@ where
         let acceleration: Vector3<f32> = acceleration.0.into();
         let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
+
+        let heading = if let Some(mag) = magnetism {
+            let m = mag.zero(&self.magnetometer_bias).gain(&self.magnetometer_gain).into();
+            Some(MagnetismOrHeading::Magnetism(m))
+        } else {
+            heading.map(|h| MagnetismOrHeading::Heading(h.into()))
+        };
 
         if self.ahrs.update(&gyro, &acceleration, heading) {
             self.acceleration = self.ahrs.quaternion().transform_vector(&acceleration);

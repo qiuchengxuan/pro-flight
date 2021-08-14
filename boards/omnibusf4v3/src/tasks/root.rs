@@ -40,7 +40,7 @@ use hal::{
 use pro_flight::{
     components::{
         cli::CLI, configuration::make_control_surface, flight_data_hub::FlightDataHUB, logger,
-        mixer::ControlMixer, variometer::Variometer,
+        mixer::ControlMixer, pipeline, variometer::Variometer,
     },
     config::{self, peripherals::serial::Config as SerialConfig},
     protocol::serial,
@@ -64,6 +64,8 @@ use crate::{
     thread::ThrsInit,
     Regs,
 };
+
+const SAMPLE_RATE: usize = 1000;
 
 macro_rules! into_interrupt {
     ($syscfg:ident, $peripherals:ident, $gpio:expr) => {{
@@ -146,7 +148,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let spi = Spi1::new(periph_spi1!(reg), pins, baudrate, mpu6000::SPI_MODE);
     let cs = gpio_a.pa4.into_push_pull_output();
     let mut mpu6000 = MPU6000::new(SpiBus::new(spi, cs, TickDelay {}));
-    match mpu6000.init(1000) {
+    match mpu6000.init(SAMPLE_RATE as u16) {
         Ok(_) => info!("MPU6000 init OK"),
         Err(_) => error!("MPU6000 init failed"),
     }
@@ -154,7 +156,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
     let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
-    mpu6000.set_callback(pro_flight::components::imu_handler(&hub));
+    let mut imu = pipeline::imu::IMU::new(SAMPLE_RATE, &hub);
+    mpu6000.set_callback(move |accel, gyro| {
+        hub.accelerometer.write(accel);
+        hub.gyroscope.write(gyro);
+        imu.invoke();
+    });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
     thread.mpu6000.add_fn(never_complete(move || int.clear_interrupt_pending_bit()));
     thread.mpu6000.add_fn(never_complete(move || mpu6000.trigger()));

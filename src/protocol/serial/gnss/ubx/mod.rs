@@ -179,7 +179,7 @@ mod test {
     fn test_message() {
         use hex_literal::hex;
 
-        use crate::components::flight_data::FlightDataHUB;
+        use crate::components::flight_data_hub::FlightDataHUB;
         use crate::protocol::serial::{
             gnss::{ubx::message::Message, DataSource},
             Receiver,
