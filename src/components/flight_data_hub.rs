@@ -1,9 +1,3 @@
-pub mod aviation;
-pub mod data;
-pub mod misc;
-pub mod navigation;
-pub mod sensor;
-
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
@@ -18,17 +12,19 @@ use crate::datastructures::{
         euler::{Euler, DEGREE_PER_DAG},
         unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
+    flight::{
+        aviation::Aviation,
+        data::FlightData,
+        misc::Misc,
+        navigation::Navigation,
+        sensor::{Sensor, GNSS},
+    }
 };
 use crate::{
     sync::singular::{SingularData, SingularDataSource},
     sync::DataReader,
 };
 
-pub use aviation::Aviation;
-pub use data::FlightData;
-pub use misc::Misc;
-pub use navigation::Navigation;
-pub use sensor::{Sensor, GNSS};
 
 macro_rules! flight_data {
     ($($names:ident : $types:ty),+) => {

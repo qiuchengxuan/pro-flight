@@ -39,7 +39,7 @@ use hal::{
 };
 use pro_flight::{
     components::{
-        cli::CLI, configuration::make_control_surface, flight_data::FlightDataHUB, logger,
+        cli::CLI, configuration::make_control_surface, flight_data_hub::FlightDataHUB, logger,
         mixer::ControlMixer, variometer::Variometer,
     },
     config::{self, peripherals::serial::Config as SerialConfig},

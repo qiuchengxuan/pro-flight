@@ -1,6 +1,6 @@
 pub mod ascii_hud;
 pub mod cli;
-pub mod flight_data;
+pub mod flight_data_hub;
 #[macro_use]
 pub mod logger;
 pub mod configuration;
@@ -10,6 +10,7 @@ pub mod positioning;
 pub mod speedometer;
 pub mod variometer;
 
+use flight_data_hub::FlightDataHUB;
 use imu::IMU;
 use positioning::Positioning;
 use speedometer::Speedometer;
@@ -17,7 +18,7 @@ use speedometer::Speedometer;
 use crate::datastructures::measurement::{Acceleration, Gyro};
 use crate::sync::DataWriter;
 
-pub fn imu_handler<'a>(hub: &'a flight_data::FlightDataHUB) -> impl FnMut(Acceleration, Gyro) + 'a {
+pub fn imu_handler<'a>(hub: &'a FlightDataHUB) -> impl FnMut(Acceleration, Gyro) + 'a {
     let reader = hub.reader();
     let (heading, course) = (reader.gnss_heading, reader.gnss_course);
     let mut imu = IMU::new(reader.magnetometer, heading, course, 1000, 1000 / 10);

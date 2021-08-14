@@ -13,7 +13,7 @@ use max7456::{
 };
 use peripheral_register::Register;
 use pro_flight::{
-    components::{ascii_hud::AsciiHud, flight_data::FlightDataReader},
+    components::{ascii_hud::AsciiHud, flight_data_hub::FlightDataReader},
     config,
     datastructures::Ratio,
     io,

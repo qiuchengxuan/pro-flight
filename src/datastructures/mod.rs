@@ -5,6 +5,7 @@ pub mod fixed_point;
 pub mod input;
 pub mod measurement;
 pub mod waypoint;
+pub mod flight;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Ratio(pub u8, pub u8);

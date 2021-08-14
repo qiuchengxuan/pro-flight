@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use crate::components::flight_data::FlightDataHUB;
+use crate::components::flight_data_hub::FlightDataHUB;
 use crate::config::peripherals::serial::Config;
 
 pub trait Receiver: Send {

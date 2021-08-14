@@ -5,10 +5,11 @@ use ascii_osd_hud::symbol::default_symbol_table;
 use ascii_osd_hud::telemetry::{self as hud, Notes, Steerpoint, Telemetry, Unit};
 use ascii_osd_hud::{AspectRatio, PixelRatio};
 
-use crate::components::flight_data::{aviation::Attitude, FlightDataReader};
+use crate::components::flight_data_hub::FlightDataReader;
 use crate::config;
 use crate::datastructures::{
     coordinate::SphericalCoordinate,
+    flight::aviation::Attitude,
     measurement::{
         displacement::DistanceVector,
         unit::{Feet, Knot, Meter, NauticalMile},
