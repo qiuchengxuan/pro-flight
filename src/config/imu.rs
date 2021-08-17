@@ -1,7 +1,8 @@
 use core::fmt::Write;
 use core::str::Split;
 
-use crate::datastructures::fixed_point::FixedPoint;
+use fixed_point::FixedPoint;
+
 use crate::datastructures::measurement::{Axes, Gain};
 
 use super::setter::{Error, Setter, Value};

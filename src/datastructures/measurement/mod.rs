@@ -1,3 +1,4 @@
+use fixed_point::{fixed_point, FixedPoint};
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 
@@ -8,8 +9,6 @@ pub mod distance;
 pub mod euler;
 pub mod rotation;
 pub mod unit;
-
-use crate::datastructures::fixed_point::FixedPoint;
 
 use distance::Distance;
 use unit::CentiMeter;
@@ -45,9 +44,15 @@ pub struct Gain {
     pub z: FixedPoint<u16, 4>,
 }
 
+macro_rules! gain {
+    ($x:literal, $y:literal, $z:literal) => {
+        Gain { x: fixed_point!($x, 4u16), y: fixed_point!($y, 4u16), z: fixed_point!($z, 4u16) }
+    };
+}
+
 impl Default for Gain {
     fn default() -> Self {
-        Self { x: FixedPoint(1_0000), y: FixedPoint(1_0000), z: FixedPoint(1_0000) }
+        gain!(1.0, 1.0, 1.0)
     }
 }
 
@@ -167,14 +172,10 @@ mod test {
     #[test]
     fn test_gain() {
         use super::{Axes, Gain, Measurement};
-        use crate::datastructures::fixed_point::FixedPoint;
+        use fixed_point::{fixed_point, FixedPoint};
 
         let measurement = Measurement { axes: Axes { x: 100, y: 200, z: 300 }, sensitive: 0 };
-        let measurement = measurement.gain(&Gain {
-            x: FixedPoint(1_0100),
-            y: FixedPoint(1_0200),
-            z: FixedPoint(1_0300),
-        });
+        let measurement = measurement.gain(&gain!(1.01, 1.02, 1.03));
         assert_eq!(measurement.axes, Axes { x: 101, y: 204, z: 309 });
     }
 }

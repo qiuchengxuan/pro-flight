@@ -13,7 +13,8 @@ use core::mem;
 use core::slice;
 use core::str::Split;
 
-use crate::datastructures::fixed_point::FixedPoint;
+use fixed_point::{fixed_point, FixedPoint};
+
 use crate::datastructures::measurement::{Axes, Gain};
 use crate::io::Read;
 pub use aircraft::Aircraft;
@@ -56,7 +57,7 @@ impl ToYAML for Axes {
 impl Setter for Gain {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or(FixedPoint(1_0000));
+        let value = value.parse()?.unwrap_or(fixed_point!(1.0, 4u16));
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
@@ -78,7 +79,7 @@ impl ToYAML for Gain {
     }
 }
 
-const DEFAULT_KP: FixedPoint<u16, 3> = FixedPoint(0_250);
+const DEFAULT_KP: FixedPoint<u16, 3> = fixed_point!(0.25, 3u16);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Speedometer {

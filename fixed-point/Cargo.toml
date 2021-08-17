@@ -1,0 +1,13 @@
+[package]
+name = "fixed-point"
+version = "1.0.0"
+authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+fixed-point-macro = { path = "../fixed-point-macro" }
+num-traits = { version = "0.2", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+[lib]
+name = "fixed_point"

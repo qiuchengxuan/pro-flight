@@ -5,10 +5,10 @@ use core::mem::size_of;
 use core::mem::transmute;
 
 use chrono::naive::NaiveDateTime;
+use fixed_point::FixedPoint;
 
 use crate::datastructures::{
     coordinate::Position,
-    fixed_point::FixedPoint,
     measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
 };
 use crate::protocol::serial;

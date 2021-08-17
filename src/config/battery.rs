@@ -1,14 +1,14 @@
 use core::fmt::Write;
 use core::str::Split;
 
-use crate::datastructures::fixed_point::FixedPoint;
+use fixed_point::{fixed_point, FixedPoint};
 
 use super::setter::{Error, Setter, Value};
 use super::yaml::ToYAML;
 
-const DEFAULT_MIN_CELL_VOLTAGE: FixedPoint<i32, 3> = FixedPoint(3_300);
-const DEFAULT_MAX_CELL_VOLTAGE: FixedPoint<i32, 3> = FixedPoint(4_200);
-const DEFAULT_WARNING_CELL_VOLTAGE: FixedPoint<i32, 3> = FixedPoint(3_500);
+const DEFAULT_MIN_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(3.3, 3i32);
+const DEFAULT_MAX_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(4.2, 3i32);
+const DEFAULT_WARNING_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(3.5, 3i32);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Battery {

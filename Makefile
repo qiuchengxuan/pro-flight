@@ -15,6 +15,10 @@ endif
 submodule:
 	@git submodule update --init --recursive
 
+.PHONY: test
+test: submodule
+	@cargo test
+
 .PHONY: $(BOARD)
 $(BOARD): submodule
 	@(cd boards/$(BOARD) && cargo build --release --target-dir ../../target)
@@ -36,17 +40,8 @@ $(BOARD).dfu: $(BOARD)
 .PHONY: dfu
 dfu: $(BOARD).dfu
 
-.PHONY: test
-test:
-	@cargo test
-
-.PHONY: clean
-clean:
-	(cd boards/$(BOARD); cargo clean --target-dir ../../target)
-	git submodule foreach git clean -dfX
-
-.PHONY: dfu-upload
-dfu-upload: dfu
+.PHONY: dfu-program
+dfu-program: $(BOARD).dfu
 ifeq ($(mass-erase),true)
 	$(SUDO) dfu-util -d 0483:df11 -a 0 -s :mass-erase:force:leave -D $(BOARD).dfu
 else
@@ -60,5 +55,10 @@ gdb:
 .PHONY: bloat
 bloat:
 	@(cd boards/$(BOARD); cargo bloat --release -n 10)
+
+.PHONY: clean
+clean:
+	(cd boards/$(BOARD); cargo clean --target-dir ../../target)
+	git submodule foreach git clean -dfX
 
 .DEFAULT_GOAL := $(BOARD)

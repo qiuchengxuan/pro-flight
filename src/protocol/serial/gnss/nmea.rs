@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
+use fixed_point::FixedPoint;
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 use nmea0183::{
@@ -12,7 +13,6 @@ use nmea0183::{
 
 use crate::datastructures::{
     coordinate::{latitude, longitude, Position},
-    fixed_point::FixedPoint,
     measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
 };
 use crate::protocol::serial;
@@ -41,10 +41,8 @@ impl Into<latitude::Latitude> for Latitude {
     }
 }
 
-impl From<nmea0183::types::IntegerDecimal> for FixedPoint<i32, 1> {
-    fn from(decimal: nmea0183::types::IntegerDecimal) -> Self {
-        Self(decimal.0)
-    }
+fn to_fixed_point(decimal: nmea0183::types::IntegerDecimal) -> FixedPoint<i32, 1> {
+    FixedPoint(decimal.0)
 }
 
 pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
@@ -90,10 +88,10 @@ impl<'a> NMEA<'a> {
 
         let course_valid = rmc.speed.integer() > 0;
         if course_valid {
-            self.course.write(rmc.course.into());
+            self.course.write(to_fixed_point(rmc.course));
         }
         if let Some(heading) = rmc.heading {
-            self.heading.write(heading.into());
+            self.heading.write(to_fixed_point(heading));
         }
 
         let course: f32 = rmc.course.into();

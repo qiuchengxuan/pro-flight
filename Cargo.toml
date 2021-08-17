@@ -1,3 +1,7 @@
+[workspace]
+members = ["fixed-point"]
+exclude = ["drone-os", "boards"]
+
 [package]
 name = "pro-flight"
 version = "0.1.0"
@@ -12,6 +16,7 @@ chrono = { version = "0.4", default-features = false }
 crc16 = { version = "0.4", default-features = false }
 drone-core = { path = "drone-os/drone-core" }
 embedded-hal = "0.2"
+fixed-point = { path = "fixed-point" }
 git-version = "0.3.4"
 hal = { path = "hal" }
 heapless = "0.6"

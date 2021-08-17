@@ -54,10 +54,11 @@ mod test {
     fn test_serialize_gnss() {
         use std::str::FromStr;
 
+        use fixed_point::FixedPoint;
         use serde_json::json;
 
         use super::GNSS;
-        use crate::datastructures::{fixed_point::FixedPoint, measurement::Course};
+        use crate::datastructures::measurement::Course;
 
         let gnss = GNSS { fixed: false, course: Course::from_str("1.1").unwrap() };
         assert_eq!(json!({"fixed": false}), serde_json::to_value(&gnss).unwrap());

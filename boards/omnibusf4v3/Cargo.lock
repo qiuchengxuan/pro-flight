@@ -565,6 +565,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixed-point"
+version = "1.0.0"
+dependencies = [
+ "fixed-point-macro",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "fixed-point-macro"
+version = "1.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -977,6 +995,7 @@ dependencies = [
  "crc16",
  "drone-core",
  "embedded-hal",
+ "fixed-point",
  "git-version",
  "hal",
  "heapless",

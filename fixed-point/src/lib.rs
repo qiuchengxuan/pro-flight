@@ -1,6 +1,9 @@
-// TODO: Replace with public fixed-point crate
+#![cfg_attr(not(test), no_std)]
+
+pub use fixed_point_macro::fixed_point;
+
 use core::fmt::Display;
-use core::ops::{Div, Rem};
+use core::ops::{Add, Div, Mul, Rem};
 use core::str::FromStr;
 use num_traits::pow::Pow;
 
@@ -14,6 +17,15 @@ impl<T, const D: usize> FixedPoint<T, D> {
 
     pub fn exp(self) -> usize {
         10_usize.pow(D as u32)
+    }
+}
+
+impl<T, const D: usize> FixedPoint<T, D>
+where
+    T: From<u8> + Pow<u32, Output = T> + Mul<Output = T> + Add<Output = T>,
+{
+    pub fn new(integer: T, decimal: T) -> Self {
+        Self(integer * T::from(10).pow(D as u32) + decimal)
     }
 }
 
@@ -146,5 +158,25 @@ mod test {
         assert_eq!("1.0", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "0.001".parse().unwrap();
         assert_eq!("0.001", format!("{}", decimal));
+    }
+
+    #[test]
+    fn test_fixed_point_macro() {
+        use fixed_point_macro::fixed_point;
+
+        use super::FixedPoint;
+
+        let decimal = fixed_point!(0.0, 2u16);
+        assert_eq!("0.0", format!("{}", decimal));
+        let decimal = fixed_point!(0.1, 2u16);
+        assert_eq!("0.1", format!("{}", decimal));
+        let decimal = fixed_point!(0.11, 2u16);
+        assert_eq!("0.11", format!("{}", decimal));
+        let decimal = fixed_point!(1.0, 2u16);
+        assert_eq!("1.0", format!("{}", decimal));
+        let decimal = fixed_point!(1.01, 2u16);
+        assert_eq!("1.01", format!("{}", decimal));
+        let decimal = fixed_point!(1.10, 2u16);
+        assert_eq!("1.1", format!("{}", decimal));
     }
 }
