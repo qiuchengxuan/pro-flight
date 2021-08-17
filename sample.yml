@@ -14,9 +14,9 @@ imu:
       y: 22
       z: -713
     gain:
-      x: 8222
-      y: 8142
-      z: 8188
+      x: 1.0036
+      y: 0.9938
+      z: 0.9995
     sensitive: 2.0
   magnetometer:
     bias:
@@ -24,9 +24,9 @@ imu:
       y: 289
       z: -33
     gain:
-      x: 3058
-      y: 3000
-      z: 3443
+      x: 1.0193
+      y: 1.0
+      z: 1.1476
     declination: 5.8
   mahony:
     kp: 0.25

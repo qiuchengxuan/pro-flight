@@ -40,20 +40,14 @@ pub type Course = FixedPoint<i32, 1>;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Gain {
-    pub x: u16,
-    pub y: u16,
-    pub z: u16,
+    pub x: FixedPoint<u16, 4>,
+    pub y: FixedPoint<u16, 4>,
+    pub z: FixedPoint<u16, 4>,
 }
 
 impl Default for Gain {
     fn default() -> Self {
-        Self { x: u16::MAX / 2, y: u16::MAX / 2, z: u16::MAX / 2 }
-    }
-}
-
-impl Into<Axes> for Gain {
-    fn into(self) -> Axes {
-        Axes { x: self.x as i32, y: self.y as i32, z: self.z as i32 }
+        Self { x: FixedPoint(1_0000), y: FixedPoint(1_0000), z: FixedPoint(1_0000) }
     }
 }
 
@@ -68,8 +62,15 @@ impl Measurement {
         Self { axes: self.axes - axes, sensitive: self.sensitive }
     }
 
-    pub fn gain(self, gain: &Axes) -> Self {
-        return Self { axes: self.axes * gain / self.sensitive, sensitive: self.sensitive };
+    pub fn gain(self, gain: &Gain) -> Self {
+        Self {
+            axes: Axes {
+                x: self.axes.x * gain.x.0 as i32 / gain.x.exp() as i32,
+                y: self.axes.y * gain.y.0 as i32 / gain.y.exp() as i32,
+                z: self.axes.z * gain.z.0 as i32 / gain.z.exp() as i32,
+            },
+            sensitive: self.sensitive,
+        }
     }
 
     pub fn rotate(self, rotation: Rotation) -> Self {
@@ -161,5 +162,19 @@ mod test {
 
         let meter = Velocity::new(1800, FTpM);
         assert_eq!(meter.to_unit(Meter), Velocity::new(9, Meter));
+    }
+
+    #[test]
+    fn test_gain() {
+        use super::{Axes, Gain, Measurement};
+        use crate::datastructures::fixed_point::FixedPoint;
+
+        let measurement = Measurement { axes: Axes { x: 100, y: 200, z: 300 }, sensitive: 0 };
+        let measurement = measurement.gain(&Gain {
+            x: FixedPoint(1_0100),
+            y: FixedPoint(1_0200),
+            z: FixedPoint(1_0300),
+        });
+        assert_eq!(measurement.axes, Axes { x: 101, y: 204, z: 309 });
     }
 }

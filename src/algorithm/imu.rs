@@ -3,7 +3,7 @@ use nalgebra::{UnitQuaternion, Vector3};
 use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};
 use crate::config::imu::IMU as Config;
 use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
-use crate::datastructures::measurement::{Acceleration, Axes, Gyro, Heading, Magnetism};
+use crate::datastructures::measurement::{Acceleration, Axes, Gain, Gyro, Heading, Magnetism};
 
 #[derive(PartialEq)]
 pub enum Calibration {
@@ -15,10 +15,10 @@ pub enum Calibration {
 pub struct IMU {
     ahrs: Mahony,
     accel_bias: Axes,
-    accel_gain: Axes,
+    accel_gain: Gain,
     gyro_bias: Axes,
     magnetometer_bias: Axes,
-    magnetometer_gain: Axes,
+    magnetometer_gain: Gain,
     calibration_loop: usize,
     counter: usize,
     calibration: Calibration,
@@ -31,10 +31,10 @@ impl IMU {
         Self {
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             accel_bias: config.accelerometer.bias.into(),
-            accel_gain: config.accelerometer.gain.into(),
+            accel_gain: config.accelerometer.gain,
             gyro_bias: Default::default(),
             magnetometer_bias: config.magnetometer.bias.into(),
-            magnetometer_gain: config.magnetometer.gain.into(),
+            magnetometer_gain: config.magnetometer.gain,
             calibration_loop: sample_rate,
             counter: 0,
             calibration: Calibration::Calibrating,

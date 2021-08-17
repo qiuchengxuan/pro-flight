@@ -56,7 +56,7 @@ impl ToYAML for Axes {
 impl Setter for Gain {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or_default();
+        let value = value.parse()?.unwrap_or(FixedPoint(1_0000));
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
@@ -69,8 +69,12 @@ impl Setter for Gain {
 
 impl ToYAML for Gain {
     fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        let axes: Axes = (*self).into();
-        axes.write_to(indent, w)
+        self.write_indent(indent, w)?;
+        writeln!(w, "x: {}", self.x)?;
+        self.write_indent(indent, w)?;
+        writeln!(w, "y: {}", self.y)?;
+        self.write_indent(indent, w)?;
+        writeln!(w, "z: {}", self.z)
     }
 }
 
