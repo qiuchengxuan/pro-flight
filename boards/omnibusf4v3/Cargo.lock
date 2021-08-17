@@ -987,6 +987,7 @@ dependencies = [
  "nalgebra",
  "nb 1.0.0",
  "nmea0183-core",
+ "num-traits",
  "sbus-parser",
  "serde",
  "serde-json-core-fmt",
