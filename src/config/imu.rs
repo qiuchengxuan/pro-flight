@@ -8,11 +8,13 @@ use crate::datastructures::measurement::{Axes, Gain};
 use super::setter::{Error, Setter, Value};
 use super::yaml::ToYAML;
 
+pub type Sensitive = FixedPoint<i32, 2>; // LSB/unit
+
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct Accelerometer {
     pub bias: Axes,
     pub gain: Gain,
-    pub sensitive: FixedPoint<i32, 1>,
+    pub sensitive: Sensitive,
 }
 
 impl Setter for Accelerometer {

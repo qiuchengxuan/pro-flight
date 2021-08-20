@@ -75,14 +75,8 @@ mod test {
         use super::Sensor;
 
         let expected = json!({
-            "acceleration": {
-                "axes": {"x": 0, "y": 0, "z": 0},
-                "sensitive": 2147483647,
-            },
-            "gyro": {
-                "axes": {"x": 0, "y": 0, "z": 0},
-                "sensitive": 2147483647,
-            },
+            "acceleration": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "gyro": {"x": 0.0, "y": 0.0, "z": 0.0},
             "magnetism": null,
             "gnss": null,
         });

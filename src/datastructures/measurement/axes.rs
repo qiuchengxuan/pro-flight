@@ -1,6 +1,6 @@
 use super::rotation::Rotation;
 
-#[derive(Copy, Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
 pub struct Axes {
     pub x: i32,
     pub y: i32,

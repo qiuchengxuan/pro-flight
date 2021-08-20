@@ -12,13 +12,17 @@ pub enum Calibration {
     Calibrated,
 }
 
+#[derive(Default)]
+struct Sensor {
+    bias: Axes,
+    gain: Gain,
+}
+
 pub struct IMU {
     ahrs: Mahony,
-    accel_bias: Axes,
-    accel_gain: Gain,
-    gyro_bias: Axes,
-    magnetometer_bias: Axes,
-    magnetometer_gain: Gain,
+    accelerometer: Sensor,
+    gyroscope: Sensor,
+    magnetometer: Sensor,
     calibration_loop: usize,
     counter: usize,
     calibration: Calibration,
@@ -30,11 +34,15 @@ impl IMU {
         let (kp, ki) = (config.mahony.kp.into(), config.mahony.ki.into());
         Self {
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
-            accel_bias: config.accelerometer.bias.into(),
-            accel_gain: config.accelerometer.gain,
-            gyro_bias: Default::default(),
-            magnetometer_bias: config.magnetometer.bias.into(),
-            magnetometer_gain: config.magnetometer.gain,
+            accelerometer: Sensor {
+                bias: config.accelerometer.bias.into(),
+                gain: config.accelerometer.gain,
+            },
+            gyroscope: Default::default(),
+            magnetometer: Sensor {
+                bias: config.magnetometer.bias.into(),
+                gain: config.magnetometer.gain,
+            },
             calibration_loop: sample_rate,
             counter: 0,
             calibration: Calibration::Calibrating,
@@ -45,7 +53,7 @@ impl IMU {
     fn calibrate(&mut self, gyro: &Gyro) {
         match self.calibration {
             Calibration::Calibrating => {
-                self.gyro_bias = (self.gyro_bias + gyro.axes) / 2;
+                self.gyroscope.bias = (self.gyroscope.bias + gyro.axes) / 2;
                 self.counter += 1;
                 if self.counter >= self.calibration_loop as usize {
                     self.calibration = Calibration::Validating;
@@ -53,9 +61,9 @@ impl IMU {
                 }
             }
             Calibration::Validating => {
-                let delta = gyro.axes - self.gyro_bias;
+                let delta = gyro.axes - self.gyroscope.bias;
                 let (x, y, z) = (delta.x, delta.y, delta.z);
-                let sensitive = gyro.sensitive;
+                let sensitive = gyro.sensitive as i32;
                 if x.abs() > sensitive || y.abs() > sensitive || z.abs() > sensitive {
                     warn!("IMU calibration invalid, restarting...");
                     self.calibration = Calibration::Calibrating;
@@ -73,7 +81,7 @@ impl IMU {
 
     pub fn update_imu(
         &mut self,
-        accel: &Acceleration,
+        acceleration: &Acceleration,
         gyro: &Gyro,
         magnetism: Option<Magnetism>,
         heading: Option<Heading>,
@@ -83,15 +91,16 @@ impl IMU {
             return false;
         }
 
-        let acceleration = Acceleration(accel.0.zero(&self.accel_bias).gain(&self.accel_gain));
-        let raw_gyro = gyro.zero(&self.gyro_bias);
+        let accel = &self.accelerometer;
+        let acceleration = Acceleration(acceleration.0.zero(&accel.bias).gain(&accel.gain));
+        let raw_gyro = gyro.zero(&self.gyroscope.bias);
 
         let acceleration: Vector3<f32> = acceleration.0.into();
         let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
 
         let heading = if let Some(mag) = magnetism {
-            let m = mag.zero(&self.magnetometer_bias).gain(&self.magnetometer_gain).into();
+            let m = mag.zero(&self.magnetometer.bias).gain(&self.magnetometer.gain).into();
             Some(MagnetismOrHeading::Magnetism(m))
         } else {
             heading.map(|h| MagnetismOrHeading::Heading(h.into()))

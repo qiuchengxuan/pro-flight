@@ -1,6 +1,7 @@
 use fixed_point::{fixed_point, FixedPoint};
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
+use serde::ser::SerializeMap;
 
 pub mod axes;
 pub mod battery;
@@ -56,10 +57,22 @@ impl Default for Gain {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Measurement {
     pub axes: Axes,
-    pub sensitive: i32,
+    pub sensitive: u16,
+}
+
+impl serde::Serialize for Measurement {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let (x, y, z) = (self.axes.x as f32, self.axes.y as f32, self.axes.z as f32);
+        let sensitive = self.sensitive as f32;
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("x", &(x / sensitive))?;
+        map.serialize_entry("y", &(y / sensitive))?;
+        map.serialize_entry("z", &(z / sensitive))?;
+        map.end()
+    }
 }
 
 impl Measurement {
@@ -101,7 +114,7 @@ impl Into<Vector3<f32>> for Measurement {
 
 impl Default for Measurement {
     fn default() -> Self {
-        Self { axes: Default::default(), sensitive: i32::MAX }
+        Self { axes: Default::default(), sensitive: u16::MAX }
     }
 }
 
@@ -123,7 +136,7 @@ impl Acceleration {
         let square_sum = x * x + y * y + z * z;
         if square_sum > 0 {
             let g_force = square_sum.integer_sqrt();
-            (g_force * 10 / self.0.sensitive) as u8
+            (g_force * 10 / self.0.sensitive as i32) as u8
         } else {
             0
         }

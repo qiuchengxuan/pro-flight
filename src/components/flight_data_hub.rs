@@ -6,25 +6,24 @@ use core::cmp;
 
 use crate::datastructures::{
     coordinate::{Displacement, Position},
+    flight::{
+        aviation::Aviation,
+        misc::Misc,
+        navigation::Navigation,
+        sensor::{Sensor, GNSS},
+        FlightData,
+    },
     input::{ControlInput, RSSI},
     measurement::{
         battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
         unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
-    flight::{
-        aviation::Aviation,
-        data::FlightData,
-        misc::Misc,
-        navigation::Navigation,
-        sensor::{Sensor, GNSS},
-    }
 };
 use crate::{
     sync::singular::{SingularData, SingularDataSource},
     sync::DataReader,
 };
-
 
 macro_rules! flight_data {
     ($($names:ident : $types:ty),+) => {

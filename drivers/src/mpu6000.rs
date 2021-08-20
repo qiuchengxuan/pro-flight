@@ -13,13 +13,12 @@ use pro_flight::sys::time::TickTimer;
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 pub const NUM_MEASUREMENT_REGS: usize = 14;
 
-fn accelerometer_sensitive() -> AccelerometerSensitive {
-    let imu = config::get().imu;
-    match imu.accelerometer.sensitive.integer() {
-        0..=2 => accelerometer_sensitive!(+/-2g, 16384/LSB),
-        3..=4 => accelerometer_sensitive!(+/-4g, 8192/LSB),
-        5..=8 => accelerometer_sensitive!(+/-8g, 4096/LSB),
-        _ => accelerometer_sensitive!(+/-16g, 2048/LSB),
+fn accelerometer_sensitive(sensitive: config::imu::Sensitive) -> AccelerometerSensitive {
+    match sensitive.integer() {
+        0..=2 => accelerometer_sensitive!(+/-2g, 16384LSB/g),
+        3..=4 => accelerometer_sensitive!(+/-4g, 8192LSB/g),
+        5..=8 => accelerometer_sensitive!(+/-8g, 4096LSB/g),
+        _ => accelerometer_sensitive!(+/-16g, 2048LSB/g),
     }
 }
 
@@ -28,9 +27,12 @@ pub struct Converter {
     gyroscope: GyroSensitive,
 }
 
-impl Default for Converter {
-    fn default() -> Self {
-        Self { accelerometer: accelerometer_sensitive(), gyroscope: GYRO_SENSITIVE }
+impl From<config::imu::IMU> for Converter {
+    fn from(config: config::imu::IMU) -> Self {
+        Self {
+            accelerometer: accelerometer_sensitive(config.accelerometer.sensitive),
+            gyroscope: GYRO_SENSITIVE,
+        }
     }
 }
 
@@ -38,14 +40,14 @@ impl Converter {
     fn convert_acceleration(&self, accel: &mpu6000::Acceleration) -> Measurement {
         let axes = Axes { x: -accel.0 as i32, y: -accel.1 as i32, z: -accel.2 as i32 };
         let sensitive: f32 = self.accelerometer.into();
-        Measurement { axes, sensitive: sensitive as i32 }
+        Measurement { axes, sensitive: sensitive as u16 }
     }
 
     fn convert_gyro(&self, gyro: &mpu6000::Gyro) -> Measurement {
         let axes =
-            Axes { x: (gyro.0 as i32) << 8, y: (gyro.1 as i32) << 8, z: (gyro.2 as i32) << 8 };
+            Axes { x: (gyro.0 as i32) * 10, y: (gyro.1 as i32) * 10, z: (gyro.2 as i32) * 10 };
         let sensitive: f32 = self.gyroscope.into();
-        Measurement { axes, sensitive: (sensitive * 256.0) as i32 }
+        Measurement { axes, sensitive: (sensitive * 10.0) as u16 }
     }
 
     pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> (Acceleration, Measurement) {
@@ -71,7 +73,8 @@ impl<E, BUS: RegAccess<Error = E>> MPU6000Init<E> for MPU6000<BUS> {
         delay.delay_us(15u8);
         self.set_clock_source(ClockSource::PLLGyroZ)?;
         delay.delay_us(15u8);
-        self.set_accelerometer_sensitive(accelerometer_sensitive())?;
+        let config = config::get().imu;
+        self.set_accelerometer_sensitive(accelerometer_sensitive(config.accelerometer.sensitive))?;
         delay.delay_us(15u8);
         self.set_gyro_sensitive(GYRO_SENSITIVE)?;
         delay.delay_us(15u8);
@@ -133,7 +136,7 @@ where
         F: FnMut(Acceleration, Measurement) + Send + 'static,
     {
         let mut cs = unsafe { core::ptr::read(&self.cs as *const _ as *const CS) };
-        let convertor = Converter::default();
+        let convertor = Converter::from(config::get().imu);
         let rotation = config::get().board.rotation;
         self.rx_bd.set_callback(move |result| {
             cs.set_high().ok();
