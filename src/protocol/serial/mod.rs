@@ -19,7 +19,7 @@ pub fn make_receiver<'a>(
     hub: &'a FlightDataHUB,
 ) -> Option<Box<dyn Receiver + 'a>> {
     match config {
-        Config::SBUS(sbus) => Some(Box::new(SBUS::new(&hub.rssi, sbus.fast, &hub.control_input))),
+        Config::SBUS(sbus) => Some(Box::new(SBUS::new(&hub.rssi, sbus.fast, &hub.input))),
         Config::GNSS(gnss) => gnss::make_receiver(gnss, hub),
     }
 }

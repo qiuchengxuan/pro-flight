@@ -26,6 +26,12 @@ impl FromStr for Identifier {
     }
 }
 
+impl Identifier {
+    pub fn equals_str(&self, string: &str) -> bool {
+        Self::from_str(string).map(|v| v == *self).ok().unwrap_or(false)
+    }
+}
+
 impl Into<bool> for Identifier {
     fn into(self) -> bool {
         match self {

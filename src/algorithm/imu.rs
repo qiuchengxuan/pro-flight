@@ -55,7 +55,7 @@ impl IMU {
             Calibration::Calibrating => {
                 self.gyroscope.bias = (self.gyroscope.bias + gyro.axes) / 2;
                 self.counter += 1;
-                if self.counter >= self.calibration_loop as usize {
+                if self.counter >= self.calibration_loop {
                     self.calibration = Calibration::Validating;
                     self.counter = 0;
                 }
@@ -68,7 +68,7 @@ impl IMU {
                     warn!("IMU calibration invalid, restarting...");
                     self.calibration = Calibration::Calibrating;
                     self.counter = 0;
-                } else if self.counter >= self.calibration_loop as usize {
+                } else if self.counter >= self.calibration_loop {
                     info!("IMU calibration finished");
                     self.calibration = Calibration::Calibrated;
                 } else {

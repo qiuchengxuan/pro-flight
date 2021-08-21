@@ -18,7 +18,7 @@ pub struct Peripherals {
 
 impl Peripherals {
     pub fn any(&self) -> bool {
-        self.serials.len() > 0 || self.pwms.len() > 0
+        self.serials.len() > 0 || self.pwms.0.len() > 0
     }
 }
 
@@ -34,7 +34,7 @@ impl Setter for Peripherals {
 
 impl ToYAML for Peripherals {
     fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        if self.serials.len() == 0 && self.pwms.len() == 0 {
+        if self.serials.len() == 0 && self.pwms.0.len() == 0 {
             return Ok(());
         }
         if self.serials.len() > 0 {
@@ -42,7 +42,7 @@ impl ToYAML for Peripherals {
             writeln!(w, "serial:")?;
             self.serials.write_to(indent + 1, w)?;
         }
-        if self.pwms.len() > 0 {
+        if self.pwms.0.len() > 0 {
             self.write_indent(indent, w)?;
             writeln!(w, "pwm:")?;
             self.pwms.write_to(indent + 1, w)?;

@@ -63,18 +63,6 @@ pub struct Measurement {
     pub sensitive: u16,
 }
 
-impl serde::Serialize for Measurement {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let (x, y, z) = (self.axes.x as f32, self.axes.y as f32, self.axes.z as f32);
-        let sensitive = self.sensitive as f32;
-        let mut map = serializer.serialize_map(Some(3))?;
-        map.serialize_entry("x", &(x / sensitive))?;
-        map.serialize_entry("y", &(y / sensitive))?;
-        map.serialize_entry("z", &(z / sensitive))?;
-        map.end()
-    }
-}
-
 impl Measurement {
     pub fn zero(self, axes: &Axes) -> Self {
         Self { axes: self.axes - axes, sensitive: self.sensitive }
@@ -115,6 +103,18 @@ impl Into<Vector3<f32>> for Measurement {
 impl Default for Measurement {
     fn default() -> Self {
         Self { axes: Default::default(), sensitive: u16::MAX }
+    }
+}
+
+impl serde::Serialize for Measurement {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let (x, y, z) = (self.axes.x as f32, self.axes.y as f32, self.axes.z as f32);
+        let sensitive = self.sensitive as f32;
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("x", &(x / sensitive))?;
+        map.serialize_entry("y", &(y / sensitive))?;
+        map.serialize_entry("z", &(z / sensitive))?;
+        map.end()
     }
 }
 

@@ -3,7 +3,7 @@ use core::str::Split;
 
 use heapless::LinearMap;
 
-use crate::datastructures::input::InputType;
+use crate::datastructures::control::ControlType;
 
 use super::setter::{Error, Setter, Value};
 use super::yaml::ToYAML;
@@ -29,7 +29,7 @@ impl Setter for Input {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Inputs(pub LinearMap<InputType, Input, 18>);
+pub struct Inputs(pub LinearMap<ControlType, Input, 18>);
 
 impl Setter for Inputs {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {

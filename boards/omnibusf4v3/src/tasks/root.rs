@@ -39,12 +39,12 @@ use hal::{
 };
 use pro_flight::{
     components::{
-        cli::CLI, configuration::make_control_surface, flight_data_hub::FlightDataHUB, logger,
+        cli::CLI, flight_control::FlightControl, flight_data_hub::FlightDataHUB, logger,
         mixer::ControlMixer, pipeline, variometer::Variometer,
     },
     config::{self, peripherals::serial::Config as SerialConfig},
     protocol::serial,
-    sync::{flag, DataWriter, NoDataSource},
+    sync::{flag, DataWriter},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
@@ -245,9 +245,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
-    let mixer = ControlMixer::new(reader.control_input, NoDataSource::new(), 50);
-    let mut control_surface = make_control_surface(mixer, pwms);
-    thread.servo.add_fn(never_complete(move || control_surface.update()));
+    let mixer = ControlMixer::new(reader.input, 50);
+    let mut flight_control = FlightControl::new(mixer, &hub.output, pwms);
+    thread.servo.add_fn(never_complete(move || flight_control.update()));
 
     let int = make_trigger(thread.servo, periph_exti1!(reg));
     let mut servos = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(20));

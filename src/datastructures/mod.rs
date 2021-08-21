@@ -1,10 +1,14 @@
 use core::str::FromStr;
 
+pub mod control;
 pub mod coordinate;
 pub mod flight;
-pub mod input;
 pub mod measurement;
+pub mod output;
+pub mod vec;
 pub mod waypoint;
+
+pub type RSSI = u16;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Ratio(pub u8, pub u8);

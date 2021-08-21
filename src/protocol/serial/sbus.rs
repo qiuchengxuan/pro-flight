@@ -4,7 +4,8 @@ use embedded_hal::timer::CountDown;
 use sbus_parser::receiver::Receiver;
 
 use crate::config;
-use crate::datastructures::input::{ControlInput, InputType, RSSI};
+use crate::datastructures::control::{Control, ControlType};
+use crate::datastructures::RSSI;
 use crate::protocol::serial;
 use crate::sync::DataWriter;
 use crate::sys::time::TickTimer;
@@ -36,7 +37,7 @@ pub struct SBUS<'a, R, C> {
     control_input: &'a C,
 }
 
-impl<'a, R: DataWriter<RSSI>, C: DataWriter<ControlInput>> SBUS<'a, R, C> {
+impl<'a, R: DataWriter<RSSI>, C: DataWriter<Control>> SBUS<'a, R, C> {
     pub fn new(rssi: &'a R, fast: bool, control_input: &'a C) -> Self {
         let gap = Duration::from_millis(if fast { 10 } else { 20 } - 1);
         Self {
@@ -54,7 +55,7 @@ impl<'a, R: DataWriter<RSSI>, C: DataWriter<ControlInput>> SBUS<'a, R, C> {
 impl<'a, R, C> serial::Receiver for SBUS<'a, R, C>
 where
     R: DataWriter<RSSI> + Sync,
-    C: DataWriter<ControlInput> + Sync,
+    C: DataWriter<Control> + Sync,
 {
     fn receive_size(&self) -> usize {
         1
@@ -79,7 +80,7 @@ where
         self.loss_bitmap_index = (self.loss_bitmap_index + 1) % 100;
 
         let mut counter = 0;
-        let mut input = ControlInput::default();
+        let mut input = Control::default();
         for (id, cfg) in config::get().receiver.inputs.0.iter() {
             let channel = cfg.channel as usize;
             if channel > packet.channels.len() {
@@ -87,10 +88,10 @@ where
             }
             let value = scale(packet.channels[channel], cfg.scale);
             match id {
-                InputType::Throttle => input.throttle = (value as i32 - i16::MIN as i32) as u16,
-                InputType::Roll => input.roll = value,
-                InputType::Pitch => input.pitch = value,
-                InputType::Yaw => input.yaw = value,
+                ControlType::Throttle => input.throttle = (value as i32 - i16::MIN as i32) as u16,
+                ControlType::Roll => input.roll = value,
+                ControlType::Pitch => input.pitch = value,
+                ControlType::Yaw => input.yaw = value,
             }
             counter += 1;
             if counter >= 4 {

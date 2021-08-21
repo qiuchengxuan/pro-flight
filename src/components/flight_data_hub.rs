@@ -5,6 +5,7 @@ use nalgebra::UnitQuaternion;
 use core::cmp;
 
 use crate::datastructures::{
+    control::Control,
     coordinate::{Displacement, Position},
     flight::{
         aviation::Aviation,
@@ -13,12 +14,13 @@ use crate::datastructures::{
         sensor::{Sensor, GNSS},
         FlightData,
     },
-    input::{ControlInput, RSSI},
     measurement::{
         battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
         unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
+    output::Output,
+    RSSI,
 };
 use crate::{
     sync::cell::{Cell, CellReader},
@@ -59,14 +61,16 @@ flight_data! {
     displacement: Displacement<unit::CentiMeter>,
 
     rssi: RSSI,
-    control_input: ControlInput,
+    input: Control,
     magnetometer: Magnetism,
 
     gnss_fixed: bool,
     gnss_heading: Heading,
     gnss_course: Course,
     gnss_position: Position,
-    gnss_velocity: VelocityVector<i32, unit::MMpS>
+    gnss_velocity: VelocityVector<i32, unit::MMpS>,
+
+    output: Output
 }
 
 impl<'a> FlightDataReader<'a> {
@@ -90,7 +94,6 @@ impl<'a> FlightDataReader<'a> {
         let misc = Misc {
             battery: battery / battery_cells as u16,
             displacement: self.displacement.get().unwrap_or_default(),
-            input: self.control_input.get().unwrap_or_default(),
             quaternion: self.imu.get().unwrap_or_default(),
             rssi: self.rssi.get().unwrap_or_default(),
         };
@@ -109,6 +112,9 @@ impl<'a> FlightDataReader<'a> {
             vario: self.vertical_speed.get().unwrap_or_default().to_unit(unit::FTpM).value() as i16,
         };
 
-        FlightData { aviation, navigation, sensor, misc }
+        let input = self.input.get().unwrap_or_default();
+        let output = self.output.get().unwrap_or_default();
+
+        FlightData { aviation, navigation, sensor, misc, input, output }
     }
 }

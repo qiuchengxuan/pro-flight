@@ -2,15 +2,14 @@ use nalgebra::UnitQuaternion;
 use serde::ser::SerializeMap;
 
 use crate::datastructures::{
-    input::{ControlInput, RSSI},
     measurement::{battery::Battery, displacement::DistanceVector, unit},
+    RSSI,
 };
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Misc {
     pub battery: Battery,
     pub displacement: DistanceVector<i32, unit::CentiMeter>,
-    pub input: ControlInput,
     pub quaternion: UnitQuaternion<f32>,
     pub rssi: RSSI,
 }
@@ -20,7 +19,6 @@ impl serde::Serialize for Misc {
         let mut map = serializer.serialize_map(Some(5))?;
         map.serialize_entry("battery", &self.battery)?;
         map.serialize_entry("displacement", &self.displacement)?;
-        map.serialize_entry("input", &self.input)?;
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         map.serialize_entry("quaternion", &value[..])?;
@@ -42,12 +40,6 @@ mod test {
                 "x": 0,
                 "y": 0,
                 "z": 0,
-            },
-            "input": {
-                "throttle": 0,
-                "roll": 0,
-                "pitch": 0,
-                "yaw": 0,
             },
             "quaternion": [0.0, 0.0, 0.0, 1.0],
             "rssi": 0

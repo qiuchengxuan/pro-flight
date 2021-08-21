@@ -3,12 +3,17 @@ pub mod misc;
 pub mod navigation;
 pub mod sensor;
 
+use crate::datastructures::control::Control;
+use crate::datastructures::output::Output;
+
 #[derive(Copy, Clone, Default, Debug, Serialize)]
 pub struct FlightData {
     pub aviation: aviation::Aviation,
     pub navigation: navigation::Navigation,
     pub sensor: sensor::Sensor,
     pub misc: misc::Misc,
+    pub input: Control,
+    pub output: Output,
 }
 
 impl core::fmt::Display for FlightData {
@@ -65,14 +70,17 @@ mod test {
             "misc": {
                 "battery": 0,
                 "displacement": {"x": 0, "y": 0, "z": 0},
-                "input": {
-                    "throttle": 0,
-                    "roll": 0,
-                    "pitch": 0,
-                    "yaw": 0
-                },
                 "quaternion": [0.0, 0.0, 0.0, 1.0],
                 "rssi": 0
+            },
+            "input": {
+                "throttle": 0,
+                "roll": 0,
+                "pitch": 0,
+                "yaw": 0
+            },
+            "output": {
+                "engines": [0],
             }
         });
         let data = FlightData::default();

@@ -21,6 +21,12 @@ impl FromStr for Identifier {
     }
 }
 
+impl Identifier {
+    pub fn equals_str(&self, string: &str) -> bool {
+        Self::from_str(string).map(|v| v == *self).ok().unwrap_or(false)
+    }
+}
+
 impl core::fmt::Display for Identifier {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "PWM{}", self.0 + 1)
@@ -51,24 +57,36 @@ impl Default for Motor {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ServoType {
-    Aileron,
+    AileronLeft,
+    AileronRight,
     Elevator,
-    Rudder,
     ElevonLeft,
     ElevonRight,
+    Rudder,
+    RuddervatorLeft,
+    RuddervatorRight,
 }
 
 impl Into<&str> for ServoType {
     fn into(self) -> &'static str {
         match self {
-            Self::Aileron => "aileron",
+            Self::AileronLeft => "aileron-left",
+            Self::AileronRight => "aileron-right",
             Self::Elevator => "elevator",
-            Self::Rudder => "rudder",
             Self::ElevonLeft => "elevon-left",
             Self::ElevonRight => "elevon-right",
+            Self::Rudder => "rudder",
+            Self::RuddervatorLeft => "ruddervator-left",
+            Self::RuddervatorRight => "ruddervator-right",
         }
+    }
+}
+
+impl serde::Serialize for ServoType {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str((*self).into())
     }
 }
 
@@ -112,11 +130,14 @@ impl Setter for PWM {
             let output_type = value.0.ok_or(Error::ExpectValue)?;
             *self = match output_type {
                 "motor" => Self::Motor(Motor::default()),
-                "aileron" => Self::Servo(Servo::of(ServoType::Aileron)),
+                "aileron-left" => Self::Servo(Servo::of(ServoType::AileronLeft)),
+                "aileron-right" => Self::Servo(Servo::of(ServoType::AileronRight)),
                 "elevator" => Self::Servo(Servo::of(ServoType::Elevator)),
                 "rudder" => Self::Servo(Servo::of(ServoType::Rudder)),
                 "elevon-left" => Self::Servo(Servo::of(ServoType::ElevonLeft)),
                 "elevon-right" => Self::Servo(Servo::of(ServoType::ElevonRight)),
+                "ruddervator-left" => Self::Servo(Servo::of(ServoType::RuddervatorLeft)),
+                "ruddervator-right" => Self::Servo(Servo::of(ServoType::RuddervatorRight)),
                 _ => return Err(Error::UnexpectedValue),
             };
             return Ok(());
@@ -194,10 +215,6 @@ pub struct PWMs(pub LinearMap<Identifier, PWM, 8>);
 impl PWMs {
     pub fn get(&self, name: &str) -> Option<&PWM> {
         Identifier::from_str(name).ok().map(|id| self.0.get(&id)).flatten()
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
     }
 }
 

@@ -70,7 +70,7 @@ peripherals:
       protocol: PWM
       rate: 400
     PWM2:
-      type: aileron
+      type: aileron-right
     PWM3:
       type: elevator
     PWM4:
