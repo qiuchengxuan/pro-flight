@@ -34,7 +34,7 @@ where
     let receive_size = rx.receive_size();
     let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-    debug!("Init {} DMA address at 0x{:x}", usart, address as usize);
+    trace!("Init {} DMA address at 0x{:x}", usart, address as usize);
     rx_bd.set_callback(move |result| match usart.read() {
         Err(nb::Error::Other(Error::Parity)) => rx.reset(),
         Err(nb::Error::Other(Error::Framing)) => {

@@ -61,4 +61,4 @@ clean:
 	(cd boards/$(BOARD); cargo clean --target-dir ../../target)
 	git submodule foreach git clean -dfX
 
-.DEFAULT_GOAL := $(BOARD)
+.DEFAULT_GOAL := dfu

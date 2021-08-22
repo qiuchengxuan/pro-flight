@@ -2,50 +2,18 @@ use core::fmt::{self, Display, Formatter, Write};
 use core::str::from_utf8_unchecked;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use log::{Log, Metadata, Record};
+
 use crate::sys::jiffies;
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum Level {
-    Debug = 0,
-    Info,
-    Warning,
-    Error,
-}
-
-impl Display for Level {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::Debug => write!(f, "DEBUG"),
-            Self::Info => write!(f, "INFO "),
-            Self::Warning => write!(f, "WARN "),
-            Self::Error => write!(f, "ERROR"),
-        }
-    }
-}
-
-impl PartialOrd for Level {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        (*self as usize).partial_cmp(&(*other as usize))
-    }
-}
-
-#[cfg(feature = "log-level-debug")]
-const LEVEL: Level = Level::Debug;
-#[cfg(feature = "log-level-info")]
-const LEVEL: Level = Level::Info;
-#[cfg(feature = "log-level-warning")]
-const LEVEL: Level = Level::Warning;
-#[cfg(feature = "log-level-error")]
-const LEVEL: Level = Level::Error;
-
 #[derive(Default)]
-pub struct Logger {
+pub struct LogBuffer {
     buffer: &'static mut [u8],
     index: AtomicUsize,
     writer_count: AtomicUsize,
 }
 
-impl Write for Logger {
+impl Write for LogBuffer {
     fn write_char(&mut self, c: char) -> fmt::Result {
         let size = self.buffer.len();
         if size == 0 {
@@ -86,7 +54,7 @@ impl Write for Logger {
     }
 }
 
-impl Display for Logger {
+impl Display for LogBuffer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         while self.writer_count.load(Ordering::Relaxed) > 0 {}
         core::sync::atomic::fence(Ordering::Acquire);
@@ -100,84 +68,34 @@ impl Display for Logger {
     }
 }
 
-static mut LOGGER: Logger =
-    Logger { buffer: &mut [], index: AtomicUsize::new(0), writer_count: AtomicUsize::new(0) };
+static mut LOG_BUFFER: LogBuffer =
+    LogBuffer { buffer: &mut [], index: AtomicUsize::new(0), writer_count: AtomicUsize::new(0) };
 
-#[doc(hidden)]
-pub fn __write_log(args: core::fmt::Arguments, level: Level) {
-    if level < LEVEL {
-        return;
+pub struct Logger;
+
+impl Log for Logger {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
     }
-    let logger = unsafe { &mut LOGGER };
-    let jiffies = jiffies::get();
-    let seconds = jiffies.as_secs() as u32;
-    println!("[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), args);
-    writeln!(logger, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), args).ok();
-}
 
-#[doc(hidden)]
-pub fn __write_log_literal(message: &'static str, level: Level) {
-    if level < LEVEL {
-        return;
+    fn log(&self, record: &Record) {
+        let jiffies = jiffies::get();
+        let seconds = jiffies.as_secs() as u32;
+        println!("[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), record.args());
+        let log_buffer = unsafe { &mut LOG_BUFFER };
+        writeln!(log_buffer, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), record.args())
+            .ok();
     }
-    let logger = unsafe { &mut LOGGER };
-    let jiffies = jiffies::get();
-    let seconds = jiffies.as_secs() as u32;
-    println!("[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), message);
-    writeln!(logger, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), message).ok();
+
+    fn flush(&self) {}
 }
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __format_logger_args {
-    ($($args:tt)*) => {
-        format_args!($($args)*)
-    };
-}
-
-#[macro_export]
-macro_rules! log {
-    ($level:path, $fmt:expr) => ({
-        let _ = __format_logger_args!($fmt);
-        $crate::components::logger::__write_log_literal($fmt, $level);
-    });
-    ($level:path, $($arg:tt)+) => {
-        $crate::components::logger::__write_log(__format_logger_args!($($arg)+), $level);
-    };
-}
-
-#[macro_export]
-macro_rules! debug {
-    ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Debug, $($arg)+);
-    };
-}
-
-#[macro_export]
-macro_rules! info {
-    ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Info, $($arg)+);
-    };
-}
-
-#[macro_export]
-macro_rules! warn {
-    ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Warning, $($arg)+);
-    };
-}
-
-#[macro_export]
-macro_rules! error {
-    ($($arg:tt)+) => {
-        log!($crate::components::logger::Level::Error, $($arg)+);
-    };
-}
-
-pub fn get() -> &'static Logger {
-    unsafe { &LOGGER }
+pub fn get() -> &'static LogBuffer {
+    unsafe { &LOG_BUFFER }
 }
 
 pub fn init(buffer: &'static mut [u8]) {
-    unsafe { LOGGER = Logger { buffer, ..Default::default() } }
+    unsafe { LOG_BUFFER = LogBuffer { buffer, ..Default::default() } }
+    log::set_max_level(log::LevelFilter::Trace);
+    log::set_logger(&Logger).ok();
 }

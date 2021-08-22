@@ -22,7 +22,7 @@ use drivers::{
     nvram::NVRAM,
     stm32::{usart, usb_serial, voltage_adc},
 };
-use drone_core::fib::{FiberState, Yielded};
+use drone_core::fib::{FiberState, ThrFiberClosure, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
     dma::*,
@@ -102,7 +102,11 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clocks.hclk() };
     static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
     let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
-    usb_serial::init(&mut thread.otg_fs, bus, board_name());
+    let poll = usb_serial::init(bus, board_name());
+    thread.otg_fs.add_fn(move || {
+        poll();
+        Yielded::<(), ()>(())
+    });
     thread.otg_fs.enable_int();
 
     logger::init(Box::leak(Box::new([0u8; 1024])));
@@ -225,7 +229,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         if let SerialConfig::SBUS(sbus_config) = config {
             if sbus_config.rx_inverted {
                 gpio_c.pc8.into_push_pull_output().set_high().ok();
-                debug!("USART6 rx inverted");
+                trace!("USART6 rx inverted");
             }
         }
         let pins = (gpio_c.pc6.into_alternate_af8(), gpio_c.pc7.into_alternate_af8());

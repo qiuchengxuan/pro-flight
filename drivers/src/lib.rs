@@ -3,10 +3,11 @@
 extern crate alloc;
 extern crate bmp280_core as bmp280;
 extern crate hal;
+#[macro_use]
+extern crate log;
 extern crate max7456 as _;
 #[macro_use]
 extern crate mpu6000 as _;
-#[macro_use]
 extern crate pro_flight;
 
 pub mod barometer;

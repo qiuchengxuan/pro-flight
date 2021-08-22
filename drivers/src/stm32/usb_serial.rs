@@ -2,8 +2,6 @@ use alloc::boxed::Box;
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use drone_core::fib::{ThrFiberClosure, Yielded};
-use drone_core::prelude::*;
 use pro_flight::io::Error;
 use stm32f4xx_hal::{
     otg_fs::{UsbBus, USB},
@@ -29,16 +27,6 @@ unsafe fn poll() {
 }
 
 #[no_mangle]
-fn stdout_write_bytes(bytes: &[u8]) -> usize {
-    let serial_port = match unsafe { SERIAL_PORT.as_mut() } {
-        Some(port) => port,
-        None => return 0,
-    };
-
-    cortex_m::interrupt::free(|_| serial_port.write(bytes).ok().unwrap_or(0))
-}
-
-#[no_mangle]
 fn stdout_flush() {
     if SUSPEND.load(Ordering::Relaxed) {
         return;
@@ -58,44 +46,21 @@ fn stdout_flush() {
 }
 
 #[no_mangle]
-fn drone_log_is_enabled(_port: u8) -> bool {
-    unsafe { SERIAL_PORT.is_some() }
-}
-
-#[no_mangle]
-fn drone_log_flush() {
-    stdout_flush()
-}
-
-#[no_mangle]
-fn drone_log_write_bytes(_port: u8, mut bytes: &[u8]) {
+fn stdout_write_bytes(bytes: &[u8]) -> usize {
     let serial_port = match unsafe { SERIAL_PORT.as_mut() } {
         Some(port) => port,
-        None => return,
+        None => return 0,
     };
 
-    while !SUSPEND.load(Ordering::Relaxed) && bytes.len() > 0 {
-        match cortex_m::interrupt::free(|_| serial_port.write(bytes)) {
-            Ok(size) => bytes = &bytes[size..],
-            Err(UsbError::WouldBlock) => drone_log_flush(),
-            Err(_) => return,
+    let mut written = 0;
+    while !SUSPEND.load(Ordering::Relaxed) && written < bytes.len() {
+        match cortex_m::interrupt::free(|_| serial_port.write(&bytes[written..])) {
+            Ok(size) => written += size,
+            Err(UsbError::WouldBlock) => stdout_flush(),
+            Err(_) => return written,
         }
     }
-}
-
-#[no_mangle]
-fn drone_log_write_u8(port: u8, value: u8) {
-    drone_log_write_bytes(port, &value.to_be_bytes())
-}
-
-#[no_mangle]
-fn drone_log_write_u16(port: u8, value: u16) {
-    drone_log_write_bytes(port, &value.to_be_bytes())
-}
-
-#[no_mangle]
-fn drone_log_write_u32(port: u8, value: u32) {
-    drone_log_write_bytes(port, &value.to_be_bytes())
+    written
 }
 
 #[no_mangle]
@@ -112,7 +77,7 @@ pub fn stdin_read_bytes(buffer: &mut [u8]) -> Result<usize, Error> {
 
 type Allocator = UsbBusAllocator<UsbBus<USB>>;
 
-pub fn init(thread: &mut impl ThrFiberClosure, alloc: Allocator, board_name: &'static str) {
+pub fn init(alloc: Allocator, board_name: &'static str) -> impl Fn() {
     let allocator: &'static mut Allocator = Box::leak(Box::new(alloc));
     let serial_port = SerialPort::new(allocator);
     unsafe { SERIAL_PORT = Some(serial_port) }
@@ -121,9 +86,5 @@ pub fn init(thread: &mut impl ThrFiberClosure, alloc: Allocator, board_name: &'s
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();
     unsafe { USB_DEVICE = MaybeUninit::new(device) }
-
-    thread.add_fn(|| unsafe {
-        poll();
-        Yielded::<(), ()>(())
-    });
+    || unsafe { poll() }
 }

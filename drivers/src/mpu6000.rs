@@ -118,7 +118,7 @@ where
             cs_.set_high().ok();
         });
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-        debug!("Init MPU6000 DMA address at 0x{:x}", address as usize);
+        trace!("Init MPU6000 DMA address at 0x{:x}", address as usize);
         let byte = Register::AccelerometerXHigh as u8 | 0x80;
         let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new([byte]));
         DmaMPU6000 { rx, tx, cs, rx_bd, tx_bd }

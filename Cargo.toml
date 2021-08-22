@@ -21,6 +21,7 @@ hal = { path = "hal" }
 heapless = "0.7"
 indoc = "1.0"
 integer-sqrt = "0.1"
+log = { version = "0.4", default-features = false }
 max7456 = "0.1"
 micromath = "1.0"
 nalgebra = { version = "0.21", default-features = false }
@@ -36,14 +37,10 @@ void = { version = "1", default-features = false }
 name = "pro_flight"
 
 [features]
-log-level-debug = []
-log-level-info = []
-log-level-warning = []
-log-level-error = []
 sleep-ms = []
 sleep-us = []
 default-config = []
-default = ["log-level-info"]
+default = []
 
 [dev-dependencies]
 hex-literal = "0.3"

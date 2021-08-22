@@ -40,7 +40,7 @@ where
 {
     let mut rx_bd = Box::new(BufferDescriptor::<u16, SAMPLE_SIZE>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-    debug!("Init voltage ADC DMA address at 0x{:x}", address as usize);
+    trace!("Init voltage ADC DMA address at 0x{:x}", address as usize);
     let mut voltage_adc = VoltageADC::default();
     rx_bd.set_callback(move |result| handler(voltage_adc.convert(result.into())));
 

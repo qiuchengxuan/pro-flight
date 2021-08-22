@@ -7,6 +7,8 @@ extern crate ascii_osd_hud;
 extern crate crc16;
 extern crate heapless;
 extern crate integer_sqrt;
+#[macro_use]
+extern crate log;
 extern crate micromath;
 extern crate nalgebra;
 extern crate nb;

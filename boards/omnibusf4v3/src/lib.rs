@@ -11,6 +11,8 @@ extern crate chips;
 extern crate drivers;
 extern crate hal;
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate pro_flight;
 
 pub mod pwm;
@@ -77,6 +79,32 @@ fn board_name() -> &'static str {
 #[no_mangle]
 fn reboot() {
     cortex_m::peripheral::SCB::sys_reset()
+}
+
+#[no_mangle]
+fn drone_log_is_enabled(_port: u8) -> bool {
+    false
+}
+
+#[no_mangle]
+fn drone_log_flush() {}
+
+#[no_mangle]
+fn drone_log_write_bytes(_port: u8, _bytes: &[u8]) {}
+
+#[no_mangle]
+fn drone_log_write_u8(port: u8, value: u8) {
+    drone_log_write_bytes(port, &value.to_be_bytes())
+}
+
+#[no_mangle]
+fn drone_log_write_u16(port: u8, value: u16) {
+    drone_log_write_bytes(port, &value.to_be_bytes())
+}
+
+#[no_mangle]
+fn drone_log_write_u32(port: u8, value: u32) {
+    drone_log_write_bytes(port, &value.to_be_bytes())
 }
 
 const DEFAULT_CONFIG: &'static [u8] = core::include_bytes!("../default.config.yaml");

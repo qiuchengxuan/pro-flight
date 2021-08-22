@@ -8,10 +8,9 @@ version = "0.0.1"
 [dependencies]
 bmp280-core = "0.1"
 cortex-m = { version = "0.6", optional = true }
-drone-core = { path = "../drone-os/drone-core" }
-drone-cortexm = { path = "../drone-os/drone-cortexm", optional = true }
 embedded-hal = "0.2"
 hal = { path = "../hal" }
+log = { version = "0.4", default-features = false }
 max7456 = { git = "https://github.com/qiuchengxuan/max7456.git" }
 mpu6000 = { git = "https://github.com/qiuchengxuan/mpu6000.git" }
 nb = "0.1"
@@ -27,7 +26,7 @@ optional = true
 
 [features]
 default = []
-stm32 = ["stm32f4xx-hal", "cortex-m", "drone-cortexm"]
+stm32 = ["stm32f4xx-hal", "cortex-m"]
 
 [lib]
 name = "drivers"
