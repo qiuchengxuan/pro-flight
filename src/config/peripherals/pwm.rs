@@ -2,7 +2,6 @@ use core::cmp;
 use core::fmt::Write;
 use core::str::{FromStr, Split};
 
-use heapless::consts::U8;
 use heapless::LinearMap;
 
 use crate::config::setter::{Error, Setter, Value};
@@ -190,7 +189,7 @@ impl ToYAML for PWM {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct PWMs(pub LinearMap<Identifier, PWM, U8>);
+pub struct PWMs(pub LinearMap<Identifier, PWM, 8>);
 
 impl PWMs {
     pub fn get(&self, name: &str) -> Option<&PWM> {

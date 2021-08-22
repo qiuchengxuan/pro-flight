@@ -1,12 +1,10 @@
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 #[macro_use]
 extern crate alloc;
 extern crate ascii;
 extern crate ascii_osd_hud;
 extern crate crc16;
-#[macro_use]
-extern crate drone_core;
 extern crate heapless;
 extern crate integer_sqrt;
 extern crate micromath;
@@ -17,27 +15,24 @@ extern crate sbus_parser;
 #[macro_use]
 extern crate serde;
 
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+#[cfg(test)]
+#[macro_use]
+extern crate serial_test;
+
+#[macro_use]
+pub mod io;
 #[macro_use]
 pub mod components;
 #[macro_use]
 pub mod datastructures;
 pub mod algorithm;
 pub mod config;
-pub mod io;
 pub mod protocol;
 pub mod sync;
 #[macro_use]
 pub mod sys;
 pub mod sysinfo;
 pub mod task;
-
-#[cfg(test)]
-extern crate std;
-
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-
-#[cfg(test)]
-#[macro_use]
-extern crate serial_test;

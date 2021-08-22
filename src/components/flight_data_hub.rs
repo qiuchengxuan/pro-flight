@@ -21,7 +21,7 @@ use crate::datastructures::{
     },
 };
 use crate::{
-    sync::singular::{SingularData, SingularDataSource},
+    sync::cell::{Cell, CellReader},
     sync::DataReader,
 };
 
@@ -29,12 +29,12 @@ macro_rules! flight_data {
     ($($names:ident : $types:ty),+) => {
         #[derive(Default)]
         pub struct FlightDataHUB {
-            $(pub $names: SingularData<$types>),+
+            $(pub $names: Cell<$types>),+
         }
 
         #[derive(Copy, Clone)]
         pub struct FlightDataReader<'a> {
-            $(pub $names: SingularDataSource<'a, $types>),+,
+            $(pub $names: CellReader<'a, $types>),+,
         }
 
         impl FlightDataHUB {

@@ -17,7 +17,7 @@ use crate::datastructures::{
 };
 use crate::protocol::serial;
 use crate::protocol::serial::gnss::DataSource;
-use crate::sync::singular::SingularData;
+use crate::sync::cell::Cell;
 use crate::sync::DataWriter;
 use crate::sys::time;
 
@@ -54,11 +54,11 @@ pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
 
 pub struct NMEA<'a> {
     parser: Parser,
-    fixed: &'a SingularData<bool>,
-    position: &'a SingularData<Position>,
-    velocity: &'a SingularData<VelocityVector<i32, unit::MMpS>>,
-    heading: &'a SingularData<Heading>,
-    course: &'a SingularData<Course>,
+    fixed: &'a Cell<bool>,
+    position: &'a Cell<Position>,
+    velocity: &'a Cell<VelocityVector<i32, unit::MMpS>>,
+    heading: &'a Cell<Heading>,
+    course: &'a Cell<Course>,
 }
 
 impl<'a> NMEA<'a> {

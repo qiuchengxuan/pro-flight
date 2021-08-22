@@ -42,35 +42,10 @@ impl core::fmt::Display for InputType {
     }
 }
 
-pub type Throttle = i16;
-pub type Roll = i16;
-pub type Pitch = i16;
-pub type Yaw = i16;
-pub enum Flaps {
-    Auto,
-    Half,
-    Full,
-}
-pub enum LandingGear {
-    Up,
-    Down,
-}
-
-#[derive(Copy, Clone, Debug, Serialize)]
+#[derive(Copy, Clone, Debug, Default, Serialize)]
 pub struct ControlInput {
-    pub throttle: Throttle,
-    pub roll: Roll,
-    pub pitch: Pitch,
-    pub yaw: Yaw,
-}
-
-impl Default for ControlInput {
-    fn default() -> Self {
-        Self { throttle: i16::MIN, roll: 0, pitch: 0, yaw: 0 }
-    }
-}
-
-pub struct FixedWingInput {
-    pub flaps: Flaps,
-    pub landing_gear: LandingGear,
+    pub throttle: u16,
+    pub roll: i16,
+    pub pitch: i16,
+    pub yaw: i16,
 }

@@ -11,31 +11,31 @@ use crate::datastructures::{
         unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
 };
-use crate::sync::singular::{SingularData, SingularDataSource};
+use crate::sync::cell::{Cell, CellReader};
 use crate::sync::{AgingDataReader, DataReader, DataWriter};
 
-type VelocityMeter<'a> = SingularDataSource<'a, Velocity<i32, unit::CMpS>>;
-type GNSSSpeedometer<'a> = SingularDataSource<'a, VelocityVector<i32, unit::MMpS>>;
-type Altimeter<'a> = SingularDataSource<'a, Altitude>;
-type GNSS<'a> = SingularDataSource<'a, Position>;
+type VelocityMeter<'a> = CellReader<'a, Velocity<i32, unit::CMpS>>;
+type GNSSSpeedometer<'a> = CellReader<'a, VelocityVector<i32, unit::MMpS>>;
+type Altimeter<'a> = CellReader<'a, Altitude>;
+type GNSS<'a> = CellReader<'a, Position>;
 
 pub struct IMU<'a> {
     aging: usize,
     // input
-    acceleration: SingularDataSource<'a, Acceleration>,
-    gyro: SingularDataSource<'a, Gyro>,
-    magnetometer: SingularDataSource<'a, Magnetism>,
-    heading: SingularDataSource<'a, Heading>,
-    course: SingularDataSource<'a, Course>,
+    acceleration: CellReader<'a, Acceleration>,
+    gyro: CellReader<'a, Gyro>,
+    magnetometer: CellReader<'a, Magnetism>,
+    heading: CellReader<'a, Heading>,
+    course: CellReader<'a, Course>,
     // data process
     imu: imu::IMU,
     speedometer: Speedometer<VelocityMeter<'a>, GNSSSpeedometer<'a>>,
     positioning: Positioning<Altimeter<'a>, GNSS<'a>>,
     // output
-    quaternion: &'a SingularData<UnitQuaternion<f32>>,
-    velocity: &'a SingularData<VelocityVector<f32, unit::MpS>>,
-    position: &'a SingularData<Position>,
-    displacement: &'a SingularData<Displacement<unit::CentiMeter>>,
+    quaternion: &'a Cell<UnitQuaternion<f32>>,
+    velocity: &'a Cell<VelocityVector<f32, unit::MpS>>,
+    position: &'a Cell<Position>,
+    displacement: &'a Cell<Displacement<unit::CentiMeter>>,
 }
 
 impl<'a> IMU<'a> {

@@ -1,4 +1,5 @@
 use core::cell::Cell;
+use core::fmt::{self, Write as _};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 pub trait Read {
@@ -88,4 +89,53 @@ impl Write for Stdout {
         unsafe { stdout_flush() };
         Ok(())
     }
+}
+
+impl fmt::Write for Stdout {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        let mut buffer = [0u8; 2];
+        match self.write(c.encode_utf8(&mut buffer).as_bytes()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error),
+        }
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        match self.write(s.as_bytes()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error),
+        }
+    }
+}
+
+#[doc(hidden)]
+pub fn __write_stdout_literal(fmt: &str) {
+    write!(stdout(), "{}", fmt).ok();
+}
+
+#[doc(hidden)]
+pub fn __write_stdout(args: fmt::Arguments) {
+    write!(stdout(), "{}", args).ok();
+}
+
+#[cfg(not(feature = "std"))]
+#[macro_export]
+macro_rules! print {
+    ($fmt:expr) => {
+        $crate::io::__write_stdout_literal($fmt);
+    };
+    ($($args:tt)+) => {
+        $crate::io::__write_stdout(format_args!($($args)+));
+    };
+}
+
+#[cfg(not(feature = "std"))]
+#[macro_export]
+macro_rules! println {
+    ($fmt:expr) => {
+        print!(concat!($fmt, "\n"));
+    };
+    ($fmt:expr, $($args:tt)+) => {
+        print!(concat!($fmt, "\n"), $($args)+)
+    };
 }

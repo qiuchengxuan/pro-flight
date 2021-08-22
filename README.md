@@ -1,7 +1,7 @@
 pro-flight
 ==========
 
-Flight control software written in rust, aims to provider more convenience for developers
+Flight control software written in rust, aims to provide more convenience for developers
 and better OSD experience for users.
 
 Why pro-flight?
@@ -77,7 +77,7 @@ Progress
   - [ ] Mavlink
 * misc
   - [ ] Camera distortion adaption
-  
+
 Priority map
 ============
 

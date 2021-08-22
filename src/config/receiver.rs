@@ -1,7 +1,6 @@
 use core::fmt::Write;
 use core::str::Split;
 
-use heapless::consts::U18;
 use heapless::LinearMap;
 
 use crate::datastructures::input::InputType;
@@ -30,7 +29,7 @@ impl Setter for Input {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Inputs(pub LinearMap<InputType, Input, U18>);
+pub struct Inputs(pub LinearMap<InputType, Input, 18>);
 
 impl Setter for Inputs {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {

@@ -1,7 +1,6 @@
 use core::fmt::Write;
 use core::str::{FromStr, Split};
 
-use heapless::consts::U8;
 use heapless::LinearMap;
 
 use crate::config::setter::{Error, Setter, Value};
@@ -169,7 +168,7 @@ impl ToYAML for Config {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Serials(LinearMap<Identifier, Config, U8>);
+pub struct Serials(LinearMap<Identifier, Config, 8>);
 
 impl Serials {
     pub fn get(&self, name: &str) -> Option<&Config> {

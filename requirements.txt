@@ -3,5 +3,5 @@ jsonpath
 numpy
 numpy-quaternion
 pexpect-serial
-serial
+pyserial
 xmodem

@@ -1,7 +1,6 @@
-pub fn to_motor_pwm_duty(max_duty: u16, rate: u16, value: i16) -> u16 {
+pub fn to_motor_pwm_duty(max_duty: u16, rate: u16, value: u16) -> u16 {
     let duty_per_ms = max_duty as u32 * rate as u32 / 1000;
-    let throttle = (value as i32 + i16::MAX as i32 + 1) as u32;
-    (duty_per_ms + duty_per_ms * throttle / u16::MAX as u32) as u16
+    (duty_per_ms + duty_per_ms * value as u32 / u16::MAX as u32) as u16
 }
 
 fn angle_to_axis(angle: i8) -> i32 {
@@ -31,9 +30,9 @@ mod test {
         use super::to_motor_pwm_duty;
 
         let max_duty = 20000;
-        assert_eq!(to_motor_pwm_duty(max_duty, 400, -32768), 8000);
-        assert_eq!(to_motor_pwm_duty(max_duty, 400, 0), 12000);
-        assert_eq!(to_motor_pwm_duty(max_duty, 400, 32767), 16000);
+        assert_eq!(to_motor_pwm_duty(max_duty, 400, 0), 8000);
+        assert_eq!(to_motor_pwm_duty(max_duty, 400, u16::MAX / 2), 11999);
+        assert_eq!(to_motor_pwm_duty(max_duty, 400, u16::MAX), 16000);
     }
 
     #[test]

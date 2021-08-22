@@ -66,7 +66,7 @@ mod test {
                 "battery": 0,
                 "displacement": {"x": 0, "y": 0, "z": 0},
                 "input": {
-                    "throttle": -32768,
+                    "throttle": 0,
                     "roll": 0,
                     "pitch": 0,
                     "yaw": 0

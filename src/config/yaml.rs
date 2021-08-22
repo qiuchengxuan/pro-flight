@@ -1,6 +1,5 @@
 use core::fmt::{Result, Write};
 
-use heapless::consts::U80;
 use heapless::String;
 
 use super::setter::{Setter, Value};
@@ -8,7 +7,7 @@ use super::setter::{Setter, Value};
 pub struct YamlParser<'a> {
     doc: core::str::Lines<'a>,
     indent_width: usize,
-    buffer: String<U80>,
+    buffer: String<80>,
 }
 
 impl<'a> YamlParser<'a> {

@@ -137,11 +137,11 @@ macro_rules! __format_logger_args {
 
 #[macro_export]
 macro_rules! log {
-    ($level:expr, $message:expr) => ({
-        let _ = __format_logger_args!($message);
-        $crate::components::logger::__write_log_literal($message, $level);
+    ($level:path, $fmt:expr) => ({
+        let _ = __format_logger_args!($fmt);
+        $crate::components::logger::__write_log_literal($fmt, $level);
     });
-    ($level:expr, $($arg:tt)+) => {
+    ($level:path, $($arg:tt)+) => {
         $crate::components::logger::__write_log(__format_logger_args!($($arg)+), $level);
     };
 }

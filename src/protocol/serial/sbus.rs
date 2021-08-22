@@ -85,11 +85,12 @@ where
             if channel > packet.channels.len() {
                 continue;
             }
+            let value = scale(packet.channels[channel], cfg.scale);
             match id {
-                InputType::Throttle => input.throttle = scale(packet.channels[channel], cfg.scale),
-                InputType::Roll => input.roll = scale(packet.channels[channel], cfg.scale),
-                InputType::Pitch => input.pitch = scale(packet.channels[channel], cfg.scale),
-                InputType::Yaw => input.yaw = scale(packet.channels[channel], cfg.scale),
+                InputType::Throttle => input.throttle = (value as i32 - i16::MIN as i32) as u16,
+                InputType::Roll => input.roll = value,
+                InputType::Pitch => input.pitch = value,
+                InputType::Yaw => input.yaw = value,
             }
             counter += 1;
             if counter >= 4 {

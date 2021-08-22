@@ -80,5 +80,5 @@ pub fn flag() -> (FlagSetter, FlagReceiver) {
     (FlagSetter(v.clone()), FlagReceiver(v))
 }
 
+pub mod cell;
 pub mod overwriting;
-pub mod singular;

@@ -7,14 +7,14 @@ use crate::datastructures::{
     measurement::{unit, Course, Heading, VelocityVector},
 };
 use crate::protocol::serial::Receiver;
-use crate::sync::singular::SingularData;
+use crate::sync::cell::Cell;
 
 pub struct DataSource<'a> {
-    pub fixed: &'a SingularData<bool>,
-    pub position: &'a SingularData<Position>,
-    pub velocity: &'a SingularData<VelocityVector<i32, unit::MMpS>>,
-    pub heading: &'a SingularData<Heading>,
-    pub course: &'a SingularData<Course>,
+    pub fixed: &'a Cell<bool>,
+    pub position: &'a Cell<Position>,
+    pub velocity: &'a Cell<VelocityVector<i32, unit::MMpS>>,
+    pub heading: &'a Cell<Heading>,
+    pub course: &'a Cell<Course>,
 }
 
 pub mod nmea;
