@@ -103,7 +103,7 @@ impl core::fmt::Display for Latitude {
 
 impl serde::Serialize for Latitude {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut string: String<16> = String::new();
+        let mut string = String::<16>::new();
         write!(string, "{}", self).ok();
         serializer.serialize_str(string.as_str())
     }

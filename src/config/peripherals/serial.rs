@@ -2,9 +2,9 @@ use core::fmt::Write;
 use core::str::{FromStr, Split};
 
 use heapless::LinearMap;
+use serde::ser::SerializeMap;
 
 use crate::config::setter::{Error, Setter, Value};
-use crate::config::yaml::ToYAML;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -23,6 +23,17 @@ impl FromStr for Identifier {
             return Ok(Identifier::UART(name[4..].parse().map_err(|_| ())?));
         }
         Err(())
+    }
+}
+
+impl serde::Serialize for Identifier {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = heapless::String::<8>::new();
+        match self {
+            Self::UART(index) => write!(s, "UART{}", index).ok(),
+            Self::USART(index) => write!(s, "USART{}", index).ok(),
+        };
+        serializer.serialize_str(s.as_str())
     }
 }
 
@@ -50,7 +61,7 @@ impl core::fmt::Display for Identifier {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 #[repr(u8)]
 pub enum GNSSProtocol {
     UBX,
@@ -69,16 +80,7 @@ impl FromStr for GNSSProtocol {
     }
 }
 
-impl core::fmt::Display for GNSSProtocol {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match self {
-            Self::UBX => write!(f, "UBX"),
-            Self::NMEA => write!(f, "NMEA"),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct GNSSConfig {
     pub baudrate: u32,
     pub protocol: GNSSProtocol,
@@ -90,7 +92,8 @@ impl Default for GNSSConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct SbusConfig {
     pub fast: bool,
     pub rx_inverted: bool,
@@ -113,7 +116,8 @@ impl SbusConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type")]
 #[repr(u8)]
 pub enum Config {
     GNSS(GNSSConfig),
@@ -149,30 +153,6 @@ impl Setter for Config {
     }
 }
 
-impl ToYAML for Config {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        match self {
-            Self::GNSS(gnss) => {
-                writeln!(w, "type: GNSS")?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "baudrate: {}", gnss.baudrate)?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "protocol: {}", gnss.protocol)
-            }
-            Self::SBUS(sbus) => {
-                writeln!(w, "type: SBUS")?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "fast: {}", sbus.fast)?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "rx-inverted: {}", sbus.rx_inverted)?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "half-duplex: {}", sbus.half_duplex)
-            }
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Serials(LinearMap<Identifier, Config, 8>);
 
@@ -200,15 +180,14 @@ impl Setter for Serials {
     }
 }
 
-impl ToYAML for Serials {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
+impl serde::Serialize for Serials {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
         for (&id, config) in self.0.iter() {
             if id.into() {
-                self.write_indent(indent, w)?;
-                writeln!(w, "{}:", id)?;
-                config.write_to(indent + 1, w)?;
+                map.serialize_entry(&id, config)?;
             }
         }
-        Ok(())
+        map.end()
     }
 }

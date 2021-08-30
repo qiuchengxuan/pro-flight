@@ -29,14 +29,14 @@ impl FromStr for Rotation {
     }
 }
 
-impl core::fmt::Display for Rotation {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl serde::Serialize for Rotation {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let s = match self {
             Self::NoRotation => "0",
             Self::Degree90 => "90",
             Self::Degree180 => "180",
             Self::Degree270 => "270",
         };
-        write!(f, "{}", s)
+        serializer.serialize_str(s)
     }
 }

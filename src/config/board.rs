@@ -1,11 +1,9 @@
-use core::fmt::Write;
 use core::str::Split;
 
 use crate::config::setter::{Error, Setter, Value};
-use crate::config::yaml::ToYAML;
 use crate::datastructures::measurement::Rotation;
 
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
 pub struct Board {
     pub rotation: Rotation,
 }
@@ -17,12 +15,5 @@ impl Setter for Board {
             _ => return Err(Error::MalformedPath),
         }
         Ok(())
-    }
-}
-
-impl ToYAML for Board {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "rotation: {}", self.rotation)
     }
 }

@@ -31,6 +31,7 @@ num-traits = { version = "0.2", default-features = false }
 sbus-parser = { git = "https://github.com/qiuchengxuan/sbus" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-core-fmt = "0.1"
+serde-yaml-core = { git = "https://github.com/qiuchengxuan/serde-yaml-core" }
 void = { version = "1", default-features = false }
 
 [lib]

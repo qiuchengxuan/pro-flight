@@ -1,4 +1,3 @@
-use core::fmt::Write;
 use core::str::Split;
 
 use fixed_point::FixedPoint;
@@ -6,11 +5,10 @@ use fixed_point::FixedPoint;
 use crate::datastructures::measurement::{Axes, Gain};
 
 use super::setter::{Error, Setter, Value};
-use super::yaml::ToYAML;
 
 pub type Sensitive = FixedPoint<i32, 2>; // LSB/unit
 
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
 pub struct Accelerometer {
     pub bias: Axes,
     pub gain: Gain,
@@ -29,22 +27,7 @@ impl Setter for Accelerometer {
     }
 }
 
-impl ToYAML for Accelerometer {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "bias:")?;
-        self.bias.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "gain:")?;
-        self.gain.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "sensitive: {}", self.sensitive)
-    }
-}
-
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Magnetometer {
     pub bias: Axes,
     pub gain: Gain,
@@ -63,25 +46,10 @@ impl Setter for Magnetometer {
     }
 }
 
-impl ToYAML for Magnetometer {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "bias:")?;
-        self.bias.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "gain:")?;
-        self.gain.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "declination: {}", self.declination)
-    }
-}
-
 const DEFAULT_KP: FixedPoint<i32, 3> = FixedPoint(0_250);
 const DEFAULT_KI: FixedPoint<i32, 3> = FixedPoint(0_005);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Mahony {
     pub kp: FixedPoint<i32, 3>,
     pub ki: FixedPoint<i32, 3>,
@@ -104,17 +72,7 @@ impl Setter for Mahony {
     }
 }
 
-impl ToYAML for Mahony {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "kp: {}", self.kp)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "ki: {}", self.ki)
-    }
-}
-
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct IMU {
     pub accelerometer: Accelerometer,
     pub magnetometer: Magnetometer,
@@ -129,21 +87,5 @@ impl Setter for IMU {
             "mahony" => self.mahony.set(path, value),
             _ => return Err(Error::MalformedPath),
         }
-    }
-}
-
-impl ToYAML for IMU {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "accelerometer:")?;
-        self.accelerometer.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "magnetometer:")?;
-        self.magnetometer.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "mahony:")?;
-        self.mahony.write_to(indent + 1, w)
     }
 }

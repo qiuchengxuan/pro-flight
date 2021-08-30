@@ -1,9 +1,6 @@
-use core::fmt::Write;
 use core::str::{FromStr, Split};
 
 use super::setter::{Error, Setter, Value};
-
-use super::yaml::ToYAML;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
@@ -26,17 +23,18 @@ impl FromStr for Configuration {
     }
 }
 
-impl Into<&str> for Configuration {
-    fn into(self) -> &'static str {
-        match self {
+impl serde::Serialize for Configuration {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = match self {
             Self::Airplane => "airplane",
             Self::FlyingWing => "flying-wing",
             Self::VTail => "v-tail",
-        }
+        };
+        serializer.serialize_str(s)
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Aircraft {
     pub configuration: Configuration,
 }
@@ -56,13 +54,5 @@ impl Setter for Aircraft {
             _ => return Err(Error::MalformedPath),
         }
         Ok(())
-    }
-}
-
-impl ToYAML for Aircraft {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        let configuration: &str = self.configuration.into();
-        writeln!(w, "configuration: {}", configuration)
     }
 }

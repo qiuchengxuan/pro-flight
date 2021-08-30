@@ -1,14 +1,13 @@
-use core::fmt::Write;
 use core::str::Split;
 
 use heapless::LinearMap;
+use serde::ser::SerializeMap;
 
 use crate::datastructures::control::ControlType;
 
 use super::setter::{Error, Setter, Value};
-use super::yaml::ToYAML;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Input {
     pub channel: u8,
     pub scale: u8,
@@ -19,7 +18,6 @@ impl Setter for Input {
         match path.next().ok_or(Error::MalformedPath)? {
             "channel" => {
                 self.channel = value.parse()?.ok_or(Error::ExpectValue)?;
-                self.channel = self.channel.wrapping_sub(1)
             }
             "scale" => self.scale = value.parse()?.unwrap_or(100),
             _ => return Err(Error::MalformedPath),
@@ -45,37 +43,19 @@ impl Setter for Inputs {
     }
 }
 
-impl ToYAML for Inputs {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        if self.0.len() == 0 {
-            return writeln!(w, "null");
-        }
-        writeln!(w, "")?;
+impl serde::Serialize for Inputs {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
         for (input_type, config) in self.0.iter() {
-            self.write_indent(indent, w)?;
-            writeln!(w, "{}:", input_type)?;
-            self.write_indent(indent, w)?;
-            writeln!(w, "  channel: {}", config.channel + 1)?;
-            if config.scale != 100 {
-                self.write_indent(indent, w)?;
-                writeln!(w, "  scale: {}", config.scale)?;
-            }
+            map.serialize_entry(input_type, config)?;
         }
-        Ok(())
+        map.end()
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct Receiver {
     pub inputs: Inputs,
-}
-
-impl ToYAML for Receiver {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        write!(w, "inputs:")?;
-        self.inputs.write_to(indent + 1, w)
-    }
 }
 
 impl Setter for Receiver {

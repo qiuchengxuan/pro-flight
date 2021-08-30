@@ -3,9 +3,9 @@ use core::fmt::Write;
 use core::str::{FromStr, Split};
 
 use heapless::LinearMap;
+use serde::ser::SerializeMap;
 
 use crate::config::setter::{Error, Setter, Value};
-use crate::config::yaml::ToYAML;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Identifier(pub u8);
@@ -27,22 +27,35 @@ impl Identifier {
     }
 }
 
-impl core::fmt::Display for Identifier {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "PWM{}", self.0 + 1)
+impl serde::Serialize for Identifier {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = heapless::String::<6>::new();
+        write!(s, "PWM{}", self.0 + 1).ok();
+        serializer.serialize_str(s.as_str())
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub enum Protocol {
     PWM,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Motor {
-    pub protocol: Protocol,
     pub index: u8,
+    pub protocol: Protocol,
     pub rate: u16,
+}
+
+impl serde::Serialize for Motor {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(4))?;
+        map.serialize_entry("type", "motor")?;
+        map.serialize_entry("index", &self.index)?;
+        map.serialize_entry("protocol", &self.protocol)?;
+        map.serialize_entry("rate", &self.rate)?;
+        map.end()
+    }
 }
 
 impl Motor {
@@ -90,8 +103,10 @@ impl serde::Serialize for ServoType {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Servo {
+    #[serde(rename = "type")]
     pub servo_type: ServoType,
     pub min_angle: i8,
     pub max_angle: i8,
@@ -108,7 +123,9 @@ impl Servo {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(untagged)]
 pub enum PWM {
     Motor(Motor),
     Servo(Servo),
@@ -170,45 +187,6 @@ impl Setter for PWM {
     }
 }
 
-impl ToYAML for PWM {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        match self {
-            Self::Motor(motor) => {
-                self.write_indent(indent, w)?;
-                writeln!(w, "type: motor")?;
-                self.write_indent(indent, w)?;
-                writeln!(w, "index: {}", motor.index)?;
-                match motor.protocol {
-                    Protocol::PWM => {
-                        self.write_indent(indent, w)?;
-                        writeln!(w, "protocol: PWM")?;
-                    }
-                }
-                self.write_indent(indent, w)?;
-                writeln!(w, "rate: {}", motor.rate)?;
-            }
-            Self::Servo(servo) => {
-                self.write_indent(indent, w)?;
-                let servo_type: &str = servo.servo_type.into();
-                writeln!(w, "type: {}", servo_type)?;
-                if servo.min_angle != -90 {
-                    self.write_indent(indent, w)?;
-                    writeln!(w, "min-angle: {}", servo.min_angle)?;
-                }
-                if servo.max_angle != 90 {
-                    self.write_indent(indent, w)?;
-                    writeln!(w, "max-angle: {}", servo.max_angle)?;
-                }
-                if servo.reversed {
-                    self.write_indent(indent, w)?;
-                    writeln!(w, "reversed: true")?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PWMs(pub LinearMap<Identifier, PWM, 8>);
 
@@ -218,14 +196,13 @@ impl PWMs {
     }
 }
 
-impl ToYAML for PWMs {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
+impl serde::Serialize for PWMs {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
         for (id, config) in self.0.iter() {
-            self.write_indent(indent, w)?;
-            writeln!(w, "{}:", id)?;
-            config.write_to(indent + 1, w)?;
+            map.serialize_entry(id, config)?;
         }
-        Ok(())
+        map.end()
     }
 }
 

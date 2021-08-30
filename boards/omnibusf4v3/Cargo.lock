@@ -1039,6 +1039,7 @@ dependencies = [
  "sbus-parser",
  "serde",
  "serde-json-core-fmt",
+ "serde-yaml-core",
  "void",
 ]
 
@@ -1225,6 +1226,15 @@ dependencies = [
  "serde",
  "thiserror",
  "xml-rs",
+]
+
+[[package]]
+name = "serde-yaml-core"
+version = "0.1.1"
+source = "git+https://github.com/qiuchengxuan/serde-yaml-core#8f1cf38f2a671c89b7215541aea53253155b601f"
+dependencies = [
+ "ryu",
+ "serde",
 ]
 
 [[package]]

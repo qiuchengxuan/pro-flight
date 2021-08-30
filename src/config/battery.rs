@@ -1,16 +1,15 @@
-use core::fmt::Write;
 use core::str::Split;
 
 use fixed_point::{fixed_point, FixedPoint};
 
 use super::setter::{Error, Setter, Value};
-use super::yaml::ToYAML;
 
 const DEFAULT_MIN_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(3.3, 3i32);
 const DEFAULT_MAX_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(4.2, 3i32);
 const DEFAULT_WARNING_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(3.5, 3i32);
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Battery {
     pub cells: u8,
     pub min_cell_voltage: FixedPoint<i32, 3>,
@@ -45,18 +44,5 @@ impl Setter for Battery {
             _ => return Err(Error::MalformedPath),
         }
         Ok(())
-    }
-}
-
-impl ToYAML for Battery {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "cells: {}", self.cells)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "min-cell-voltage: {}", self.min_cell_voltage)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "max-cell-voltage: {}", self.max_cell_voltage)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "warning-cell-voltage: {}", self.warning_cell_voltage)
     }
 }

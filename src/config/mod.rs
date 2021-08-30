@@ -8,7 +8,6 @@ pub mod receiver;
 pub mod setter;
 pub mod yaml;
 
-use core::fmt::Write;
 use core::mem;
 use core::slice;
 use core::str::Split;
@@ -27,7 +26,7 @@ pub use peripherals::serial::{Config as SerialConfig, Serials};
 pub use peripherals::Peripherals;
 pub use receiver::Receiver;
 use setter::{Error, Setter, Value};
-use yaml::{ToYAML, YamlParser};
+use yaml::YamlParser;
 
 impl Setter for Axes {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
@@ -40,17 +39,6 @@ impl Setter for Axes {
             _ => return Err(Error::MalformedPath),
         }
         Ok(())
-    }
-}
-
-impl ToYAML for Axes {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "x: {}", self.x)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "y: {}", self.y)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "z: {}", self.z)
     }
 }
 
@@ -68,20 +56,9 @@ impl Setter for Gain {
     }
 }
 
-impl ToYAML for Gain {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "x: {}", self.x)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "y: {}", self.y)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "z: {}", self.z)
-    }
-}
-
 const DEFAULT_KP: FixedPoint<u16, 3> = fixed_point!(0.25, 3u16);
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Speedometer {
     pub kp: FixedPoint<u16, 3>,
 }
@@ -102,16 +79,10 @@ impl Setter for Speedometer {
     }
 }
 
-impl ToYAML for Speedometer {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "kp: {}", self.kp)
-    }
-}
-
 #[repr(C, align(4))]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct Config {
+    #[serde(skip)]
     version: u8,
     pub aircraft: Aircraft,
     pub battery: Battery,
@@ -139,47 +110,9 @@ impl Setter for Config {
     }
 }
 
-impl ToYAML for Config {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "aircraft:")?;
-        self.aircraft.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "battery:")?;
-        self.battery.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "board:")?;
-        self.board.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "imu:")?;
-        self.imu.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "osd:")?;
-        self.osd.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "receiver:")?;
-        self.receiver.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "speedometer:")?;
-        self.speedometer.write_to(indent + 1, w)?;
-
-        if self.peripherals.any() {
-            writeln!(w, "peripherals:")?;
-            self.peripherals.write_to(indent + 1, w)?;
-        }
-        Ok(())
-    }
-}
-
 impl core::fmt::Display for Config {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        self.write_to(0, f)
+        serde_yaml_core::to_fmt(f, self)
     }
 }
 
@@ -249,11 +182,12 @@ mod test {
     #[test]
     #[serial]
     fn test_init_config() -> std::io::Result<()> {
+        use std::fmt::Write;
         use std::fs::File;
         use std::io::Read;
         use std::string::{String, ToString};
 
-        use super::yaml::{ToYAML, YamlParser};
+        use super::yaml::YamlParser;
         use super::Config;
 
         let mut file = File::open("sample.yml")?;
@@ -262,7 +196,7 @@ mod test {
         let config: Config = YamlParser::new(yaml_string.as_str()).parse();
 
         let mut buf = String::new();
-        config.write_to(0, &mut buf).ok();
+        writeln!(buf, "{}", config).ok();
         assert_eq!(yaml_string.trim(), buf.to_string().trim());
         Ok(())
     }
@@ -270,12 +204,13 @@ mod test {
     #[test]
     #[serial]
     fn test_binary_decode() -> std::io::Result<()> {
+        use std::fmt::Write;
         use std::fs::File;
         use std::io::Read;
         use std::mem;
         use std::string::String;
 
-        use super::yaml::{ToYAML, YamlParser};
+        use super::yaml::YamlParser;
         use super::Config;
 
         let mut file = File::open("sample.yml")?;
@@ -289,7 +224,7 @@ mod test {
         let config: &Config = unsafe { mem::transmute(&new_bytes) };
 
         let mut buf = String::new();
-        config.write_to(0, &mut buf).ok();
+        writeln!(buf, "{}", config).ok();
         assert_eq!(yaml_string.trim(), buf.to_string().trim());
         Ok(())
     }

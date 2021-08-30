@@ -1,13 +1,12 @@
-use core::fmt::{Display, Formatter, Write};
+use core::fmt::{Display, Formatter};
 use core::str::Split;
 use core::time::Duration;
 
 use crate::datastructures::Ratio;
 
 use super::setter::{Error, Setter, Value};
-use super::yaml::ToYAML;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 #[repr(u8)]
 pub enum Standard {
     PAL,
@@ -57,7 +56,7 @@ impl Into<Ratio> for Standard {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Default, Serialize)]
 pub struct Offset {
     pub horizental: i8,
     pub vertical: i8,
@@ -75,17 +74,8 @@ impl Setter for Offset {
     }
 }
 
-impl ToYAML for Offset {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "horizental: {}", self.horizental)?;
-        self.write_indent(indent, w)?;
-        writeln!(w, "vertical: {}", self.vertical)?;
-        Ok(())
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct OSD {
     pub aspect_ratio: Ratio,
     pub fov: u8,
@@ -117,25 +107,5 @@ impl Setter for OSD {
             _ => return Err(Error::MalformedPath),
         }
         Ok(())
-    }
-}
-
-impl ToYAML for OSD {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> core::fmt::Result {
-        self.write_indent(indent, w)?;
-        writeln!(w, "aspect-ratio: '{}'", self.aspect_ratio)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "fov: {}", self.fov)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "offset:")?;
-        self.offset.write_to(indent + 1, w)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "refresh-rate: {}", self.refresh_rate)?;
-
-        self.write_indent(indent, w)?;
-        writeln!(w, "standard: {}", self.standard)
     }
 }

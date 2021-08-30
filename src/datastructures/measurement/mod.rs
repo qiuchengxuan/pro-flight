@@ -38,7 +38,7 @@ pub type Altitude = Distance<i32, CentiMeter>;
 pub type Heading = FixedPoint<i32, 1>;
 pub type Course = FixedPoint<i32, 1>;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Gain {
     pub x: FixedPoint<u16, 4>,
     pub y: FixedPoint<u16, 4>,

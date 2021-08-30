@@ -1,4 +1,4 @@
-use core::fmt::{Result, Write};
+use core::fmt::Write;
 
 use heapless::String;
 
@@ -126,14 +126,6 @@ impl<'a> YamlParser<'a> {
 
     pub fn new(doc: &'a str) -> Self {
         Self { doc: doc.lines(), indent_width: 2, buffer: String::new() }
-    }
-}
-
-pub trait ToYAML {
-    fn write_to(&self, indent: usize, w: &mut impl Write) -> Result;
-
-    fn write_indent(&self, indent: usize, w: &mut impl Write) -> Result {
-        write!(w, "{:indent$}", "", indent = indent * 2 as usize)
     }
 }
 

@@ -1,6 +1,7 @@
 use core::str::FromStr;
 
-#[derive(Copy, Clone, Eq, Debug, PartialEq)]
+#[derive(Copy, Clone, Eq, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
 #[repr(u8)]
 pub enum ControlType {
     Throttle = 0,
@@ -19,24 +20,6 @@ impl FromStr for ControlType {
             "yaw" => Ok(Self::Yaw),
             _ => Err(()),
         }
-    }
-}
-
-impl Into<&str> for ControlType {
-    fn into(self) -> &'static str {
-        match self {
-            Self::Throttle => "throttle",
-            Self::Roll => "roll",
-            Self::Pitch => "pitch",
-            Self::Yaw => "yaw",
-        }
-    }
-}
-
-impl core::fmt::Display for ControlType {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        let s: &str = (*self).into();
-        write!(f, "{}", s)
     }
 }
 

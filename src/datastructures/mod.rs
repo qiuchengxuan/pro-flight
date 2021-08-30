@@ -1,3 +1,4 @@
+use core::fmt::Write;
 use core::str::FromStr;
 
 pub mod control;
@@ -30,8 +31,10 @@ impl Default for Ratio {
     }
 }
 
-impl core::fmt::Display for Ratio {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{}:{}", self.0, self.1)
+impl serde::Serialize for Ratio {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut string = heapless::String::<7>::new();
+        write!(string, "{}:{}", self.0, self.1).ok();
+        serializer.serialize_str(string.as_str())
     }
 }

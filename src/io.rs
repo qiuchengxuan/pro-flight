@@ -122,10 +122,10 @@ pub fn __write_stdout(args: fmt::Arguments) {
 #[macro_export]
 macro_rules! print {
     ($fmt:expr) => {
-        $crate::io::__write_stdout_literal($fmt);
+        $crate::io::__write_stdout_literal($fmt)
     };
     ($($args:tt)+) => {
-        $crate::io::__write_stdout(format_args!($($args)+));
+        $crate::io::__write_stdout(format_args!($($args)+))
     };
 }
 
@@ -133,7 +133,7 @@ macro_rules! print {
 #[macro_export]
 macro_rules! println {
     ($fmt:expr) => {
-        print!(concat!($fmt, "\n"));
+        print!(concat!($fmt, "\n"))
     };
     ($fmt:expr, $($args:tt)+) => {
         print!(concat!($fmt, "\n"), $($args)+)

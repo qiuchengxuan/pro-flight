@@ -1,6 +1,7 @@
+use core::fmt::Write;
+
 use crate::config;
 use crate::config::setter::{Setter, Value};
-use crate::config::yaml::ToYAML;
 use crate::sys::fs::{File, OpenOptions};
 
 pub fn show() {
@@ -52,7 +53,7 @@ pub fn export(line: &str) {
     };
     let option = OpenOptions { create: true, write: true, truncate: true, ..Default::default() };
     if let Some(mut file) = option.open(path).ok() {
-        config::get().write_to(0, &mut file).ok();
+        write!(&mut file, "{}", config::get()).ok();
         file.close();
     }
 }
