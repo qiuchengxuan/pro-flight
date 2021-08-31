@@ -1,3 +1,5 @@
+use core::ops;
+
 use fixed_point::{fixed_point, FixedPoint};
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
@@ -39,6 +41,25 @@ pub type Heading = FixedPoint<i32, 1>;
 pub type Course = FixedPoint<i32, 1>;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+pub struct Bias {
+    pub x: FixedPoint<i32, 5>,
+    pub y: FixedPoint<i32, 5>,
+    pub z: FixedPoint<i32, 5>,
+}
+
+macro_rules! bias {
+    ($x:literal, $y:literal, $z:literal) => {
+        Bias { x: fixed_point!($x, 5i32), y: fixed_point!($y, 5i32), z: fixed_point!($z, 5i32) }
+    };
+}
+
+impl Default for Bias {
+    fn default() -> Self {
+        bias!(0.0, 0.0, 0.0)
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Gain {
     pub x: FixedPoint<u16, 4>,
     pub y: FixedPoint<u16, 4>,
@@ -64,8 +85,15 @@ pub struct Measurement {
 }
 
 impl Measurement {
-    pub fn zero(self, axes: &Axes) -> Self {
-        Self { axes: self.axes - axes, sensitive: self.sensitive }
+    pub fn zero(self, bias: &Bias) -> Self {
+        Self {
+            axes: Axes {
+                x: self.axes.x + bias.x.0 * self.sensitive as i32 / bias.x.exp() as i32,
+                y: self.axes.y + bias.y.0 * self.sensitive as i32 / bias.y.exp() as i32,
+                z: self.axes.z + bias.z.0 * self.sensitive as i32 / bias.z.exp() as i32,
+            },
+            sensitive: self.sensitive,
+        }
     }
 
     pub fn gain(self, gain: &Gain) -> Self {
@@ -87,6 +115,30 @@ impl Measurement {
 impl PartialOrd for Measurement {
     fn partial_cmp(self: &Self, other: &Self) -> Option<core::cmp::Ordering> {
         self.axes.partial_cmp(&other.axes)
+    }
+}
+
+impl ops::Add for Measurement {
+    type Output = Measurement;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self::Output { axes: self.axes + other.axes, sensitive: other.sensitive }
+    }
+}
+
+impl ops::Sub for Measurement {
+    type Output = Measurement;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self::Output { axes: self.axes - other.axes, sensitive: other.sensitive }
+    }
+}
+
+impl ops::Div<i32> for Measurement {
+    type Output = Measurement;
+
+    fn div(self, div: i32) -> Self::Output {
+        Self::Output { axes: self.axes / div, sensitive: self.sensitive }
     }
 }
 

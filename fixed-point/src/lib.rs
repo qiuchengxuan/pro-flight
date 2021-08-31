@@ -89,8 +89,9 @@ macro_rules! impl_signed_from_str {
         impl<const D: usize> FromStr for FixedPoint<$type, D> {
             type Err = <$type as FromStr>::Err;
             fn from_str(string: &str) -> Result<Self, Self::Err> {
+                let negative = string.chars().next().map(|c| c == '-').unwrap_or(false);
                 let mut splitted = string.split('.');
-                let mut integer = splitted.next().unwrap_or("").parse::<$type>()?;
+                let mut integer = splitted.next().unwrap_or("0").parse::<$type>()?;
                 integer *= (10 as $type).pow(D as u32);
                 let field = match splitted.next() {
                     Some(s) => s,
@@ -98,7 +99,7 @@ macro_rules! impl_signed_from_str {
                 };
                 let decimal_length = core::cmp::min(field.len(), 255);
                 let mut decimal = field.parse::<$type>()?;
-                if integer < 0 {
+                if integer < 0 || negative {
                     decimal = -decimal
                 }
                 if D >= decimal_length {
@@ -114,7 +115,10 @@ macro_rules! impl_signed_from_str {
 
 impl_signed_from_str!(i32);
 
-impl<T: Number + Display + Into<i32>, const D: usize> Display for FixedPoint<T, D> {
+impl<T, const D: usize> Display for FixedPoint<T, D>
+where
+    T: Number + Display + Into<i32> + PartialEq + From<u8> + PartialOrd,
+{
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let mut decimal = self.decimal().into().abs();
         if D == 0 || decimal == 0 {
@@ -125,7 +129,12 @@ impl<T: Number + Display + Into<i32>, const D: usize> Display for FixedPoint<T, 
             decimal = decimal / 10;
             length -= 1;
         }
-        write!(f, "{}.{:0length$}", self.integer(), decimal, length = length)
+        let integer = self.integer();
+        if integer == T::from(0) && self.0 < T::from(0) {
+            write!(f, "-0.{:0length$}", decimal, length = length)
+        } else {
+            write!(f, "{}.{:0length$}", integer, decimal, length = length)
+        }
     }
 }
 
@@ -158,6 +167,10 @@ mod test {
         assert_eq!("1.0", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "0.001".parse().unwrap();
         assert_eq!("0.001", format!("{}", decimal));
+        let decimal: FixedPoint<i32, 3> = "-0.1".parse().unwrap();
+        assert_eq!("-0.1", format!("{}", decimal));
+        let decimal: FixedPoint<i32, 3> = "-1.1".parse().unwrap();
+        assert_eq!("-1.1", format!("{}", decimal));
     }
 
     #[test]
@@ -178,5 +191,9 @@ mod test {
         assert_eq!("1.01", format!("{}", decimal));
         let decimal = fixed_point!(1.10, 2u16);
         assert_eq!("1.1", format!("{}", decimal));
+        let decimal = fixed_point!(-0.1, 2i16);
+        assert_eq!("-0.1", format!("{}", decimal));
+        let decimal = fixed_point!(-1.1, 2i16);
+        assert_eq!("-1.1", format!("{}", decimal));
     }
 }

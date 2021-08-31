@@ -68,7 +68,7 @@ impl<'a> IMU<'a> {
         let magnetism = self.magnetometer.get_last();
         let aging = self.aging;
         let heading = self.heading.get_aging_last(aging).and(self.course.get_aging_last(aging));
-        if self.imu.update_imu(&acceleration, &gyro, magnetism, heading) {
+        if self.imu.update_imu(acceleration, gyro, magnetism, heading) {
             self.quaternion.write(self.imu.quaternion());
             let v = self.speedometer.update(self.imu.acceleration());
             self.velocity.write(v);

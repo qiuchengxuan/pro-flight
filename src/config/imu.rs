@@ -2,7 +2,7 @@ use core::str::Split;
 
 use fixed_point::FixedPoint;
 
-use crate::datastructures::measurement::{Axes, Gain};
+use crate::datastructures::measurement::{Bias, Gain};
 
 use super::setter::{Error, Setter, Value};
 
@@ -10,7 +10,7 @@ pub type Sensitive = FixedPoint<i32, 2>; // LSB/unit
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
 pub struct Accelerometer {
-    pub bias: Axes,
+    pub bias: Bias,
     pub gain: Gain,
     pub sensitive: Sensitive,
 }
@@ -29,7 +29,7 @@ impl Setter for Accelerometer {
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Magnetometer {
-    pub bias: Axes,
+    pub bias: Bias,
     pub gain: Gain,
     pub declination: FixedPoint<i32, 1>,
 }

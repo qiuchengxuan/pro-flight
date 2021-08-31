@@ -24,42 +24,34 @@ impl Axes {
 }
 
 impl core::ops::Add for Axes {
-    type Output = Self;
+    type Output = Axes;
 
-    fn add(self, other: Self) -> Self {
-        Self { x: (self.x + other.x), y: (self.y + other.y), z: (self.z + other.z) }
+    fn add(self, other: Self) -> Self::Output {
+        Self::Output { x: (self.x + other.x), y: (self.y + other.y), z: (self.z + other.z) }
     }
 }
 
-impl core::ops::Sub<Self> for Axes {
-    type Output = Self;
+impl core::ops::Sub for Axes {
+    type Output = Axes;
 
-    fn sub(self, other: Self) -> Self {
-        Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
-    }
-}
-
-impl core::ops::Sub<&Self> for Axes {
-    type Output = Self;
-
-    fn sub(self, other: &Self) -> Self {
-        Self { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
+    fn sub(self, other: Self) -> Self::Output {
+        Self::Output { x: (self.x - other.x), y: (self.y - other.y), z: (self.z - other.z) }
     }
 }
 
 impl core::ops::Div<i32> for Axes {
-    type Output = Self;
+    type Output = Axes;
 
-    fn div(self, div: i32) -> Self {
-        Self { x: self.x / div, y: self.y / div, z: self.z / div }
+    fn div(self, div: i32) -> Self::Output {
+        Self::Output { x: self.x / div, y: self.y / div, z: self.z / div }
     }
 }
 
-impl core::ops::Mul<&Self> for Axes {
-    type Output = Self;
+impl core::ops::Mul for Axes {
+    type Output = Axes;
 
-    fn mul(self, other: &Self) -> Self {
-        Self { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
+    fn mul(self, other: Self) -> Self::Output {
+        Self::Output { x: self.x * other.x, y: self.y * other.y, z: self.z * other.z }
     }
 }
 

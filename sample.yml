@@ -6,13 +6,13 @@ battery:
   max-cell-voltage: 4.2
   warning-cell-voltage: 3.5
 board:
-  rotation: 270
+  rotation: '270'
 imu:
   accelerometer:
     bias:
-      x: -236
-      y: 22
-      z: -713
+      x: -0.0288
+      y: 0.00268
+      z: -0.08703
     gain:
       x: 1.0036
       y: 0.9938
@@ -20,9 +20,9 @@ imu:
     sensitive: 2.0
   magnetometer:
     bias:
-      x: -78
-      y: 289
-      z: -33
+      x: -0.02599
+      y: 0.09633
+      z: -0.01099
     gain:
       x: 1.0193
       y: 1.0
@@ -32,7 +32,7 @@ imu:
     kp: 0.25
     ki: 0.005
 osd:
-  aspect-ratio: 16:9
+  aspect-ratio: '16:9'
   fov: 145
   offset:
     horizental: 8

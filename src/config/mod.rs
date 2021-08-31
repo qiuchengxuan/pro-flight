@@ -14,7 +14,7 @@ use core::str::Split;
 
 use fixed_point::{fixed_point, FixedPoint};
 
-use crate::datastructures::measurement::{Axes, Gain};
+use crate::datastructures::measurement::{Axes, Bias, Gain};
 use crate::io::Read;
 pub use aircraft::Aircraft;
 pub use battery::Battery;
@@ -32,6 +32,20 @@ impl Setter for Axes {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
         let value = value.parse()?.unwrap_or_default();
+        match key {
+            "x" => self.x = value,
+            "y" => self.y = value,
+            "z" => self.z = value,
+            _ => return Err(Error::MalformedPath),
+        }
+        Ok(())
+    }
+}
+
+impl Setter for Bias {
+    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        let key = path.next().ok_or(Error::MalformedPath)?;
+        let value = value.parse()?.unwrap_or(fixed_point!(1.0, 5i32));
         match key {
             "x" => self.x = value,
             "y" => self.y = value,

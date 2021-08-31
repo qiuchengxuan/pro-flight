@@ -3,7 +3,7 @@ use nalgebra::{UnitQuaternion, Vector3};
 use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};
 use crate::config::imu::IMU as Config;
 use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
-use crate::datastructures::measurement::{Acceleration, Axes, Gain, Gyro, Heading, Magnetism};
+use crate::datastructures::measurement::{Acceleration, Bias, Gain, Gyro, Heading, Magnetism};
 
 #[derive(PartialEq)]
 pub enum Calibration {
@@ -14,14 +14,14 @@ pub enum Calibration {
 
 #[derive(Default)]
 struct Sensor {
-    bias: Axes,
+    bias: Bias,
     gain: Gain,
 }
 
 pub struct IMU {
     ahrs: Mahony,
     accelerometer: Sensor,
-    gyroscope: Sensor,
+    gyroscope_bias: Gyro,
     magnetometer: Sensor,
     calibration_loop: usize,
     counter: usize,
@@ -35,14 +35,11 @@ impl IMU {
         Self {
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             accelerometer: Sensor {
-                bias: config.accelerometer.bias.into(),
+                bias: config.accelerometer.bias,
                 gain: config.accelerometer.gain,
             },
-            gyroscope: Default::default(),
-            magnetometer: Sensor {
-                bias: config.magnetometer.bias.into(),
-                gain: config.magnetometer.gain,
-            },
+            gyroscope_bias: Default::default(),
+            magnetometer: Sensor { bias: config.magnetometer.bias, gain: config.magnetometer.gain },
             calibration_loop: sample_rate,
             counter: 0,
             calibration: Calibration::Calibrating,
@@ -50,10 +47,10 @@ impl IMU {
         }
     }
 
-    fn calibrate(&mut self, gyro: &Gyro) {
+    fn calibrate(&mut self, gyro: Gyro) {
         match self.calibration {
             Calibration::Calibrating => {
-                self.gyroscope.bias = (self.gyroscope.bias + gyro.axes) / 2;
+                self.gyroscope_bias = (self.gyroscope_bias + gyro) / 2;
                 self.counter += 1;
                 if self.counter >= self.calibration_loop {
                     self.calibration = Calibration::Validating;
@@ -61,8 +58,8 @@ impl IMU {
                 }
             }
             Calibration::Validating => {
-                let delta = gyro.axes - self.gyroscope.bias;
-                let (x, y, z) = (delta.x, delta.y, delta.z);
+                let delta = gyro - self.gyroscope_bias;
+                let (x, y, z) = (delta.axes.x, delta.axes.y, delta.axes.z);
                 let sensitive = gyro.sensitive as i32;
                 if x.abs() > sensitive || y.abs() > sensitive || z.abs() > sensitive {
                     warn!("IMU calibration invalid, restarting...");
@@ -81,8 +78,8 @@ impl IMU {
 
     pub fn update_imu(
         &mut self,
-        acceleration: &Acceleration,
-        gyro: &Gyro,
+        acceleration: Acceleration,
+        gyro: Gyro,
         magnetism: Option<Magnetism>,
         heading: Option<Heading>,
     ) -> bool {
@@ -93,7 +90,7 @@ impl IMU {
 
         let accel = &self.accelerometer;
         let acceleration = Acceleration(acceleration.0.zero(&accel.bias).gain(&accel.gain));
-        let raw_gyro = gyro.zero(&self.gyroscope.bias);
+        let raw_gyro = gyro - self.gyroscope_bias;
 
         let acceleration: Vector3<f32> = acceleration.0.into();
         let mut gyro: Vector3<f32> = raw_gyro.into();
