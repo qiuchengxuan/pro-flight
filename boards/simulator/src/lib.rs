@@ -2,67 +2,56 @@
 extern crate log;
 extern crate pro_flight;
 
-use pro_flight::components::flight_data_hub::FlightDataHUB;
-use pro_flight::components::mixer::ControlMixer;
-use pro_flight::components::pipeline;
+pub mod simulator;
+
+pub use simulator::Simulator;
+
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use async_std::sync::Mutex;
 use pro_flight::datastructures::control::Control;
-use pro_flight::datastructures::flight::FlightData;
 use pro_flight::datastructures::measurement::{Acceleration, Gyro};
-use pro_flight::sync::DataWriter;
 
 #[no_mangle]
 fn get_jiffies() -> u64 {
     std::time::Instant::now().elapsed().as_nanos() as u64
 }
 
-pub struct Simulator {
-    hub: &'static FlightDataHUB,
-    imu: pipeline::imu::IMU<'static>,
-    mixer: ControlMixer<'static>,
-    acceleration: bool,
-    gyro: bool,
+static SIMULATOR: Mutex<Option<Simulator>> = Mutex::new(None);
+
+#[get("/telemetry")]
+async fn get_telemetry() -> impl Responder {
+    web::Json(SIMULATOR.lock().await.as_ref().unwrap().get_telemetry())
 }
 
-impl Simulator {
-    pub fn new(sample_rate: usize) -> Self {
-        let hub = Box::leak(Box::new(FlightDataHUB::default()));
-        let imu = pipeline::imu::IMU::new(sample_rate, hub);
-        let reader = hub.reader();
-        let mut mixer = ControlMixer::new(reader.input, 50);
-        hub.output.write(mixer.mix());
-        Self { hub, imu, mixer, acceleration: false, gyro: false }
-    }
+#[post("/input")]
+async fn update_input(input: web::Json<Control>) -> impl Responder {
+    SIMULATOR.lock().await.as_mut().unwrap().update_input(*input);
+    HttpResponse::Ok()
+}
 
-    pub fn get_telemetry(&self) -> FlightData {
-        self.hub.reader().read()
-    }
+#[post("/sensors/accelerometer")]
+async fn update_acceleration(acceleration: web::Json<Acceleration>) -> impl Responder {
+    SIMULATOR.lock().await.as_mut().unwrap().update_acceleration(*acceleration);
+    HttpResponse::Ok()
+}
 
-    pub fn update_input(&mut self, input: Control) {
-        self.hub.input.write(input);
-        self.hub.output.write(self.mixer.mix());
-    }
+#[post("/sensors/gyroscope")]
+async fn update_gyro(gyro: web::Json<Gyro>) -> impl Responder {
+    SIMULATOR.lock().await.as_mut().unwrap().update_gyro(*gyro);
+    HttpResponse::Ok()
+}
 
-    pub fn update_acceleration(&mut self, acceleration: Acceleration) {
-        self.hub.accelerometer.write(acceleration);
-        if self.gyro {
-            trace!("Invoke IMU update");
-            self.imu.invoke();
-            self.hub.output.write(self.mixer.mix());
-            self.gyro = false;
-        } else {
-            self.acceleration = true;
-        }
-    }
-
-    pub fn update_gyro(&mut self, gyro: Gyro) {
-        self.hub.gyroscope.write(gyro);
-        if self.acceleration {
-            trace!("Invoke IMU update");
-            self.imu.invoke();
-            self.hub.output.write(self.mixer.mix());
-            self.acceleration = false;
-        } else {
-            self.gyro = true;
-        }
-    }
+pub async fn start(sample_rate: usize, listen: &str) -> std::io::Result<()> {
+    *SIMULATOR.lock().await = Some(Simulator::new(sample_rate));
+    let server = HttpServer::new(|| {
+        App::new()
+            .service(get_telemetry)
+            .service(update_input)
+            .service(update_acceleration)
+            .service(update_gyro)
+    });
+    let server =
+        if listen.starts_with("/") { server.bind_uds(listen)? } else { server.bind(listen)? };
+    info!("Start listening on {}", listen);
+    server.run().await
 }
