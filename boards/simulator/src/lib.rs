@@ -1,10 +1,11 @@
 #[macro_use]
 extern crate log;
 extern crate pro_flight;
+extern crate serde;
 
 pub mod simulator;
 
-pub use simulator::Simulator;
+pub use simulator::{Config, Simulator};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_std::sync::Mutex;
@@ -41,14 +42,21 @@ async fn update_gyro(gyro: web::Json<Gyro>) -> impl Responder {
     HttpResponse::Ok()
 }
 
-pub async fn start(sample_rate: usize, listen: &str) -> std::io::Result<()> {
-    *SIMULATOR.lock().await = Some(Simulator::new(sample_rate));
+#[post("/sensors/altimeter")]
+async fn update_altitude(altitude: web::Json<f32>) -> impl Responder {
+    SIMULATOR.lock().await.as_mut().unwrap().update_altitude(*altitude);
+    HttpResponse::Ok()
+}
+
+pub async fn start(config: Config, listen: &str) -> std::io::Result<()> {
+    *SIMULATOR.lock().await = Some(Simulator::new(config));
     let server = HttpServer::new(|| {
         App::new()
             .service(get_telemetry)
             .service(update_input)
             .service(update_acceleration)
             .service(update_gyro)
+            .service(update_altitude)
     });
     let server =
         if listen.starts_with("/") { server.bind_uds(listen)? } else { server.bind(listen)? };

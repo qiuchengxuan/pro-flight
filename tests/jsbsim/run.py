@@ -22,6 +22,7 @@ XSI = 'http://www.w3.org/2001/XMLSchema-instance'
 HREF = 'http://jsbsim.sf.net/JSBSimScript.xsl'
 SIMULATE_TIME = 0.2  # seconds
 DELTA_TIME = 0.001  # seconds
+ALTIMETER_RATE  = 10
 
 RASCAL_XML = 'aircraft/rascal/rascal.xml'
 
@@ -84,7 +85,9 @@ def start_jsbsim(port: int):
 
 
 def start_simulator(simulator: str, sock: str, simulator_config: str):
-    cmd = '%s -l %s --config %s' % (simulator, sock, simulator_config)
+    cmd = 'RUST_LOG=debug %s -l %s --config %s' % (simulator, sock, simulator_config)
+    cmd += ' --rate 1000 --altimeter-rate 10'
+    print(cmd)
     return subprocess.Popen(cmd, shell=True)
 
 
@@ -121,6 +124,9 @@ def main():
             simulator_api.update_acceleration(Axes(accel.x, accel.y, accel.z))
             gyro = jsbsim_api.gyro
             simulator_api.update_gyro(Axes(gyro.roll, gyro.pitch, gyro.yaw))
+            if i % ALTIMETER_RATE == 0:
+                simulator_api.update_altitude(jsbsim_api.altitude * 30.48)
+
             output = simulator_api.get_output()
             jsbsim_api.step(Control(output.engine, output.aileron, output.elevator, output.rudder))
             status = 'speed: %d, height: %d' % (jsbsim_api.speed.cas, jsbsim_api.height)
@@ -130,10 +136,11 @@ def main():
                 break
     except KeyboardInterrupt:
         pass
-    jsbsim.kill(signal.SIGINT)
-    simulator.kill()
-    for path in [RASCAL_XML, 'aircraft/rascal/takeoff.xml', 'rascal_test.xml', sock]:
-        os.remove(path)
+    finally:
+        jsbsim.kill(signal.SIGINT)
+        simulator.kill()
+        for path in [RASCAL_XML, 'aircraft/rascal/takeoff.xml', 'rascal_test.xml', sock]:
+            os.remove(path)
 
 
 if __name__ == '__main__':

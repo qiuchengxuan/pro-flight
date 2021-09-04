@@ -2082,6 +2082,7 @@ dependencies = [
  "lazy_static",
  "log",
  "pro-flight",
+ "serde",
 ]
 
 [[package]]

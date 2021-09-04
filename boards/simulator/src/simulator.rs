@@ -1,27 +1,36 @@
 use pro_flight::components::flight_data_hub::FlightDataHUB;
 use pro_flight::components::mixer::ControlMixer;
 use pro_flight::components::pipeline;
+use pro_flight::components::variometer::Variometer;
 use pro_flight::datastructures::control::Control;
 use pro_flight::datastructures::flight::FlightData;
-use pro_flight::datastructures::measurement::{Acceleration, Altitude, Gyro};
+use pro_flight::datastructures::measurement::distance::Distance;
+use pro_flight::datastructures::measurement::{unit, Acceleration, Gyro};
 use pro_flight::sync::DataWriter;
+
+pub struct Config {
+    pub sample_rate: usize,
+    pub altimeter_rate: usize,
+}
 
 pub struct Simulator {
     hub: &'static FlightDataHUB,
     imu: pipeline::imu::IMU<'static>,
+    variometer: Variometer,
     mixer: ControlMixer<'static>,
     acceleration: bool,
     gyro: bool,
 }
 
 impl Simulator {
-    pub fn new(sample_rate: usize) -> Self {
+    pub fn new(config: Config) -> Self {
         let hub = Box::leak(Box::new(FlightDataHUB::default()));
-        let imu = pipeline::imu::IMU::new(sample_rate, hub);
+        let imu = pipeline::imu::IMU::new(config.sample_rate, hub);
         let reader = hub.reader();
+        let variometer = Variometer::new(1000 / config.altimeter_rate);
         let mut mixer = ControlMixer::new(reader.input, 50);
         hub.output.write(mixer.mix());
-        Self { hub, imu, mixer, acceleration: false, gyro: false }
+        Self { hub, imu, variometer, mixer, acceleration: false, gyro: false }
     }
 
     pub fn get_telemetry(&self) -> FlightData {
@@ -57,7 +66,9 @@ impl Simulator {
         }
     }
 
-    pub fn update_altitude(&mut self, altitude: Altitude) {
+    pub fn update_altitude(&mut self, altitude: f32) {
+        let altitude = Distance::new(altitude as i32, unit::CentiMeter);
         self.hub.altimeter.write(altitude);
+        self.hub.vertical_speed.write(self.variometer.update(altitude.into()));
     }
 }

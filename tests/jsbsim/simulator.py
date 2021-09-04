@@ -69,6 +69,11 @@ class Simulator:
         response = self._session.post(api, gyro.json(), headers=JSON_HEADER)
         assert response.status_code == http.client.OK
 
+    def update_altitude(self, altitude: float):
+        api = self._api + '/sensors/altimeter'
+        response = self._session.post(api, json.dumps(altitude), headers=JSON_HEADER)
+        assert response.status_code == http.client.OK
+
     def get_output(self) -> Output:
         response = self._session.get(self._api + '/telemetry')
         assert response.status_code == http.client.OK
