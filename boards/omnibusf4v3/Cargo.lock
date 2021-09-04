@@ -247,6 +247,7 @@ dependencies = [
  "bmp280-core",
  "cortex-m 0.6.7",
  "embedded-hal",
+ "fixed-point",
  "hal",
  "log",
  "max7456 0.1.10 (git+https://github.com/qiuchengxuan/max7456.git)",

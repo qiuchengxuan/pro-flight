@@ -3,7 +3,7 @@
 pub use fixed_point_macro::fixed_point;
 
 use core::fmt::Display;
-use core::ops::{Add, Div, Mul, Rem};
+use core::ops;
 use core::str::FromStr;
 use num_traits::pow::Pow;
 
@@ -22,7 +22,7 @@ impl<T, const D: usize> FixedPoint<T, D> {
 
 impl<T, const D: usize> FixedPoint<T, D>
 where
-    T: From<u8> + Pow<u32, Output = T> + Mul<Output = T> + Add<Output = T>,
+    T: From<u8> + Pow<u32, Output = T> + ops::Mul<Output = T> + ops::Add<Output = T>,
 {
     pub fn new(integer: T, decimal: T) -> Self {
         Self(integer * T::from(10).pow(D as u32) + decimal)
@@ -30,12 +30,12 @@ where
 }
 
 pub trait Number:
-    Copy + From<u8> + Div<Output = Self> + Pow<u32, Output = Self> + Rem<Output = Self>
+    Copy + From<u8> + ops::Div<Output = Self> + Pow<u32, Output = Self> + ops::Rem<Output = Self>
 {
 }
 
 impl<T> Number for T where
-    T: Copy + From<u8> + Div<Output = T> + Pow<u32, Output = T> + Rem<Output = T>
+    T: Copy + From<u8> + ops::Div<Output = T> + Pow<u32, Output = T> + ops::Rem<Output = T>
 {
 }
 
@@ -46,6 +46,13 @@ impl<T: Number, const D: usize> FixedPoint<T, D> {
 
     pub fn decimal(&self) -> T {
         self.0 % (T::from(10)).pow(D as u32)
+    }
+}
+
+impl<T: ops::Div<Output = T>, const D: usize> ops::Div<T> for FixedPoint<T, D> {
+    type Output = Self;
+    fn div(self, div: T) -> Self {
+        Self(self.0 / div)
     }
 }
 

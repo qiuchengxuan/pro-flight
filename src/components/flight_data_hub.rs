@@ -2,8 +2,6 @@
 use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
 
-use core::cmp;
-
 use crate::datastructures::{
     control::Control,
     coordinate::{Displacement, Position},
@@ -15,9 +13,10 @@ use crate::datastructures::{
         FlightData,
     },
     measurement::{
-        battery::Battery,
         euler::{Euler, DEGREE_PER_DAG},
-        unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
+        unit,
+        voltage::Voltage,
+        Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
     },
     output::Output,
     RSSI,
@@ -52,7 +51,7 @@ macro_rules! flight_data {
 flight_data! {
     altimeter: Altitude,
     vertical_speed: Velocity<i32, unit::CMpS>,
-    battery: Battery,
+    voltmeter: Voltage,
     accelerometer: Acceleration,
     gyroscope: Gyro,
     imu: UnitQuaternion<f32>,
@@ -89,13 +88,12 @@ impl<'a> FlightDataReader<'a> {
         let speed_vector = self.speedometer.get().unwrap_or_default();
         let navigation = Navigation { position, speed_vector, ..Default::default() };
 
-        let battery = self.battery.get().unwrap_or_default();
-        let battery_cells = cmp::max(1, cmp::min(battery.0 / 4200 + 1, 8)) as u16;
+        let voltage = self.voltmeter.get().unwrap_or_default();
         let misc = Misc {
-            battery: battery / battery_cells as u16,
             displacement: self.displacement.get().unwrap_or_default(),
             quaternion: self.imu.get().unwrap_or_default(),
             rssi: self.rssi.get().unwrap_or_default(),
+            voltage: voltage / voltage.cells() as u16,
         };
 
         let euler: Euler = misc.quaternion.into();

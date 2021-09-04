@@ -102,7 +102,7 @@ impl<'a, const W: usize, const H: usize> AsciiHud<'a, W, H> {
             g_force: data.aviation.g_force,
             height: if height > 200 { i16::MIN } else { height },
             notes: Notes { left: note_left, center: "", right: "" },
-            battery: data.misc.battery.percentage(),
+            battery: data.misc.voltage.soc(),
             rssi: data.misc.rssi as u8,
             unit: Unit::Aviation,
             speed_vector: hud_coordinate(speed_vector),

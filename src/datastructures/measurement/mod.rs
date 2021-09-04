@@ -7,12 +7,13 @@ use nalgebra::Vector3;
 use serde::ser::SerializeMap;
 
 pub mod axes;
-pub mod battery;
 pub mod displacement;
 pub mod distance;
 pub mod euler;
 pub mod rotation;
 pub mod unit;
+#[macro_use]
+pub mod voltage;
 
 use distance::Distance;
 use unit::CentiMeter;

@@ -1,20 +1,22 @@
 use core::str::Split;
 
-use fixed_point::{fixed_point, FixedPoint};
+use fixed_point::FixedPoint;
+
+use crate::datastructures::measurement::voltage::Voltage;
 
 use super::setter::{Error, Setter, Value};
 
-const DEFAULT_MIN_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(3.3, 3i32);
-const DEFAULT_MAX_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(4.2, 3i32);
-const DEFAULT_WARNING_CELL_VOLTAGE: FixedPoint<i32, 3> = fixed_point!(3.5, 3i32);
+const DEFAULT_MIN_CELL_VOLTAGE: Voltage = voltage!(3.3);
+const DEFAULT_MAX_CELL_VOLTAGE: Voltage = voltage!(4.2);
+const DEFAULT_WARNING_CELL_VOLTAGE: Voltage = voltage!(3.5);
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Battery {
     pub cells: u8,
-    pub min_cell_voltage: FixedPoint<i32, 3>,
-    pub max_cell_voltage: FixedPoint<i32, 3>,
-    pub warning_cell_voltage: FixedPoint<i32, 3>,
+    pub min_cell_voltage: Voltage,
+    pub max_cell_voltage: Voltage,
+    pub warning_cell_voltage: Voltage,
 }
 
 impl Default for Battery {

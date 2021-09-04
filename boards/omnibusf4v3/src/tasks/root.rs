@@ -172,12 +172,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     thread.mpu6000.enable_int();
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma2_stream2);
-    let battery = &hub.battery;
+    let voltmeter = &hub.voltmeter;
     let mut adc = Adc::adc2(peripherals.ADC2, true, voltage_adc::adc_config());
     let vbat = gpio_c.pc2.into_analog();
     adc.configure_channel(&vbat, voltage_adc::SEQUENCE, voltage_adc::SAMPLE_TIME);
     adc.start_conversion();
-    voltage_adc::init(adc.into_dma(), dma_rx, move |voltage| battery.write(voltage));
+    voltage_adc::init(adc.into_dma(), dma_rx, move |voltage| voltmeter.write(voltage));
 
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));

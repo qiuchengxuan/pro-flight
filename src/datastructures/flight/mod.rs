@@ -68,10 +68,10 @@ mod test {
                 "gnss": null
             },
             "misc": {
-                "battery": 0,
                 "displacement": {"x": 0, "y": 0, "z": 0},
                 "quaternion": [0.0, 0.0, 0.0, 1.0],
-                "rssi": 0
+                "rssi": 0,
+                "voltage": 0.0
             },
             "input": {
                 "throttle": 0,

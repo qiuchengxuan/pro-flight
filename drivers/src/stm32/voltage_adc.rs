@@ -1,8 +1,9 @@
 use alloc::boxed::Box;
 
+use fixed_point::FixedPoint;
 use hal::dma::{BufferDescriptor, Peripheral, TransferOption, DMA};
 use pro_flight::algorithm::lpf::LPF;
-use pro_flight::datastructures::measurement::battery::Battery;
+use pro_flight::datastructures::measurement::voltage::Voltage;
 use stm32f4xx_hal::adc::config::{AdcConfig, Continuous, Dma, SampleTime, Sequence};
 
 pub struct VoltageADC(LPF<u16>);
@@ -21,11 +22,11 @@ const SAMPLE_SIZE: usize = 16;
 const VREF: usize = 3300;
 
 impl VoltageADC {
-    fn convert(&mut self, data: &[u16]) -> Battery {
+    fn convert(&mut self, data: &[u16]) -> Voltage {
         let sum: usize = data.iter().map(|&v| v as usize).sum();
         let value = self.0.filter((sum / data.len() * VREF / 0xFFF) as u16) as usize;
         let milli_voltages = value * VOLTAGE_SCALE_X100 / 100;
-        Battery(milli_voltages as u16)
+        Voltage(FixedPoint(milli_voltages as u16))
     }
 }
 
@@ -36,7 +37,7 @@ pub fn adc_config() -> AdcConfig {
 pub fn init<F, D, H>(mut adc: impl Peripheral, mut dma: D, mut handler: H)
 where
     D: DMA<Future = F>,
-    H: FnMut(Battery) + Send + 'static,
+    H: FnMut(Voltage) + Send + 'static,
 {
     let mut rx_bd = Box::new(BufferDescriptor::<u16, SAMPLE_SIZE>::default());
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
