@@ -14,15 +14,16 @@ from jsbsim import JSBSim
 from jsbsim.fcs import Control
 from lxml import etree
 from lxml.builder import E, ElementMaker
-from simulator import Axes
+from simulator import GNSS, Axes
 from simulator import Control as Input
-from simulator import Simulator
+from simulator import Position, Simulator, Velocity
 
 XSI = 'http://www.w3.org/2001/XMLSchema-instance'
 HREF = 'http://jsbsim.sf.net/JSBSimScript.xsl'
 SIMULATE_TIME = 0.2  # seconds
 DELTA_TIME = 0.001  # seconds
-ALTIMETER_RATE  = 10
+ALTIMETER_RATE = 10
+GNSS_RATE = 10
 
 RASCAL_XML = 'aircraft/rascal/rascal.xml'
 
@@ -124,8 +125,19 @@ def main():
             simulator_api.update_acceleration(Axes(accel.x, accel.y, accel.z))
             gyro = jsbsim_api.gyro
             simulator_api.update_gyro(Axes(gyro.roll, gyro.pitch, gyro.yaw))
+            altitude_cm = jsbsim_api.altitude * 30.48
             if i % ALTIMETER_RATE == 0:
-                simulator_api.update_altitude(jsbsim_api.altitude * 30.48)
+                simulator_api.update_altitude(int(altitude_cm))
+            if i % GNSS_RATE == 0:
+                p = jsbsim_api.position
+                v = jsbsim_api.velocity
+                gnss = GNSS(
+                    round(jsbsim_api.attitude.true_heading, 1),
+                    round(v.course(), 1),
+                    Position(str(p.latitude), str(p.longitude), int(altitude_cm)),
+                    Velocity(int(v.x * 303), int(v.y * 303), int(v.z * 303))  # ft/s to mm/s
+                )
+                simulator_api.update_gnss(gnss)
 
             output = simulator_api.get_output()
             jsbsim_api.step(Control(output.engine, output.aileron, output.elevator, output.rudder))

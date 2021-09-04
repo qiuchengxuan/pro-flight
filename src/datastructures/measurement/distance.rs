@@ -1,15 +1,11 @@
+use core::fmt;
+use core::marker;
 use core::ops::{Add, AddAssign, Div, Mul, Sub};
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Distance<T, U> {
     pub value: T,
-    unit: core::marker::PhantomData<U>,
-}
-
-impl<T: core::fmt::Display, U: core::fmt::Display + Default> core::fmt::Display for Distance<T, U> {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{}{}", self.value, U::default())
-    }
+    unit: marker::PhantomData<U>,
 }
 
 impl<T: Copy + Default, U: Copy> Distance<T, U> {
@@ -23,7 +19,13 @@ impl<T: Copy + Default, U: Copy> Distance<T, U> {
 
     #[inline]
     pub fn convert<V: Copy + Default>(self, convert: impl Fn(T) -> V) -> Distance<V, U> {
-        Distance { value: convert(self.value), unit: core::marker::PhantomData }
+        Distance { value: convert(self.value), unit: marker::PhantomData }
+    }
+}
+
+impl<T: fmt::Display, U: fmt::Display + Default> fmt::Display for Distance<T, U> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.value, U::default())
     }
 }
 
@@ -42,7 +44,7 @@ impl<T: PartialEq + Copy + Default, U: Copy> PartialEq for Distance<T, U> {
 impl<T: Add<Output = T> + Copy + Default + PartialEq, U: Copy> Add for Distance<T, U> {
     type Output = Distance<T::Output, U>;
     fn add(self, other: Self) -> Self::Output {
-        Self { value: self.value + other.value, unit: core::marker::PhantomData }
+        Self { value: self.value + other.value, unit: marker::PhantomData }
     }
 }
 
@@ -55,27 +57,21 @@ impl<T: AddAssign + Copy + Default + PartialEq, U: Copy> AddAssign for Distance<
 impl<T: Sub<Output = T> + Copy + Default + PartialEq, U: Copy> Sub for Distance<T, U> {
     type Output = Distance<T::Output, U>;
     fn sub(self, other: Self) -> Self::Output {
-        Self { value: self.value - other.value, unit: core::marker::PhantomData }
+        Self { value: self.value - other.value, unit: marker::PhantomData }
     }
 }
 
 impl<T: Mul<Output = T> + Copy + Default + PartialEq, U: Copy> Mul<T> for Distance<T, U> {
     type Output = Distance<T::Output, U>;
     fn mul(self, t: T) -> Self::Output {
-        Self { value: self.value * t, unit: core::marker::PhantomData }
+        Self { value: self.value * t, unit: marker::PhantomData }
     }
 }
 
 impl<T: Div<Output = T> + Copy + Default + PartialEq, U: Copy> Div<T> for Distance<T, U> {
     type Output = Distance<T::Output, U>;
     fn div(self, t: T) -> Self::Output {
-        Self { value: self.value / t, unit: core::marker::PhantomData }
-    }
-}
-
-impl<T: serde::Serialize, U: Copy> serde::Serialize for Distance<T, U> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.value.serialize(serializer)
+        Self { value: self.value / t, unit: marker::PhantomData }
     }
 }
 
@@ -86,6 +82,18 @@ where
     pub fn to_unit<T: Copy + Default + Into<V>>(self, _: T) -> Distance<V, T> {
         let from: V = F::default().into();
         let to: V = T::default().into();
-        Distance { value: self.value * from / to, unit: core::marker::PhantomData }
+        Distance { value: self.value * from / to, unit: marker::PhantomData }
+    }
+}
+
+impl<T: serde::Serialize, U: Copy> serde::Serialize for Distance<T, U> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.value.serialize(serializer)
+    }
+}
+
+impl<'a, T: serde::Deserialize<'a>, U> serde::Deserialize<'a> for Distance<T, U> {
+    fn deserialize<D: serde::Deserializer<'a>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self { value: T::deserialize(deserializer)?, unit: marker::PhantomData })
     }
 }

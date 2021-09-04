@@ -4,7 +4,7 @@ pub trait Distance {}
 macro_rules! units {
     ($($class:ident => ($value:expr, $name:expr, $trait:ty)),+) => {
         $(
-            #[derive(Copy, Clone, Default, Debug, PartialEq)]
+            #[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
             pub struct $class;
 
             impl Into<u32> for $class {

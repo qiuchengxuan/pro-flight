@@ -48,7 +48,7 @@ impl<U: Copy + Default + Into<u32>> SphericalCoordinate<U> {
 
 pub type Displacement<U> = DistanceVector<i32, U>;
 
-#[derive(Default, Copy, Clone, Serialize, PartialEq, Debug)]
+#[derive(Default, Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Position {
     pub latitude: Latitude,
     pub longitude: Longitude,

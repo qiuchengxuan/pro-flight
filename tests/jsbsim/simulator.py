@@ -1,6 +1,6 @@
 import http
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, asdict
 from urllib.parse import quote
 
 import requests_unixsocket
@@ -42,6 +42,28 @@ class Output:
     rudder: float
 
 
+@dataclass
+class Position:
+    latitude: str
+    longitude: str
+    altitude: int
+
+
+@dataclass
+class Velocity:
+    x: int
+    y: int
+    z: int
+
+
+@dataclass
+class GNSS:
+    heading: float
+    course: float
+    position: Position
+    velocity: Velocity
+
+
 class Simulator:
     def __init__(self, sock: str):
         self._session = requests_unixsocket.Session()
@@ -69,9 +91,15 @@ class Simulator:
         response = self._session.post(api, gyro.json(), headers=JSON_HEADER)
         assert response.status_code == http.client.OK
 
-    def update_altitude(self, altitude: float):
+    def update_altitude(self, altitude: int):
         api = self._api + '/sensors/altimeter'
         response = self._session.post(api, json.dumps(altitude), headers=JSON_HEADER)
+        assert response.status_code == http.client.OK
+
+    def update_gnss(self, gnss: GNSS):
+        api = self._api + '/sensors/gnss'
+        body = json.dumps(asdict(gnss), ensure_ascii=False)
+        response = self._session.post(api, body.encode('utf-8'), headers=JSON_HEADER)
         assert response.status_code == http.client.OK
 
     def get_output(self) -> Output:

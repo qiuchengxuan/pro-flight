@@ -3,14 +3,25 @@ use pro_flight::components::mixer::ControlMixer;
 use pro_flight::components::pipeline;
 use pro_flight::components::variometer::Variometer;
 use pro_flight::datastructures::control::Control;
+use pro_flight::datastructures::coordinate::Position;
 use pro_flight::datastructures::flight::FlightData;
-use pro_flight::datastructures::measurement::distance::Distance;
-use pro_flight::datastructures::measurement::{unit, Acceleration, Gyro};
+use pro_flight::datastructures::measurement::{
+    distance::Distance, unit, Acceleration, Course, Gyro, Heading, VelocityVector,
+};
 use pro_flight::sync::DataWriter;
 
 pub struct Config {
     pub sample_rate: usize,
     pub altimeter_rate: usize,
+    pub gnss_rate: usize,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize)]
+pub struct GNSS {
+    heading: Heading,
+    course: Course,
+    position: Position,
+    velocity: VelocityVector<i32, unit::MMpS>,
 }
 
 pub struct Simulator {
@@ -66,9 +77,15 @@ impl Simulator {
         }
     }
 
-    pub fn update_altitude(&mut self, altitude: f32) {
-        let altitude = Distance::new(altitude as i32, unit::CentiMeter);
+    pub fn update_altitude(&mut self, altitude: Distance<i32, unit::CentiMeter>) {
         self.hub.altimeter.write(altitude);
         self.hub.vertical_speed.write(self.variometer.update(altitude.into()));
+    }
+
+    pub fn update_gnss(&mut self, gnss: GNSS) {
+        self.hub.gnss_heading.write(gnss.heading);
+        self.hub.gnss_course.write(gnss.course);
+        self.hub.gnss_velocity.write(gnss.velocity);
+        self.hub.gnss_position.write(gnss.position);
     }
 }

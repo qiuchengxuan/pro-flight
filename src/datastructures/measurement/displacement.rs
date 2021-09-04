@@ -4,26 +4,15 @@ use integer_sqrt::IntegerSquareRoot as SquareRoot;
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 use nalgebra::Vector3;
-use serde::ser::SerializeMap;
 
 use super::distance::Distance;
 use super::unit::Meter;
 
-#[derive(Copy, Clone, Default, Debug)]
-pub struct DistanceVector<T, U> {
+#[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
+pub struct DistanceVector<T, U: Copy> {
     pub x: Distance<T, U>,
     pub y: Distance<T, U>,
     pub z: Distance<T, U>,
-}
-
-impl<T: serde::Serialize, U: Copy> serde::Serialize for DistanceVector<T, U> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(3))?;
-        map.serialize_entry("x", &self.x)?;
-        map.serialize_entry("y", &self.y)?;
-        map.serialize_entry("z", &self.z)?;
-        map.end()
-    }
 }
 
 impl<T: Copy + Default, U: Copy> DistanceVector<T, U> {

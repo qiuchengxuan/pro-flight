@@ -1,4 +1,4 @@
-use core::fmt::Write;
+use core::fmt::{self, Write};
 
 use heapless::String;
 
@@ -90,8 +90,8 @@ impl core::ops::Sub for Latitude {
     }
 }
 
-impl core::fmt::Display for Latitude {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+impl fmt::Display for Latitude {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let direction = if self.0 >= 0 { "N" } else { "S" };
         let sub_second = self.0.abs();
         let second = sub_second / SUB_SECOND;
@@ -106,6 +106,13 @@ impl serde::Serialize for Latitude {
         let mut string = String::<16>::new();
         write!(string, "{}", self).ok();
         serializer.serialize_str(string.as_str())
+    }
+}
+
+impl<'a> serde::Deserialize<'a> for Latitude {
+    fn deserialize<D: serde::Deserializer<'a>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <&str>::deserialize(deserializer)?;
+        Latitude::from_str(s).ok_or(<D::Error as serde::de::Error>::custom("Not longitude"))
     }
 }
 

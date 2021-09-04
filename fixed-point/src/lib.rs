@@ -118,6 +118,16 @@ impl<T: Copy + Into<i32>, const D: u8> serde::Serialize for FixedPoint<T, D> {
     }
 }
 
+impl<'a, T: convert::TryFrom<isize>, const D: u8> serde::Deserialize<'a> for FixedPoint<T, D> {
+    fn deserialize<DE: serde::Deserializer<'a>>(deserializer: DE) -> Result<Self, DE::Error> {
+        let float = <f32>::deserialize(deserializer)?;
+        let v = (float * 10f32.pow(D as u8)) as isize;
+        T::try_from(v)
+            .map(|v| Self(v))
+            .map_err(|_| <DE::Error as serde::de::Error>::custom("Not fixed-point"))
+    }
+}
+
 mod test {
     #[test]
     fn test_fixed_point() {

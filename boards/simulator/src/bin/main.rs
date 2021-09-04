@@ -16,9 +16,11 @@ fn init<'a>(matches: &'a clap::ArgMatches<'a>) -> Result<simulator::Config, Stri
     config::replace(&config);
     let rate_str = matches.value_of("rate").unwrap_or("1000");
     let sample_rate = rate_str.parse::<usize>().map_err(|_| format!("Rate not a number"))?;
-    let rate_str = matches.value_of("rate").unwrap_or("10");
+    let rate_str = matches.value_of("altimeter-rate").unwrap_or("10");
     let altimeter_rate = rate_str.parse::<usize>().map_err(|_| format!("Rate not a number"))?;
-    Ok(simulator::Config { sample_rate, altimeter_rate })
+    let rate_str = matches.value_of("gnss-rate").unwrap_or("10");
+    let gnss_rate = rate_str.parse::<usize>().map_err(|_| format!("Rate not a number"))?;
+    Ok(simulator::Config { sample_rate, altimeter_rate, gnss_rate })
 }
 
 macro_rules! arg {
@@ -41,6 +43,7 @@ async fn main() -> std::io::Result<()> {
         .arg(arg!("config", "Config file path"))
         .arg(arg!("rate", "IMU sample rate"))
         .arg(arg!("altimeter-rate", "Altimeter sample rate"))
+        .arg(arg!("gnss-rate", "GNSS sample rate"))
         .get_matches();
     let config = match init(&matches) {
         Ok(config) => config,

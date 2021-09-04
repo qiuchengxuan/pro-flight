@@ -1,16 +1,17 @@
 #[macro_use]
 extern crate log;
 extern crate pro_flight;
+#[macro_use]
 extern crate serde;
 
 pub mod simulator;
 
-pub use simulator::{Config, Simulator};
+pub use simulator::{Config, Simulator, GNSS};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_std::sync::Mutex;
 use pro_flight::datastructures::control::Control;
-use pro_flight::datastructures::measurement::{Acceleration, Gyro};
+use pro_flight::datastructures::measurement::{distance::Distance, unit, Acceleration, Gyro};
 
 #[no_mangle]
 fn get_jiffies() -> u64 {
@@ -43,8 +44,14 @@ async fn update_gyro(gyro: web::Json<Gyro>) -> impl Responder {
 }
 
 #[post("/sensors/altimeter")]
-async fn update_altitude(altitude: web::Json<f32>) -> impl Responder {
+async fn update_altitude(altitude: web::Json<Distance<i32, unit::CentiMeter>>) -> impl Responder {
     SIMULATOR.lock().await.as_mut().unwrap().update_altitude(*altitude);
+    HttpResponse::Ok()
+}
+
+#[post("/sensors/gnss")]
+async fn update_gnss(gnss: web::Json<GNSS>) -> impl Responder {
+    SIMULATOR.lock().await.as_mut().unwrap().update_gnss(*gnss);
     HttpResponse::Ok()
 }
 
@@ -57,6 +64,7 @@ pub async fn start(config: Config, listen: &str) -> std::io::Result<()> {
             .service(update_acceleration)
             .service(update_gyro)
             .service(update_altitude)
+            .service(update_gnss)
     });
     let server =
         if listen.starts_with("/") { server.bind_uds(listen)? } else { server.bind(listen)? };
