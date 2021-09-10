@@ -17,7 +17,7 @@ submodule:
 
 .PHONY: test
 test: submodule
-	@cargo test
+	@cargo test --all
 
 .PHONY: $(BOARD)
 $(BOARD): submodule

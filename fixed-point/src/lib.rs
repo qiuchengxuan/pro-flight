@@ -2,16 +2,17 @@
 
 pub use fixed_point_macro::fixed_point;
 
+use core::convert;
 use core::fmt::Display;
 use core::ops;
 use core::str::FromStr;
 use num_traits::pow::Pow;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
-pub struct FixedPoint<T, const D: usize>(pub T);
+pub struct FixedPoint<T, const D: u8>(pub T);
 
-impl<T, const D: usize> FixedPoint<T, D> {
-    pub fn decimal_length(self) -> usize {
+impl<T, const D: u8> FixedPoint<T, D> {
+    pub fn decimal_length(self) -> u8 {
         D
     }
 
@@ -20,7 +21,7 @@ impl<T, const D: usize> FixedPoint<T, D> {
     }
 }
 
-impl<T, const D: usize> FixedPoint<T, D>
+impl<T, const D: u8> FixedPoint<T, D>
 where
     T: From<u8> + Pow<u32, Output = T> + ops::Mul<Output = T> + ops::Add<Output = T>,
 {
@@ -39,7 +40,7 @@ impl<T> Number for T where
 {
 }
 
-impl<T: Number, const D: usize> FixedPoint<T, D> {
+impl<T: Number, const D: u8> FixedPoint<T, D> {
     pub fn integer(&self) -> T {
         self.0 / (T::from(10)).pow(D as u32)
     }
@@ -49,80 +50,46 @@ impl<T: Number, const D: usize> FixedPoint<T, D> {
     }
 }
 
-impl<T: ops::Div<Output = T>, const D: usize> ops::Div<T> for FixedPoint<T, D> {
+impl<T: ops::Div<Output = T>, const D: u8> ops::Div<T> for FixedPoint<T, D> {
     type Output = Self;
     fn div(self, div: T) -> Self {
         Self(self.0 / div)
     }
 }
 
-impl<T: Copy + Into<i32>, const D: usize> Into<f32> for FixedPoint<T, D> {
+impl<T: Copy + Into<i32>, const D: u8> Into<f32> for FixedPoint<T, D> {
     fn into(self) -> f32 {
         let value: i32 = self.0.into();
         value as f32 / self.exp() as f32
     }
 }
 
-macro_rules! impl_unsigned_from_str {
-    ($type:ty) => {
-        impl<const D: usize> FromStr for FixedPoint<$type, D> {
-            type Err = <$type as FromStr>::Err;
-            fn from_str(string: &str) -> Result<Self, Self::Err> {
-                let mut splitted = string.split('.');
-                let mut integer = splitted.next().unwrap_or("").parse::<$type>()?;
-                integer *= (10 as $type).pow(D as u32);
-                let field = match splitted.next() {
-                    Some(s) => s,
-                    None => return Ok(Self(integer)),
-                };
-                let decimal_length = core::cmp::min(field.len(), 255);
-                let mut decimal = field.parse::<$type>()?;
-                if D >= decimal_length {
-                    decimal *= (10 as $type).pow((D - decimal_length) as u32);
-                } else {
-                    decimal /= (10 as $type).pow((decimal_length - D) as u32);
-                }
-                Ok(Self(integer + decimal))
-            }
+impl<T: convert::TryFrom<isize>, const D: u8> FromStr for FixedPoint<T, D> {
+    type Err = ();
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        let negative = string.chars().next().map(|c| c == '-').unwrap_or(false);
+        let mut splitted = string.split('.');
+        let mut integer = splitted.next().ok_or(())?.parse::<isize>().map_err(|_| ())?;
+        integer *= (10 as isize).pow(D as u32);
+        let field = match splitted.next() {
+            Some(s) => s,
+            None => return T::try_from(integer).map(|v| Self(v)).map_err(|_| ()),
+        };
+        let decimal_length = core::cmp::min(field.len(), 255) as u8;
+        let mut decimal = field.parse::<isize>().map_err(|_| ())?;
+        if integer < 0 || negative {
+            decimal = -decimal
         }
-    };
+        if D >= decimal_length {
+            decimal *= (10 as isize).pow((D - decimal_length) as u32);
+        } else {
+            decimal /= (10 as isize).pow((decimal_length - D) as u32);
+        }
+        T::try_from(integer + decimal).map(|v| Self(v)).map_err(|_| ())
+    }
 }
 
-impl_unsigned_from_str!(u8);
-impl_unsigned_from_str!(u16);
-
-macro_rules! impl_signed_from_str {
-    ($type:ty) => {
-        impl<const D: usize> FromStr for FixedPoint<$type, D> {
-            type Err = <$type as FromStr>::Err;
-            fn from_str(string: &str) -> Result<Self, Self::Err> {
-                let negative = string.chars().next().map(|c| c == '-').unwrap_or(false);
-                let mut splitted = string.split('.');
-                let mut integer = splitted.next().unwrap_or("0").parse::<$type>()?;
-                integer *= (10 as $type).pow(D as u32);
-                let field = match splitted.next() {
-                    Some(s) => s,
-                    None => return Ok(Self(integer)),
-                };
-                let decimal_length = core::cmp::min(field.len(), 255);
-                let mut decimal = field.parse::<$type>()?;
-                if integer < 0 || negative {
-                    decimal = -decimal
-                }
-                if D >= decimal_length {
-                    decimal *= (10 as $type).pow((D - decimal_length) as u32);
-                } else {
-                    decimal /= (10 as $type).pow((decimal_length - D) as u32);
-                }
-                Ok(Self(integer + decimal))
-            }
-        }
-    };
-}
-
-impl_signed_from_str!(i32);
-
-impl<T, const D: usize> Display for FixedPoint<T, D>
+impl<T, const D: u8> Display for FixedPoint<T, D>
 where
     T: Number + Display + Into<i32> + PartialEq + From<u8> + PartialOrd,
 {
@@ -138,14 +105,14 @@ where
         }
         let integer = self.integer();
         if integer == T::from(0) && self.0 < T::from(0) {
-            write!(f, "-0.{:0length$}", decimal, length = length)
+            write!(f, "-0.{:0length$}", decimal, length = length as usize)
         } else {
-            write!(f, "{}.{:0length$}", integer, decimal, length = length)
+            write!(f, "{}.{:0length$}", integer, decimal, length = length as usize)
         }
     }
 }
 
-impl<T: Copy + Into<i32>, const D: usize> serde::Serialize for FixedPoint<T, D> {
+impl<T: Copy + Into<i32>, const D: u8> serde::Serialize for FixedPoint<T, D> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_f32((*self).into())
     }
@@ -175,7 +142,7 @@ mod test {
         let decimal: FixedPoint<i32, 3> = "0.001".parse().unwrap();
         assert_eq!("0.001", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "0.0001".parse().unwrap();
-        assert_eq!("0.000", format!("{}", decimal));
+        assert_eq!("0.0", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "-0.1".parse().unwrap();
         assert_eq!("-0.1", format!("{}", decimal));
         let decimal: FixedPoint<i32, 3> = "-1.1".parse().unwrap();
@@ -204,5 +171,16 @@ mod test {
         assert_eq!("-0.1", format!("{}", decimal));
         let decimal = fixed_point!(-1.1, 2i16);
         assert_eq!("-1.1", format!("{}", decimal));
+    }
+
+    #[test]
+    fn test_malformed() {
+        use super::FixedPoint;
+
+        assert_eq!(Err(()), "".parse::<FixedPoint<u16, 4>>());
+        assert_eq!(Err(()), "1.".parse::<FixedPoint<u16, 4>>());
+        assert_eq!(Err(()), ".1".parse::<FixedPoint<u16, 4>>());
+        assert_eq!(Err(()), "-1.0".parse::<FixedPoint<u16, 4>>());
+        assert_eq!(Err(()), "10.0".parse::<FixedPoint<u16, 4>>());
     }
 }
