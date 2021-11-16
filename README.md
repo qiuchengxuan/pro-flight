@@ -36,6 +36,8 @@ Progress
   - [x] Complementary filter
   - [x] software interrupt based event
   - [x] PWM & ESC
+* fight-control
+  - [x] PID
 * IO
   - [x] USB console serial
   - [x] DMA buffer descriptor
@@ -56,14 +58,13 @@ Progress
 
 **WIP**
 
-* fight-control
-  - [ ] PID & Stabilizer
+* IO
+  - [ ] SDCARD read & write
+  - [ ] DMA based SDCARD read & write
 
 **Future**
 
 * logging
-  - [ ] SDCARD read & write
-  - [ ] DMA based SDCARD read & write
   - [ ] Blackbox
 * navigation
   - [ ] Magnetometer
@@ -189,5 +190,24 @@ data-flow
   +------+   Postion & Steerpoint             |             |   +----------+
   | SINS |------------------------------------+             +-->| HUD(OSD) |
   +------+                                                      +----------+
+  @enduml
+  ```
+
+* flight-control
+
+  ```plantuml
+  @startuml
+  ditaa
+  +-----------+                   Max-rate
+  | Gyroscope |-----------------+   |
+  +-----------+                 |   |
+                                v   v
+  +----------+    +-------+    +-----+    +--------+
+  | Receiver |--->|       |    |     |--->| Motors |
+  +----------+    |       |    |     |    +--------+
+                  | Mixer |--->| PID |
+  +----------+    |       |    |     |    +--------+
+  | AP       |--->|       |    |     |--->| Servos |
+  +----------+    +-------+    +-----+    +--------+
   @enduml
   ```

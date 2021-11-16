@@ -13,7 +13,7 @@ class Control:
 
 class FlightControlSystem(WithSession):
     def set(self, control: Control):
-        self._session.set('throttle-cmd-norm', control.throttle)
-        self._session.set('aileron-cmd-norm', control.aileron)
-        self._session.set('elevator-cmd-norm', control.elevator)
-        self._session.set('rudder-cmd-norm', control.rudder)
+        self._session.set('fcs/aileron-cmd-norm', control.aileron)
+        self._session.set('fcs/elevator-cmd-norm', control.elevator)
+        self._session.set('fcs/rudder-cmd-norm', control.rudder)
+        self._session.set('fcs/throttle-cmd-norm', control.throttle)

@@ -4,6 +4,7 @@ pub mod board;
 pub mod imu;
 pub mod osd;
 pub mod peripherals;
+pub mod pid;
 pub mod receiver;
 pub mod setter;
 pub mod yaml;
@@ -12,6 +13,7 @@ use core::{mem, slice, str::Split};
 
 use fixed_point::{fixed_point, FixedPoint};
 
+pub use self::pid::PIDs;
 use crate::{
     datastructures::measurement::{Axes, Bias, Gain},
     io::Read,
@@ -106,6 +108,7 @@ pub struct Config {
     pub imu: IMU,
     pub osd: OSD,
     pub peripherals: Peripherals,
+    pub pids: PIDs,
     pub receiver: Receiver,
     pub speedometer: Speedometer,
 }
@@ -119,6 +122,7 @@ impl Setter for Config {
             "imu" => self.imu.set(path, value),
             "osd" => self.osd.set(path, value),
             "peripherals" => self.peripherals.set(path, value),
+            "pids" => self.pids.set(path, value),
             "receiver" => self.receiver.set(path, value),
             "speedometer" => self.speedometer.set(path, value),
             _ => Err(Error::MalformedPath),

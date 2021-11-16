@@ -1027,6 +1027,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d95b20c9bee5a08f4e6445825b633e5393e23984f2f3f4a5b4a687f53832234"
 
 [[package]]
+name = "pid"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d81764342f0ec3d969b9898925e5b0dc31c95466cb70a79a3064b33eb3b5480a"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1066,6 +1075,7 @@ dependencies = [
  "nb 1.0.0",
  "nmea0183-core",
  "num-traits",
+ "pid",
  "sbus-parser",
  "serde",
  "serde-json-core-fmt",

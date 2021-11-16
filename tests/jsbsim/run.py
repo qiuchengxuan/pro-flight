@@ -38,7 +38,7 @@ def initialize() -> str:
         E.phi('0.0', unit='DEG'),
         E.theta('0.0', unit='DEG'),
         E.psi('0.0', unit='DEG'),
-        E.altitude('6.6', unit='FT'),
+        E.altitude('100', unit='FT'),
         E.elevation('2000.0', unit='FT'),
         E.hwind('0.0'),
         name='takeoff'
@@ -53,7 +53,7 @@ def make_script(input_port: int) -> str:
             E.condition('simulation/sim-time-sec le 0.01'),
             E.set(name='propulsion/engine[0]/set-running', value='1'),
             name='Set engine running'
-        )
+        ),
     ]
     xml = ElementMaker(nsmap=dict(xsi=XSI))
     location = '{%s}noNamespaceSchemaLocation' % XSI
@@ -70,7 +70,7 @@ def make_script(input_port: int) -> str:
 
 
 def start_jsbsim(port: int):
-    cmd = '/usr/bin/env JSBSim --realtime --root=. rascal_test.xml'
+    cmd = '/usr/bin/env JSBSim --realtime --nice --root=. rascal_test.xml'
     jsbsim = pexpect.spawn(cmd)
     if platform.system() == 'Darwin':
         jsbsim.expect('JSBSim Execution beginning')
@@ -118,6 +118,7 @@ def main():
         time.sleep(0.1)
 
     total = int(SIMULATE_TIME / DELTA_TIME)
+    print('total %dms' % total)
     try:
         for i in range(total):
             simulator_api.update_input(Input(throttle=1.0))
@@ -141,10 +142,16 @@ def main():
 
             output = simulator_api.get_output()
             jsbsim_api.step(Control(output.engine, output.aileron, output.elevator, output.rudder))
-            status = 'speed: %d, height: %d' % (jsbsim_api.speed.cas, jsbsim_api.height)
-            print('Iteration %d/%d, ' % (i + 1, total) + status, end='\r')
+            status = '%dkt, %dft,' % (jsbsim_api.speed.cas, jsbsim_api.height)
+            atti = jsbsim_api.attitude
+            attitude = 'atti=[%.2f, %.2f, %.2f]' % (atti.roll, atti.pitch, atti.true_heading)
+            gyro = 'gyro=[%.2f, %.2f, %.2f]' % (gyro.roll, gyro.pitch, gyro.yaw)
+            control = 'ctrl=[%.2f, %.2f, %.2f @%.2f]' % (
+                output.aileron, output.elevator, output.rudder, output.engine
+            )
+            print('%dms: ' % (i + 1) + ' '.join([status, attitude, gyro, control]))
             if jsbsim_api.height <= 1:
-                print('\nCrashed')
+                print('Crashed after %dms' % i)
                 break
     except KeyboardInterrupt:
         pass

@@ -53,6 +53,22 @@ peripherals:
       type: aileron-left
     PWM6:
       type: rudder
+pids:
+  roll:
+    max-rate: 30
+    kp: 44
+    ki: 40
+    kd: 20
+  pitch:
+    max-rate: 10
+    kp: 58
+    ki: 50
+    kd: 22
+  yaw:
+    max-rate: 10
+    kp: 70
+    ki: 45
+    kd: 20
 receiver:
   inputs:
     roll:

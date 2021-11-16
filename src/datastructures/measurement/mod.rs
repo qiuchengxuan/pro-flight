@@ -143,13 +143,20 @@ impl ops::Div<i32> for Measurement {
     }
 }
 
-impl Into<Vector3<f32>> for Measurement {
-    fn into(self) -> Vector3<f32> {
-        Vector3::new(
+impl Into<(f32, f32, f32)> for Measurement {
+    fn into(self) -> (f32, f32, f32) {
+        (
             self.axes.x as f32 / self.sensitive as f32,
             self.axes.y as f32 / self.sensitive as f32,
             self.axes.z as f32 / self.sensitive as f32,
         )
+    }
+}
+
+impl Into<Vector3<f32>> for Measurement {
+    fn into(self) -> Vector3<f32> {
+        let (x, y, z) = self.into();
+        Vector3::new(x, y, z)
     }
 }
 

@@ -3,7 +3,6 @@ pub mod cli;
 pub mod flight_control;
 pub mod flight_data_hub;
 pub mod logger;
-pub mod mixer;
 pub mod pipeline;
 pub mod positioning;
 pub mod speedometer;

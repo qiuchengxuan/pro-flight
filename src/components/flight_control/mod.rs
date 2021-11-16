@@ -1,13 +1,19 @@
+pub mod mixer;
+pub mod pid;
+
 use alloc::{boxed::Box, vec::Vec};
 
 use embedded_hal::PwmPin;
 use heapless::LinearMap;
 
+use self::{mixer::ControlMixer, pid::PIDs};
 use crate::{
-    components::mixer::ControlMixer,
-    config::peripherals::pwm as config,
-    datastructures::output::Output,
-    sync::{cell::Cell, DataWriter},
+    config::{aircraft::Configuration, peripherals::pwm as config},
+    datastructures::{measurement::Gyro, output::Output},
+    sync::{
+        cell::{Cell, CellReader},
+        DataWriter,
+    },
 };
 
 fn to_motor_pwm_duty(max_duty: u16, rate: u16, value: u16) -> u16 {
@@ -42,7 +48,10 @@ pub struct FlightControl<'a> {
     mixer: ControlMixer<'a>,
     output: &'a Cell<Output>,
     pwms: Vec<(&'static str, PWM)>,
+
     config_iteration: usize,
+    configuration: Configuration,
+    pids: PIDs<'a>,
     motors: heapless::Vec<(config::Motor, usize), 4>,
     servos: LinearMap<config::ServoType, (config::Servo, usize), 4>,
 }
@@ -51,7 +60,8 @@ impl<'a> FlightControl<'a> {
     fn reconfigure(&mut self) {
         self.servos.clear();
         self.motors.clear();
-        for (&id, &config) in crate::config::get().peripherals.pwms.0.iter() {
+        let config = crate::config::get();
+        for (&id, &config) in config.peripherals.pwms.0.iter() {
             let index = match self.pwms.iter().enumerate().find(|(_, (n, _))| id.equals_str(n)) {
                 Some((index, _)) => index,
                 None => continue,
@@ -65,10 +75,12 @@ impl<'a> FlightControl<'a> {
                 }
             }
         }
-        self.motors.sort_by(|a, b| a.0.index.partial_cmp(&b.0.index).unwrap())
+        self.motors.sort_by(|a, b| a.0.index.partial_cmp(&b.0.index).unwrap());
+        self.pids.reconfigure(&config.pids)
     }
 
     pub fn new(
+        gyroscope: CellReader<'a, Gyro>,
         mixer: ControlMixer<'a>,
         output: &'a Cell<Output>,
         pwms: Vec<(&'static str, PWM)>,
@@ -78,6 +90,8 @@ impl<'a> FlightControl<'a> {
             output,
             pwms,
             config_iteration: crate::config::iteration(),
+            configuration: crate::config::get().aircraft.configuration,
+            pids: PIDs::new(gyroscope, &crate::config::get().pids),
             motors: heapless::Vec::new(),
             servos: heapless::LinearMap::new(),
         };
@@ -89,7 +103,9 @@ impl<'a> FlightControl<'a> {
         if self.config_iteration != crate::config::iteration() {
             self.reconfigure();
         }
-        let output = self.mixer.mix();
+
+        let control = self.pids.next_control(self.mixer.mix());
+        let output = Output::from(&control, self.configuration);
         self.output.write(output);
         match output {
             Output::FixedWing(fixed_wing) => {

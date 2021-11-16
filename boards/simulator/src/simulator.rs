@@ -1,7 +1,12 @@
 use pro_flight::{
     components::{
-        flight_data_hub::FlightDataHUB, mixer::ControlMixer, pipeline, variometer::Variometer,
+        flight_control::{mixer::ControlMixer, pid::PIDs},
+        flight_data_hub::FlightDataHUB,
+        pipeline,
+        variometer::Variometer,
     },
+    config,
+    config::aircraft::Configuration,
     datastructures::{
         control::Control,
         coordinate::Position,
@@ -9,6 +14,7 @@ use pro_flight::{
         measurement::{
             distance::Distance, unit, Acceleration, Course, Gyro, Heading, VelocityVector,
         },
+        output::Output,
     },
     sync::DataWriter,
 };
@@ -31,7 +37,9 @@ pub struct Simulator {
     hub: &'static FlightDataHUB,
     imu: pipeline::imu::IMU<'static>,
     variometer: Variometer,
+    configuration: Configuration,
     mixer: ControlMixer<'static>,
+    pids: PIDs<'static>,
     acceleration: bool,
     gyro: bool,
 }
@@ -42,18 +50,26 @@ impl Simulator {
         let imu = pipeline::imu::IMU::new(config.sample_rate, hub);
         let reader = hub.reader();
         let variometer = Variometer::new(1000 / config.altimeter_rate);
+        let configuration = config::get().aircraft.configuration;
         let mut mixer = ControlMixer::new(reader.input, 50);
-        hub.output.write(mixer.mix());
-        Self { hub, imu, variometer, mixer, acceleration: false, gyro: false }
+        hub.output.write(Output::from(&mixer.mix(), configuration));
+        let pids = PIDs::new(hub.reader().gyroscope, &config::get().pids);
+        Self { hub, imu, variometer, configuration, mixer, pids, acceleration: false, gyro: false }
     }
 
     pub fn get_telemetry(&self) -> FlightData {
         self.hub.reader().read()
     }
 
+    fn update_output(&mut self) {
+        let control = self.pids.next_control(self.mixer.mix());
+        let output = Output::from(&control, self.configuration);
+        self.hub.output.write(output);
+    }
+
     pub fn update_input(&mut self, input: Control) {
         self.hub.input.write(input);
-        self.hub.output.write(self.mixer.mix());
+        self.update_output();
     }
 
     pub fn update_acceleration(&mut self, acceleration: Acceleration) {
@@ -61,7 +77,7 @@ impl Simulator {
         if self.gyro {
             trace!("Invoke IMU update");
             self.imu.invoke();
-            self.hub.output.write(self.mixer.mix());
+            self.update_output();
             self.gyro = false;
         } else {
             self.acceleration = true;
@@ -73,7 +89,7 @@ impl Simulator {
         if self.acceleration {
             trace!("Invoke IMU update");
             self.imu.invoke();
-            self.hub.output.write(self.mixer.mix());
+            self.update_output();
             self.acceleration = false;
         } else {
             self.gyro = true;

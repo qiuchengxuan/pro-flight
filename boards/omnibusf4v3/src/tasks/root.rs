@@ -247,7 +247,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
     let mixer = ControlMixer::new(reader.input, 50);
-    let mut flight_control = FlightControl::new(mixer, &hub.output, pwms);
+    let mut flight_control = FlightControl::new(reader.gyroscope, mixer, &hub.output, pwms);
     thread.servo.add_fn(never_complete(move || flight_control.update()));
 
     let int = make_trigger(thread.servo, periph_exti1!(reg));

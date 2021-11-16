@@ -4,7 +4,7 @@ from .session import WithSession
 
 
 @dataclass
-class Attitude:  # °/s
+class Attitude:  # °
     phi: float
     theta: float
     psi: float

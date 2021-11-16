@@ -71,6 +71,22 @@ peripherals:
       min-angle: -80
       max-angle: 80
       reversed: false
+pids:
+  roll:
+    max-rate: 30
+    kp: 0.44
+    ki: 0.4
+    kd: 0.2
+  pitch:
+    max-rate: 10
+    kp: 0.58
+    ki: 0.5
+    kd: 0.22
+  yaw:
+    max-rate: 10
+    kp: 0.7
+    ki: 0.45
+    kd: 0.2
 receiver:
   inputs:
     throttle:

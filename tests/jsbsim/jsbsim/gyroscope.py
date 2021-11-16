@@ -1,10 +1,11 @@
+import math
 from dataclasses import dataclass
 
 from .session import WithSession
 
 
 @dataclass
-class Gyro:  # rad/s²
+class Gyro:  # °/s
     phi: float
     theta: float
     psi: float
@@ -25,7 +26,7 @@ class Gyro:  # rad/s²
 class Gyroscope(WithSession):
     def get(self) -> Gyro:
         return Gyro(
-            self._session.get('velocities/phidot-rad_sec', float),
-            self._session.get('velocities/thetadot-rad_sec', float),
-            self._session.get('velocities/psidot-rad_sec', float)
+            self._session.get('velocities/phidot-rad_sec', float) * 180 / math.pi,
+            self._session.get('velocities/thetadot-rad_sec', float) * 180 / math.pi,
+            self._session.get('velocities/psidot-rad_sec', float) * 180 / math.pi
         )
