@@ -1,7 +1,6 @@
 use core::time::Duration;
 
-use embedded_hal::digital::v2::OutputPin;
-use embedded_hal::timer::CountDown;
+use embedded_hal::{digital::v2::OutputPin, timer::CountDown};
 use hal::event::Notifier;
 
 pub struct LED<P, C> {

@@ -1,6 +1,8 @@
-use core::cmp;
-use core::fmt::Write;
-use core::str::{FromStr, Split};
+use core::{
+    cmp,
+    fmt::Write,
+    str::{FromStr, Split},
+};
 
 use heapless::LinearMap;
 use serde::ser::SerializeMap;

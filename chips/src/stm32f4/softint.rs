@@ -1,7 +1,8 @@
 use drone_core::fib::Yielded;
-use drone_cortexm::reg::field::WRwRegFieldBitAtomic;
-use drone_cortexm::thr::ThrNvic;
-use drone_cortexm::{reg::prelude::*, thr::prelude::*};
+use drone_cortexm::{
+    reg::{field::WRwRegFieldBitAtomic, prelude::*},
+    thr::{prelude::*, ThrNvic},
+};
 use drone_stm32_map::periph::exti::{
     ExtiMap, ExtiPeriph, ExtiPrPif, ExtiSwierSwi, ExtiSwierSwiOpt,
 };

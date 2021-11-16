@@ -11,15 +11,15 @@ use nmea0183::{
     Parser, MAX_MESSAGE_SIZE,
 };
 
-use crate::datastructures::{
-    coordinate::{latitude, longitude, Position},
-    measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
+use crate::{
+    datastructures::{
+        coordinate::{latitude, longitude, Position},
+        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
+    },
+    protocol::{serial, serial::gnss::DataSource},
+    sync::{cell::Cell, DataWriter},
+    sys::time,
 };
-use crate::protocol::serial;
-use crate::protocol::serial::gnss::DataSource;
-use crate::sync::cell::Cell;
-use crate::sync::DataWriter;
-use crate::sys::time;
 
 impl Into<longitude::Longitude> for Longitude {
     fn into(self) -> longitude::Longitude {

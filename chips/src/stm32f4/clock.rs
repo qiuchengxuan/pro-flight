@@ -1,5 +1,4 @@
-use drone_core::fib::ThrFiberFuture;
-use drone_core::reg::prelude::*;
+use drone_core::{fib::ThrFiberFuture, reg::prelude::*};
 use drone_cortexm::{fib, reg::prelude::*};
 use drone_stm32_map::reg;
 

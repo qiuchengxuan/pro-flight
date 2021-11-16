@@ -1,8 +1,10 @@
 use core::fmt::Write;
 
-use crate::config;
-use crate::config::setter::{Setter, Value};
-use crate::sys::fs::{File, OpenOptions};
+use crate::{
+    config,
+    config::setter::{Setter, Value},
+    sys::fs::{File, OpenOptions},
+};
 
 pub fn show() {
     println!("{}", config::get());

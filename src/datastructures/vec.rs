@@ -167,11 +167,7 @@ impl<T: Copy, const N: usize> Vec<T, N> {
 
     /// Removes the last element from a vector and returns it, or `None` if it's empty
     pub fn pop(&mut self) -> Option<T> {
-        if self.len != 0 {
-            Some(unsafe { self.pop_unchecked() })
-        } else {
-            None
-        }
+        if self.len != 0 { Some(unsafe { self.pop_unchecked() }) } else { None }
     }
 
     /// Appends an `item` to the back of the collection
@@ -342,7 +338,7 @@ impl<T: Copy, const N: usize> Vec<T, N> {
     ///         Vec::from_iter([0, 0, 1].iter().cloned()),
     ///     ]
     ///     .iter()
-    ///     .cloned()
+    ///     .cloned(),
     /// );
     /// // SAFETY:
     /// // 1. `old_len..0` is empty so no elements need to be initialized.
@@ -537,8 +533,8 @@ where
 }
 
 impl<'a, T: Copy, const N: usize> IntoIterator for &'a Vec<T, N> {
-    type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
+    type Item = &'a T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -546,8 +542,8 @@ impl<'a, T: Copy, const N: usize> IntoIterator for &'a Vec<T, N> {
 }
 
 impl<'a, T: Copy, const N: usize> IntoIterator for &'a mut Vec<T, N> {
-    type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
+    type Item = &'a mut T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
@@ -572,7 +568,6 @@ impl<T: Copy, const N: usize> FromIterator<T> for Vec<T, N> {
 /// This struct is created by calling the `into_iter` method on [`Vec`][`Vec`].
 ///
 /// [`Vec`]: (https://doc.rust-lang.org/std/vec/struct.Vec.html)
-///
 pub struct IntoIter<T: Copy, const N: usize> {
     vec: Vec<T, N>,
     next: usize,
@@ -580,6 +575,7 @@ pub struct IntoIter<T: Copy, const N: usize> {
 
 impl<T: Copy, const N: usize> Iterator for IntoIter<T, N> {
     type Item = T;
+
     fn next(&mut self) -> Option<Self::Item> {
         if self.next < self.vec.len() {
             let item = unsafe {
@@ -626,8 +622,8 @@ impl<T: Copy, const N: usize> Drop for IntoIter<T, N> {
 }
 
 impl<T: Copy, const N: usize> IntoIterator for Vec<T, N> {
-    type Item = T;
     type IntoIter = IntoIter<T, N>;
+    type Item = T;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIter { vec: self, next: 0 }

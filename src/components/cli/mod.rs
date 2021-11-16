@@ -8,8 +8,10 @@ use alloc::boxed::Box;
 use git_version::git_version;
 use indoc::indoc;
 
-use crate::components::logger;
-use crate::io::{self, Read};
+use crate::{
+    components::logger,
+    io::{self, Read},
+};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 const REVISION: &'static str = git_version!();
@@ -75,7 +77,7 @@ Usage:
 
 #[macro_export]
 macro_rules! __command {
-    (bootloader, [$persist:ident]) => {
+    (bootloader,[$persist:ident]) => {
         $crate::components::cli::Command::new("bootloader", "Reboot to bootloader", move |_| {
             let mut sysinfo: $crate::sysinfo::SystemInfo = $persist.load();
             sysinfo.reboot_reason = RebootReason::Bootloader;
@@ -83,7 +85,7 @@ macro_rules! __command {
             unsafe { $crate::components::cli::reboot() };
         })
     };
-    (osd, [$setter:ident]) => {
+    (osd,[$setter:ident]) => {
         $crate::components::cli::Command::new("osd", "OSD related command", move |cmd| {
             if cmd.trim() != "upload-font" {
                 println!("{}", $crate::components::cli::OSD_CMD_USAGE);
@@ -95,7 +97,7 @@ macro_rules! __command {
             }
         })
     };
-    (save, [$nvram:ident]) => {
+    (save,[$nvram:ident]) => {
         $crate::components::cli::Command::new("save", "Save configuration", move |_| {
             if let Some(err) = $nvram.store(config::get()).err() {
                 println!("Save configuration failed: {:?}", err);
@@ -103,7 +105,7 @@ macro_rules! __command {
             }
         })
     };
-    (telemetry, [$reader:ident]) => {
+    (telemetry,[$reader:ident]) => {
         $crate::components::cli::Command::new("telemetry", "Show flight data", move |_| {
             println!("{}", $reader.read())
         })

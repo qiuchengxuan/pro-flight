@@ -4,12 +4,17 @@ use alloc::{boxed::Box, vec, vec::Vec};
 
 use embedded_hal::PwmPin;
 use pro_flight::config::peripherals::pwm::PWMs as Config;
-use stm32f4xx_hal::gpio::{
-    gpioa::{PA1, PA2, PA3, PA8},
-    gpiob::{PB0, PB1},
-    Floating, Input,
+use stm32f4xx_hal::{
+    gpio::{
+        gpioa::{PA1, PA2, PA3, PA8},
+        gpiob::{PB0, PB1},
+        Floating, Input,
+    },
+    prelude::*,
+    pwm,
+    rcc::Clocks,
+    stm32,
 };
-use stm32f4xx_hal::{prelude::*, pwm, rcc::Clocks, stm32};
 
 type Default = Input<Floating>;
 type PWMs = (stm32::TIM1, stm32::TIM2, stm32::TIM3, stm32::TIM5);

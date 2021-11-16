@@ -1,5 +1,4 @@
-use core::fmt::Write;
-use core::str::FromStr;
+use core::{fmt::Write, str::FromStr};
 
 pub mod control;
 pub mod coordinate;

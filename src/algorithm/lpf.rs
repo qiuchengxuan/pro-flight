@@ -20,7 +20,7 @@ impl LPF<u16> {
     pub fn new(sample_rate: f32, freq: f32) -> Self {
         let rc = 1.0 / (2.0 * core::f32::consts::PI * freq);
         let alpha = ((1.0 / (1.0 + rc * sample_rate)) * 1000.0) as u16;
-        Self { alpha: alpha, value: 0 }
+        Self { alpha, value: 0 }
     }
 
     pub fn filter(&mut self, sample: u16) -> u16 {

@@ -1,21 +1,25 @@
 use alloc::boxed::Box;
 
-use ascii_osd_hud::hud::HUD;
-use ascii_osd_hud::symbol::default_symbol_table;
-use ascii_osd_hud::telemetry::{self as hud, Notes, Steerpoint, Telemetry, Unit};
-use ascii_osd_hud::{AspectRatio, PixelRatio};
+use ascii_osd_hud::{
+    hud::HUD,
+    symbol::default_symbol_table,
+    telemetry::{self as hud, Notes, Steerpoint, Telemetry, Unit},
+    AspectRatio, PixelRatio,
+};
 
-use crate::components::flight_data_hub::FlightDataReader;
-use crate::config;
-use crate::datastructures::{
-    coordinate::SphericalCoordinate,
-    flight::aviation::Attitude,
-    measurement::{
-        displacement::DistanceVector,
-        unit::{Feet, Knot, Meter, NauticalMile},
-        VelocityVector,
+use crate::{
+    components::flight_data_hub::FlightDataReader,
+    config,
+    datastructures::{
+        coordinate::SphericalCoordinate,
+        flight::aviation::Attitude,
+        measurement::{
+            displacement::DistanceVector,
+            unit::{Feet, Knot, Meter, NauticalMile},
+            VelocityVector,
+        },
+        Ratio,
     },
-    Ratio,
 };
 
 type Screen<const W: usize, const H: usize> = [[u8; W]; H];
@@ -107,7 +111,7 @@ impl<'a, const W: usize, const H: usize> AsciiHud<'a, W, H> {
             unit: Unit::Aviation,
             speed_vector: hud_coordinate(speed_vector),
             vario: data.aviation.vario as i16 / 100 * 100,
-            steerpoint: steerpoint,
+            steerpoint,
         };
         self.hud.draw(&hud_telemetry, self.screen.as_mut());
         &self.screen
@@ -119,9 +123,13 @@ mod test {
     fn test_speed_vector() {
         use ascii_osd_hud::telemetry as hud;
 
-        use crate::datastructures::coordinate::SphericalCoordinate;
-        use crate::datastructures::measurement::unit::{Knot, Meter};
-        use crate::datastructures::measurement::VelocityVector;
+        use crate::datastructures::{
+            coordinate::SphericalCoordinate,
+            measurement::{
+                unit::{Knot, Meter},
+                VelocityVector,
+            },
+        };
 
         let vector: VelocityVector<f32, Meter> = VelocityVector::new(10.0, 10.0, 10.0, Meter);
         let speed_vector: SphericalCoordinate<Knot> = vector.to_unit(Knot).into();

@@ -1,14 +1,17 @@
-use pro_flight::components::flight_data_hub::FlightDataHUB;
-use pro_flight::components::mixer::ControlMixer;
-use pro_flight::components::pipeline;
-use pro_flight::components::variometer::Variometer;
-use pro_flight::datastructures::control::Control;
-use pro_flight::datastructures::coordinate::Position;
-use pro_flight::datastructures::flight::FlightData;
-use pro_flight::datastructures::measurement::{
-    distance::Distance, unit, Acceleration, Course, Gyro, Heading, VelocityVector,
+use pro_flight::{
+    components::{
+        flight_data_hub::FlightDataHUB, mixer::ControlMixer, pipeline, variometer::Variometer,
+    },
+    datastructures::{
+        control::Control,
+        coordinate::Position,
+        flight::FlightData,
+        measurement::{
+            distance::Distance, unit, Acceleration, Course, Gyro, Heading, VelocityVector,
+        },
+    },
+    sync::DataWriter,
 };
-use pro_flight::sync::DataWriter;
 
 pub struct Config {
     pub sample_rate: usize,

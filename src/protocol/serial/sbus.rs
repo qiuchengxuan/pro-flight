@@ -3,12 +3,16 @@ use core::time::Duration;
 use embedded_hal::timer::CountDown;
 use sbus_parser::receiver::Receiver;
 
-use crate::config;
-use crate::datastructures::control::{Control, ControlType};
-use crate::datastructures::RSSI;
-use crate::protocol::serial;
-use crate::sync::DataWriter;
-use crate::sys::time::TickTimer;
+use crate::{
+    config,
+    datastructures::{
+        control::{Control, ControlType},
+        RSSI,
+    },
+    protocol::serial,
+    sync::DataWriter,
+    sys::time::TickTimer,
+};
 
 #[inline]
 fn to_axis(value: u16) -> i32 {

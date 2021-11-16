@@ -1,5 +1,4 @@
-use core::mem;
-use core::slice;
+use core::{mem, slice};
 
 use drone_core::reg::prelude::*;
 use drone_cortexm::reg::prelude::*;

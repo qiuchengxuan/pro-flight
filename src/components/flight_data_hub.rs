@@ -2,28 +2,30 @@
 use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
 
-use crate::datastructures::{
-    control::Control,
-    coordinate::{Displacement, Position},
-    flight::{
-        aviation::Aviation,
-        misc::Misc,
-        navigation::Navigation,
-        sensor::{Sensor, GNSS},
-        FlightData,
-    },
-    measurement::{
-        euler::{Euler, DEGREE_PER_DAG},
-        unit,
-        voltage::Voltage,
-        Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
-    },
-    output::Output,
-    RSSI,
-};
 use crate::{
-    sync::cell::{Cell, CellReader},
-    sync::DataReader,
+    datastructures::{
+        control::Control,
+        coordinate::{Displacement, Position},
+        flight::{
+            aviation::Aviation,
+            misc::Misc,
+            navigation::Navigation,
+            sensor::{Sensor, GNSS},
+            FlightData,
+        },
+        measurement::{
+            euler::{Euler, DEGREE_PER_DAG},
+            unit,
+            voltage::Voltage,
+            Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
+        },
+        output::Output,
+        RSSI,
+    },
+    sync::{
+        cell::{Cell, CellReader},
+        DataReader,
+    },
 };
 
 macro_rules! flight_data {

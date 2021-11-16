@@ -136,6 +136,7 @@ mod test {
 
     impl Flash<u32> for DummyFlash {
         type Error = ();
+
         fn erase(&mut self, address: usize) -> Result<(), ()> {
             unsafe { *(address as *mut u32) = super::EMPTY }
             Ok(())

@@ -134,17 +134,15 @@ impl File {
 
 impl Read for File {
     type Error = Error;
+
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
-        if let Some(fd) = self.fd.as_ref() {
-            get_media(self.schema).read(fd, buf)
-        } else {
-            Ok(0)
-        }
+        if let Some(fd) = self.fd.as_ref() { get_media(self.schema).read(fd, buf) } else { Ok(0) }
     }
 }
 
 impl Write for File {
     type Error = Error;
+
     fn write(&mut self, bytes: &[u8]) -> Result<usize, Error> {
         if let Some(fd) = self.fd.as_ref() {
             get_media(self.schema).write(fd, bytes)

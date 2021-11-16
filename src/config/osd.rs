@@ -1,6 +1,8 @@
-use core::fmt::{Display, Formatter};
-use core::str::Split;
-use core::time::Duration;
+use core::{
+    fmt::{Display, Formatter},
+    str::Split,
+    time::Duration,
+};
 
 use crate::datastructures::Ratio;
 

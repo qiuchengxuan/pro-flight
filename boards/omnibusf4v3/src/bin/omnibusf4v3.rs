@@ -4,8 +4,11 @@
 use drone_core::{mem, token::Token};
 use drone_cortexm::processor;
 
-use omnibusf4v3::thread::{ThrsInit, Vtable};
-use omnibusf4v3::{tasks, Regs};
+use omnibusf4v3::{
+    tasks,
+    thread::{ThrsInit, Vtable},
+    Regs,
+};
 
 /// The vector table.
 #[no_mangle]

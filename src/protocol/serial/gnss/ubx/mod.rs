@@ -1,21 +1,20 @@
 pub mod message;
 pub mod nav_pos_pvt;
 
-use core::mem::size_of;
-use core::mem::transmute;
+use core::mem::{size_of, transmute};
 
 use chrono::naive::NaiveDateTime;
 use fixed_point::FixedPoint;
 
-use crate::datastructures::{
-    coordinate::Position,
-    measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
+use crate::{
+    datastructures::{
+        coordinate::Position,
+        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
+    },
+    protocol::{serial, serial::gnss::DataSource},
+    sync::{cell::Cell, DataWriter},
+    sys::time,
 };
-use crate::protocol::serial;
-use crate::protocol::serial::gnss::DataSource;
-use crate::sync::cell::Cell;
-use crate::sync::DataWriter;
-use crate::sys::time;
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
@@ -179,12 +178,14 @@ mod test {
     fn test_message() {
         use hex_literal::hex;
 
-        use crate::components::flight_data_hub::FlightDataHUB;
-        use crate::protocol::serial::{
-            gnss::{ubx::message::Message, DataSource},
-            Receiver,
+        use crate::{
+            components::flight_data_hub::FlightDataHUB,
+            protocol::serial::{
+                gnss::{ubx::message::Message, DataSource},
+                Receiver,
+            },
+            sync::DataReader,
         };
-        use crate::sync::DataReader;
 
         use super::{NavPositionVelocityTime, UBX};
 

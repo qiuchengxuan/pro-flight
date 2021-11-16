@@ -1,8 +1,10 @@
-use crate::datastructures::{
-    coordinate::{Displacement, Position},
-    measurement::{displacement::DistanceVector, unit, Altitude, VelocityVector},
+use crate::{
+    datastructures::{
+        coordinate::{Displacement, Position},
+        measurement::{displacement::DistanceVector, unit, Altitude, VelocityVector},
+    },
+    sync::{AgingDataReader, DataReader},
 };
-use crate::sync::{AgingDataReader, DataReader};
 
 pub struct Positioning<A, GNSS> {
     altimeter: A,

@@ -10,8 +10,10 @@ pub use simulator::{Config, Simulator, GNSS};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_std::sync::Mutex;
-use pro_flight::datastructures::control::Control;
-use pro_flight::datastructures::measurement::{distance::Distance, unit, Acceleration, Gyro};
+use pro_flight::datastructures::{
+    control::Control,
+    measurement::{distance::Distance, unit, Acceleration, Gyro},
+};
 
 #[no_mangle]
 fn get_jiffies() -> u64 {

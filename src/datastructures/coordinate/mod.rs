@@ -62,7 +62,7 @@ impl core::ops::Sub for Position {
         let x = self.longitude - other.longitude;
         let y = self.latitude - other.latitude;
         let height = self.altitude - other.altitude;
-        Self::Output { x: x, y: y, z: height.to_unit(unit::Meter).into() }
+        Self::Output { x, y, z: height.to_unit(unit::Meter).into() }
     }
 }
 
@@ -91,9 +91,9 @@ impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<U>> for Position
 mod test {
     #[test]
     fn test_spherical_coordinate() {
-        use crate::datastructures::measurement::displacement::DistanceVector;
-        use crate::datastructures::measurement::distance::Distance;
-        use crate::datastructures::measurement::unit::Meter;
+        use crate::datastructures::measurement::{
+            displacement::DistanceVector, distance::Distance, unit::Meter,
+        };
 
         use super::SphericalCoordinate;
 
@@ -109,23 +109,26 @@ mod test {
 
         let vector = DistanceVector::new(-60.0, 100.0, 0.0, Meter);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
-        assert_eq!(
-            coordinate,
-            SphericalCoordinate { rho: Distance::new(116, Meter), theta: -30, phi: 0 }
-        );
+        assert_eq!(coordinate, SphericalCoordinate {
+            rho: Distance::new(116, Meter),
+            theta: -30,
+            phi: 0
+        });
 
         let vector = DistanceVector::new(0.0, 100.0, 60.0, Meter);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
-        assert_eq!(
-            coordinate,
-            SphericalCoordinate { rho: Distance::new(116, Meter), theta: 0, phi: 31 }
-        );
+        assert_eq!(coordinate, SphericalCoordinate {
+            rho: Distance::new(116, Meter),
+            theta: 0,
+            phi: 31
+        });
 
         let vector = DistanceVector::new(0.0, 100.0, -60.0, Meter);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
-        assert_eq!(
-            coordinate,
-            SphericalCoordinate { rho: Distance::new(116, Meter), theta: 0, phi: -31 }
-        );
+        assert_eq!(coordinate, SphericalCoordinate {
+            rho: Distance::new(116, Meter),
+            theta: 0,
+            phi: -31
+        });
     }
 }

@@ -1,5 +1,7 @@
-use core::fmt::Write;
-use core::str::{FromStr, Split};
+use core::{
+    fmt::Write,
+    str::{FromStr, Split},
+};
 
 use heapless::LinearMap;
 use serde::ser::SerializeMap;
@@ -108,11 +110,7 @@ impl Default for SbusConfig {
 
 impl SbusConfig {
     pub fn baudrate(&self) -> u32 {
-        if !self.fast {
-            100_000
-        } else {
-            200_000
-        }
+        if !self.fast { 100_000 } else { 200_000 }
     }
 }
 

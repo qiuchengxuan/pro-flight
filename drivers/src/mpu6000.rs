@@ -1,15 +1,20 @@
 use alloc::boxed::Box;
 use core::ptr;
 
-use embedded_hal::blocking::delay::DelayUs;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
 use hal::dma::{BufferDescriptor, Channel, Peripheral, TransferOption, DMA};
-use mpu6000::registers::{AccelerometerSensitive, GyroSensitive, Register};
-use mpu6000::{self, bus::RegAccess, ClockSource, IntPinConfig, Interrupt};
+use mpu6000::{
+    self,
+    bus::RegAccess,
+    registers::{AccelerometerSensitive, GyroSensitive, Register},
+    ClockSource, IntPinConfig, Interrupt,
+};
 pub use mpu6000::{bus::SpiBus, MPU6000, SPI_MODE};
-use pro_flight::config;
-use pro_flight::datastructures::measurement::{Acceleration, Axes, Measurement, Rotation};
-use pro_flight::sys::time::TickTimer;
+use pro_flight::{
+    config,
+    datastructures::measurement::{Acceleration, Axes, Measurement, Rotation},
+    sys::time::TickTimer,
+};
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 pub const NUM_MEASUREMENT_REGS: usize = 14;

@@ -12,16 +12,20 @@ use core::{mem, slice, str::Split};
 
 use fixed_point::{fixed_point, FixedPoint};
 
-use crate::datastructures::measurement::{Axes, Bias, Gain};
-use crate::io::Read;
+use crate::{
+    datastructures::measurement::{Axes, Bias, Gain},
+    io::Read,
+};
 pub use aircraft::Aircraft;
 pub use battery::Battery;
 pub use board::Board;
 pub use imu::IMU;
 pub use osd::{Offset, Standard, OSD};
-pub use peripherals::pwm::{PWMs, Protocol, PWM};
-pub use peripherals::serial::{Config as SerialConfig, Serials};
-pub use peripherals::Peripherals;
+pub use peripherals::{
+    pwm::{PWMs, Protocol, PWM},
+    serial::{Config as SerialConfig, Serials},
+    Peripherals,
+};
 pub use receiver::Receiver;
 use setter::{Error, Setter, Value};
 use yaml::YamlParser;
@@ -191,13 +195,14 @@ mod test {
     #[test]
     #[serial]
     fn test_init_config() -> std::io::Result<()> {
-        use std::fmt::Write;
-        use std::fs::File;
-        use std::io::Read;
-        use std::string::{String, ToString};
+        use std::{
+            fmt::Write,
+            fs::File,
+            io::Read,
+            string::{String, ToString},
+        };
 
-        use super::yaml::YamlParser;
-        use super::Config;
+        use super::{yaml::YamlParser, Config};
 
         let mut file = File::open("sample.yml")?;
         let mut yaml_string = String::new();
@@ -213,14 +218,9 @@ mod test {
     #[test]
     #[serial]
     fn test_binary_decode() -> std::io::Result<()> {
-        use std::fmt::Write;
-        use std::fs::File;
-        use std::io::Read;
-        use std::mem;
-        use std::string::String;
+        use std::{fmt::Write, fs::File, io::Read, mem, string::String};
 
-        use super::yaml::YamlParser;
-        use super::Config;
+        use super::{yaml::YamlParser, Config};
 
         let mut file = File::open("sample.yml")?;
         let mut yaml_string = String::new();

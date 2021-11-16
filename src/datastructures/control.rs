@@ -12,6 +12,7 @@ pub enum ControlType {
 
 impl FromStr for ControlType {
     type Err = ();
+
     fn from_str(string: &str) -> Result<Self, ()> {
         match string {
             "throttle" => Ok(Self::Throttle),

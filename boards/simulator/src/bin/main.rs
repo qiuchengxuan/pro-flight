@@ -3,8 +3,7 @@ extern crate log;
 use env_logger::Env;
 use std::io::Read;
 
-use pro_flight::config;
-use pro_flight::config::yaml::YamlParser;
+use pro_flight::{config, config::yaml::YamlParser};
 
 fn init<'a>(matches: &'a clap::ArgMatches<'a>) -> Result<simulator::Config, String> {
     let config_path = matches.value_of("config").unwrap_or("simulator.yaml");

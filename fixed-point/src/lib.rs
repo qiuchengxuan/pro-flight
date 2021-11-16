@@ -2,10 +2,7 @@
 
 pub use fixed_point_macro::fixed_point;
 
-use core::convert;
-use core::fmt::Display;
-use core::ops;
-use core::str::FromStr;
+use core::{convert, fmt::Display, ops, str::FromStr};
 use num_traits::pow::Pow;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
@@ -52,6 +49,7 @@ impl<T: Number, const D: u8> FixedPoint<T, D> {
 
 impl<T: ops::Div<Output = T>, const D: u8> ops::Div<T> for FixedPoint<T, D> {
     type Output = Self;
+
     fn div(self, div: T) -> Self {
         Self(self.0 / div)
     }
@@ -66,6 +64,7 @@ impl<T: Copy + Into<i32>, const D: u8> Into<f32> for FixedPoint<T, D> {
 
 impl<T: convert::TryFrom<isize>, const D: u8> FromStr for FixedPoint<T, D> {
     type Err = ();
+
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         let negative = string.chars().next().map(|c| c == '-').unwrap_or(false);
         let mut splitted = string.split('.');

@@ -1,17 +1,22 @@
 use alloc::boxed::Box;
 use core::ptr;
 
-use bmp280::bus::{Bus, SpiBus};
-use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
-use bmp280::registers::{PressureOversampling, Register, StandbyTime, TemperatureOversampling};
 pub use bmp280::DEFAULT_SPI_MODE as SPI_MODE;
-use bmp280::{Mode, BMP280};
-use embedded_hal::blocking::delay::DelayUs;
-use embedded_hal::blocking::spi::{Transfer, Write};
-use embedded_hal::digital::v2::OutputPin;
+use bmp280::{
+    bus::{Bus, SpiBus},
+    measurement::{Calibration, RawPressure, RawTemperature},
+    registers::{PressureOversampling, Register, StandbyTime, TemperatureOversampling},
+    Mode, BMP280,
+};
+use embedded_hal::{
+    blocking::{
+        delay::DelayUs,
+        spi::{Transfer, Write},
+    },
+    digital::v2::OutputPin,
+};
 use hal::dma::{BufferDescriptor, TransferOption, DMA};
-use pro_flight::datastructures::measurement::Pressure;
-use pro_flight::sys::time::TickTimer;
+use pro_flight::{datastructures::measurement::Pressure, sys::time::TickTimer};
 
 pub const SAMPLE_RATE: usize = 10; // actually 16
 

@@ -19,9 +19,10 @@ impl BaudrateControl {
 
 #[macro_export]
 macro_rules! __define_spi {
-    ($spi:ident => (
-        $gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:ident, $into_af:ident
-    )) => {
+    (
+        $spi:ident =>
+        ($gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:ident, $into_af:ident)
+    ) => {
         type $sclk = gpio::$gpio::$sclk<Input<Floating>>;
         type $miso = gpio::$gpio::$miso<Input<Floating>>;
         type $mosi = gpio::$gpio::$mosi<Input<Floating>>;

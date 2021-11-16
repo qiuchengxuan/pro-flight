@@ -1,8 +1,8 @@
-use crate::config::aircraft::Configuration;
-use crate::datastructures::control::Control;
-use crate::datastructures::output::Output;
-use crate::sync::cell::CellReader;
-use crate::sync::AgingDataReader;
+use crate::{
+    config::aircraft::Configuration,
+    datastructures::{control::Control, output::Output},
+    sync::{cell::CellReader, AgingDataReader},
+};
 
 pub struct ControlMixer<'a> {
     receiver: CellReader<'a, Control>,

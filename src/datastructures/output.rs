@@ -1,9 +1,9 @@
 use serde::ser::SerializeMap;
 
-use crate::config::aircraft::Configuration;
-use crate::config::peripherals::pwm::ServoType;
-use crate::datastructures::control::Control;
-use crate::datastructures::vec::Vec;
+use crate::{
+    config::{aircraft::Configuration, peripherals::pwm::ServoType},
+    datastructures::{control::Control, vec::Vec},
+};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct FixedWing {

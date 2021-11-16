@@ -1,7 +1,9 @@
 use chrono::naive::{NaiveDate, NaiveTime};
 
-use crate::datastructures::coordinate;
-use crate::datastructures::coordinate::{latitude, longitude};
+use crate::datastructures::{
+    coordinate,
+    coordinate::{latitude, longitude},
+};
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Valid(u8);

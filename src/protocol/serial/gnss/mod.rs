@@ -1,13 +1,15 @@
 use alloc::boxed::Box;
 
-use crate::components::flight_data_hub::FlightDataHUB;
-use crate::config::peripherals::serial::{GNSSConfig, GNSSProtocol};
-use crate::datastructures::{
-    coordinate::Position,
-    measurement::{unit, Course, Heading, VelocityVector},
+use crate::{
+    components::flight_data_hub::FlightDataHUB,
+    config::peripherals::serial::{GNSSConfig, GNSSProtocol},
+    datastructures::{
+        coordinate::Position,
+        measurement::{unit, Course, Heading, VelocityVector},
+    },
+    protocol::serial::Receiver,
+    sync::cell::Cell,
 };
-use crate::protocol::serial::Receiver;
-use crate::sync::cell::Cell;
 
 pub struct DataSource<'a> {
     pub fixed: &'a Cell<bool>,

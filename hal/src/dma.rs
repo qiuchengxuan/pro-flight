@@ -1,7 +1,9 @@
 use alloc::boxed::Box;
-use core::future::Future;
-use core::sync::atomic::{AtomicBool, Ordering};
-use core::{mem, slice};
+use core::{
+    future::Future,
+    mem, slice,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Owner {

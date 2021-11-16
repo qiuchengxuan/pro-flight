@@ -1,10 +1,16 @@
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
-use core::{cmp, mem};
+use core::{
+    cmp,
+    future::Future,
+    mem,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use drone_core::fib::Yielded;
-use drone_cortexm::{reg::prelude::*, reg::Reg as _, thr::prelude::*, thr::ThrNvic};
+use drone_cortexm::{
+    reg::{prelude::*, Reg as _},
+    thr::{prelude::*, ThrNvic},
+};
 use drone_stm32_map::periph::dma::ch::*;
 
 use hal::dma::{

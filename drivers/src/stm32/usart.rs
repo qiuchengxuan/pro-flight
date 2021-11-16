@@ -1,10 +1,11 @@
 use alloc::boxed::Box;
 
 use embedded_hal::serial;
-use hal::dma::{BufferDescriptor, Peripheral, TransferOption, DMA};
-use hal::serial::Error;
-use pro_flight::config::SerialConfig;
-use pro_flight::protocol::serial::Receiver;
+use hal::{
+    dma::{BufferDescriptor, Peripheral, TransferOption, DMA},
+    serial::Error,
+};
+use pro_flight::{config::SerialConfig, protocol::serial::Receiver};
 use stm32f4xx_hal::{
     prelude::*,
     serial::config::{Config, DmaConfig, Parity, StopBits, WordLength},

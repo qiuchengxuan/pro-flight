@@ -1,18 +1,23 @@
 use nalgebra::UnitQuaternion;
 
-use crate::algorithm::imu;
-use crate::components::flight_data_hub::FlightDataHUB;
-use crate::components::positioning::Positioning;
-use crate::components::speedometer::Speedometer;
-use crate::config;
-use crate::datastructures::{
-    coordinate::{Displacement, Position},
-    measurement::{
-        unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity, VelocityVector,
+use crate::{
+    algorithm::imu,
+    components::{
+        flight_data_hub::FlightDataHUB, positioning::Positioning, speedometer::Speedometer,
+    },
+    config,
+    datastructures::{
+        coordinate::{Displacement, Position},
+        measurement::{
+            unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity,
+            VelocityVector,
+        },
+    },
+    sync::{
+        cell::{Cell, CellReader},
+        AgingDataReader, DataReader, DataWriter,
     },
 };
-use crate::sync::cell::{Cell, CellReader};
-use crate::sync::{AgingDataReader, DataReader, DataWriter};
 
 type VelocityMeter<'a> = CellReader<'a, Velocity<i32, unit::CMpS>>;
 type GNSSSpeedometer<'a> = CellReader<'a, VelocityVector<i32, unit::MMpS>>;

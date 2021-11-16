@@ -21,6 +21,7 @@ impl Euler {
 
 impl core::ops::Mul<f32> for Euler {
     type Output = Self;
+
     fn mul(self, m: f32) -> Euler {
         Euler { roll: self.roll * m, pitch: self.pitch * m, yaw: self.yaw * m }
     }
@@ -28,6 +29,7 @@ impl core::ops::Mul<f32> for Euler {
 
 impl core::ops::Div<f32> for Euler {
     type Output = Self;
+
     fn div(self, d: f32) -> Euler {
         Euler { roll: self.roll / d, pitch: self.pitch / d, yaw: self.yaw / d }
     }

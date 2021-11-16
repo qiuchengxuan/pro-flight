@@ -1,7 +1,9 @@
 use core::str::Split;
 
-use crate::config::setter::{Error, Setter, Value};
-use crate::datastructures::measurement::Rotation;
+use crate::{
+    config::setter::{Error, Setter, Value},
+    datastructures::measurement::Rotation,
+};
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
 pub struct Board {

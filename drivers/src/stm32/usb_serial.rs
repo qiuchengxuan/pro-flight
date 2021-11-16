@@ -1,14 +1,15 @@
 use alloc::boxed::Box;
-use core::mem::MaybeUninit;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{
+    mem::MaybeUninit,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use pro_flight::io::Error;
 use stm32f4xx_hal::{
     otg_fs::{UsbBus, USB},
     stm32,
 };
-use usb_device::bus::UsbBusAllocator;
-use usb_device::prelude::*;
+use usb_device::{bus::UsbBusAllocator, prelude::*};
 use usbd_serial::{SerialPort, UsbError};
 
 static mut USB_DEVICE: MaybeUninit<UsbDevice<'static, UsbBus<USB>>> = MaybeUninit::uninit();

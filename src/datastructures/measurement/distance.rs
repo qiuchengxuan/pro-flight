@@ -1,6 +1,7 @@
-use core::fmt;
-use core::marker;
-use core::ops::{Add, AddAssign, Div, Mul, Sub};
+use core::{
+    fmt, marker,
+    ops::{Add, AddAssign, Div, Mul, Sub},
+};
 
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Distance<T, U> {
@@ -43,6 +44,7 @@ impl<T: PartialEq + Copy + Default, U: Copy> PartialEq for Distance<T, U> {
 
 impl<T: Add<Output = T> + Copy + Default + PartialEq, U: Copy> Add for Distance<T, U> {
     type Output = Distance<T::Output, U>;
+
     fn add(self, other: Self) -> Self::Output {
         Self { value: self.value + other.value, unit: marker::PhantomData }
     }
@@ -56,6 +58,7 @@ impl<T: AddAssign + Copy + Default + PartialEq, U: Copy> AddAssign for Distance<
 
 impl<T: Sub<Output = T> + Copy + Default + PartialEq, U: Copy> Sub for Distance<T, U> {
     type Output = Distance<T::Output, U>;
+
     fn sub(self, other: Self) -> Self::Output {
         Self { value: self.value - other.value, unit: marker::PhantomData }
     }
@@ -63,6 +66,7 @@ impl<T: Sub<Output = T> + Copy + Default + PartialEq, U: Copy> Sub for Distance<
 
 impl<T: Mul<Output = T> + Copy + Default + PartialEq, U: Copy> Mul<T> for Distance<T, U> {
     type Output = Distance<T::Output, U>;
+
     fn mul(self, t: T) -> Self::Output {
         Self { value: self.value * t, unit: marker::PhantomData }
     }
@@ -70,6 +74,7 @@ impl<T: Mul<Output = T> + Copy + Default + PartialEq, U: Copy> Mul<T> for Distan
 
 impl<T: Div<Output = T> + Copy + Default + PartialEq, U: Copy> Div<T> for Distance<T, U> {
     type Output = Distance<T::Output, U>;
+
     fn div(self, t: T) -> Self::Output {
         Self { value: self.value / t, unit: marker::PhantomData }
     }

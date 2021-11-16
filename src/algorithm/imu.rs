@@ -1,9 +1,12 @@
 use nalgebra::{UnitQuaternion, Vector3};
 
-use crate::algorithm::mahony::{MagnetismOrHeading, Mahony};
-use crate::config::imu::IMU as Config;
-use crate::datastructures::measurement::euler::DEGREE_PER_DAG;
-use crate::datastructures::measurement::{Acceleration, Bias, Gain, Gyro, Heading, Magnetism};
+use crate::{
+    algorithm::mahony::{MagnetismOrHeading, Mahony},
+    config::imu::IMU as Config,
+    datastructures::measurement::{
+        euler::DEGREE_PER_DAG, Acceleration, Bias, Gain, Gyro, Heading, Magnetism,
+    },
+};
 
 #[derive(PartialEq)]
 pub enum Calibration {

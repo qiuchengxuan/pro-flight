@@ -1,6 +1,8 @@
-use core::cell::Cell;
-use core::fmt::{self, Write as _};
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{
+    cell::Cell,
+    fmt::{self, Write as _},
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 pub trait Read {
     type Error;
@@ -59,6 +61,7 @@ impl Drop for Stdin {
 
 impl Read for Stdin {
     type Error = Error;
+
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         if self.0.get() {
             return unsafe { stdin_read_bytes(buf) };
@@ -80,6 +83,7 @@ pub fn stdout() -> Stdout {
 
 impl Write for Stdout {
     type Error = Error;
+
     fn write(&mut self, bytes: &[u8]) -> Result<usize, Error> {
         unsafe { stdout_write_bytes(bytes) };
         Ok(bytes.len())

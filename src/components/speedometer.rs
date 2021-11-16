@@ -1,9 +1,11 @@
 use nalgebra::Vector3;
 
-use crate::algorithm::ComplementaryFilter;
-use crate::config;
-use crate::datastructures::measurement::{unit, Velocity, VelocityVector, GRAVITY};
-use crate::sync::{AgingDataReader, DataReader};
+use crate::{
+    algorithm::ComplementaryFilter,
+    config,
+    datastructures::measurement::{unit, Velocity, VelocityVector, GRAVITY},
+    sync::{AgingDataReader, DataReader},
+};
 
 pub struct Speedometer<A, GNSS> {
     altimeter: A,

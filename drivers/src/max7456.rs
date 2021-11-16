@@ -1,10 +1,10 @@
 use alloc::boxed::Box;
-use core::future::Future;
-use core::ptr;
-use core::time::Duration;
+use core::{future::Future, ptr, time::Duration};
 
-use embedded_hal::blocking::spi::{Transfer, Write};
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::{
+    blocking::spi::{Transfer, Write},
+    digital::v2::OutputPin,
+};
 use hal::dma::{BufferDescriptor, TransferOption, DMA};
 use max7456::{
     character_memory::{build_store_char_operation, CHAR_DATA_SIZE, STORE_CHAR_BUFFER_SIZE},
@@ -78,6 +78,7 @@ where
     TX: DMA<Future = TXF>,
 {
     type Error = E;
+
     fn into_dma(
         mut self,
         rx: FlagReceiver,

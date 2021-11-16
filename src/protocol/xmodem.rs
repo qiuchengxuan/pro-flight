@@ -2,8 +2,10 @@ use core::time::Duration;
 
 use ascii::{AsciiChar, ToAsciiChar};
 
-use crate::io::{self, Read, Write};
-use crate::sys::time::TickTimer;
+use crate::{
+    io::{self, Read, Write},
+    sys::time::TickTimer,
+};
 
 #[repr(C)]
 struct Packet {

@@ -4,8 +4,10 @@ use embedded_hal::PwmPin;
 use heapless::LinearMap;
 
 use crate::{
-    components::mixer::ControlMixer, config::peripherals::pwm as config,
-    datastructures::output::Output, sync::cell::Cell, sync::DataWriter,
+    components::mixer::ControlMixer,
+    config::peripherals::pwm as config,
+    datastructures::output::Output,
+    sync::{cell::Cell, DataWriter},
 };
 
 fn to_motor_pwm_duty(max_duty: u16, rate: u16, value: u16) -> u16 {

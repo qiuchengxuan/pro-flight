@@ -1,12 +1,16 @@
 use alloc::boxed::Box;
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
-use core::time::Duration;
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
-use embedded_hal::timer::CountDown;
+use embedded_hal::{
+    blocking::delay::{DelayMs, DelayUs},
+    timer::CountDown,
+};
 use hal::rtc::{RTCReader, RTCWriter};
 use nb;
 use void::Void;

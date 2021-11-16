@@ -1,5 +1,4 @@
-use core::fmt;
-use core::ops;
+use core::{fmt, ops};
 
 use fixed_point::{fixed_point, FixedPoint};
 use integer_sqrt::IntegerSquareRoot;

@@ -1,6 +1,8 @@
-use core::fmt::{self, Display, Formatter, Write};
-use core::str::from_utf8_unchecked;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    fmt::{self, Display, Formatter, Write},
+    str::from_utf8_unchecked,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use log::{Log, Metadata, Record};
 

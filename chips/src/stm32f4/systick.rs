@@ -1,8 +1,9 @@
-use core::mem::MaybeUninit;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::{
+    mem::MaybeUninit,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
-use drone_core::fib::Yielded;
-use drone_core::thr::ThrToken;
+use drone_core::{fib::Yielded, thr::ThrToken};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::sys_tick::SysTickPeriph;
 

@@ -5,8 +5,7 @@ use integer_sqrt::IntegerSquareRoot as SquareRoot;
 use micromath::F32Ext;
 use nalgebra::Vector3;
 
-use super::distance::Distance;
-use super::unit::Meter;
+use super::{distance::Distance, unit::Meter};
 
 #[derive(Copy, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct DistanceVector<T, U: Copy> {

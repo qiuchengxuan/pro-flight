@@ -1,8 +1,9 @@
-use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
-use chrono::{Datelike, Timelike};
+use chrono::{
+    naive::{NaiveDate, NaiveDateTime, NaiveTime},
+    Datelike, Timelike,
+};
 use drone_cortexm::reg::prelude::*;
-use drone_stm32_map::periph::rtc::RtcPeriph;
-use drone_stm32_map::reg;
+use drone_stm32_map::{periph::rtc::RtcPeriph, reg};
 use hal::{self, persist::PersistDatastore};
 
 const RTCPRE: u32 = 8; // HSE / 8 = 1MHz
