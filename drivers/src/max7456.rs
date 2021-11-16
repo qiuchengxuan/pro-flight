@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use core::future::Future;
+use core::ptr;
 use core::time::Duration;
 
 use embedded_hal::blocking::spi::{Transfer, Write};
@@ -86,7 +87,7 @@ where
         let video_mode_0 = self.load(Registers::VideoMode0)?;
         let mut bd = Box::new(BufferDescriptor::<u8, 800>::default());
         let (_, cs) = self.free();
-        let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
+        let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
         bd.set_callback(move |_bytes| {
             cs_.set_high().ok();
         });

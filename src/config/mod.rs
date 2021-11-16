@@ -8,9 +8,7 @@ pub mod receiver;
 pub mod setter;
 pub mod yaml;
 
-use core::mem;
-use core::slice;
-use core::str::Split;
+use core::{mem, slice, str::Split};
 
 use fixed_point::{fixed_point, FixedPoint};
 
@@ -103,9 +101,9 @@ pub struct Config {
     pub board: Board,
     pub imu: IMU,
     pub osd: OSD,
+    pub peripherals: Peripherals,
     pub receiver: Receiver,
     pub speedometer: Speedometer,
-    pub peripherals: Peripherals,
 }
 
 impl Setter for Config {
@@ -116,9 +114,9 @@ impl Setter for Config {
             "board" => self.board.set(path, value),
             "imu" => self.imu.set(path, value),
             "osd" => self.osd.set(path, value),
+            "peripherals" => self.peripherals.set(path, value),
             "receiver" => self.receiver.set(path, value),
             "speedometer" => self.speedometer.set(path, value),
-            "peripherals" => self.peripherals.set(path, value),
             _ => Err(Error::MalformedPath),
         }
     }
@@ -190,9 +188,6 @@ pub fn reset() {
 }
 
 mod test {
-    #[cfg(test)]
-    extern crate std;
-
     #[test]
     #[serial]
     fn test_init_config() -> std::io::Result<()> {

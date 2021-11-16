@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use core::ptr;
 
 use bmp280::bus::{Bus, SpiBus};
 use bmp280::measurement::{Calibration, RawPressure, RawTemperature};
@@ -63,7 +64,7 @@ impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
         let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::default());
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
         trace!("Init BMP280 DMA address at 0x{:x}", address as usize);
-        let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
+        let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
         rx_bd.set_callback(move |result| {
             cs_.set_high().ok();
             handler(compensator.convert(result.into()))

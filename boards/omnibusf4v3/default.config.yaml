@@ -23,18 +23,6 @@ osd:
     vertical: 0
   refresh-rate: 50
   standard: PAL
-receiver:
-  inputs:
-    roll:
-      channel: 1
-    pitch:
-      channel: 2
-    throttle:
-      channel: 3
-    yaw:
-      channel: 4
-speedometer:
-  kp: 0.25
 peripherals:
   serial:
     USART1:
@@ -65,3 +53,15 @@ peripherals:
       type: aileron-left
     PWM6:
       type: rudder
+receiver:
+  inputs:
+    roll:
+      channel: 1
+    pitch:
+      channel: 2
+    throttle:
+      channel: 3
+    yaw:
+      channel: 4
+speedometer:
+  kp: 0.25

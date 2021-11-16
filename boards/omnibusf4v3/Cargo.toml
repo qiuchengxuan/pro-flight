@@ -15,9 +15,7 @@ doc = false
 [features]
 default = []
 std = [
-    "drone-core/std",
     "drone-cortexm/std",
-    "drone-stm32-map/std",
     "futures/std",
 ]
 

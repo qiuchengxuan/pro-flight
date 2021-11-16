@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use core::ptr;
 
 use embedded_hal::blocking::delay::DelayUs;
 use embedded_hal::digital::v2::OutputPin;
@@ -113,7 +114,7 @@ where
         let (mut tx, ch) = tx;
         tx.setup_peripheral(ch, &mut spi);
         let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
-        let mut cs_ = unsafe { core::ptr::read(&cs as *const _ as *const CS) };
+        let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
         rx_bd.set_callback(move |_bytes| {
             cs_.set_high().ok();
         });
@@ -135,7 +136,7 @@ where
     where
         F: FnMut(Acceleration, Measurement) + Send + 'static,
     {
-        let mut cs = unsafe { core::ptr::read(&self.cs as *const _ as *const CS) };
+        let mut cs = unsafe { ptr::read(ptr::addr_of!(self.cs)) };
         let convertor = Converter::from(config::get().imu);
         let rotation = config::get().board.rotation;
         self.rx_bd.set_callback(move |result| {

@@ -1,5 +1,6 @@
 //! The root task.
 
+use alloc::boxed::Box;
 use core::time::Duration;
 
 use chips::stm32f4::{
