@@ -10,7 +10,7 @@ use crate::{
         RSSI,
     },
     protocol::serial,
-    sync::DataWriter,
+    service::info,
     sys::time::TickTimer,
 };
 
@@ -41,7 +41,7 @@ pub struct SBUS<'a, R, C> {
     control_input: &'a C,
 }
 
-impl<'a, R: DataWriter<RSSI>, C: DataWriter<Control>> SBUS<'a, R, C> {
+impl<'a, R: info::Writer<RSSI>, C: info::Writer<Control>> SBUS<'a, R, C> {
     pub fn new(rssi: &'a R, fast: bool, control_input: &'a C) -> Self {
         let gap = Duration::from_millis(if fast { 10 } else { 20 } - 1);
         Self {
@@ -58,8 +58,8 @@ impl<'a, R: DataWriter<RSSI>, C: DataWriter<Control>> SBUS<'a, R, C> {
 
 impl<'a, R, C> serial::Receiver for SBUS<'a, R, C>
 where
-    R: DataWriter<RSSI> + Sync,
-    C: DataWriter<Control> + Sync,
+    R: info::Writer<RSSI> + Sync,
+    C: info::Writer<Control> + Sync,
 {
     fn receive_size(&self) -> usize {
         1

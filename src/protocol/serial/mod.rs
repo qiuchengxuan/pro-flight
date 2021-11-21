@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use crate::{components::flight_data_hub::FlightDataHUB, config::peripherals::serial::Config};
+use crate::{config::peripherals::serial::Config, service::flight::data::FlightDataHUB};
 
 pub trait Receiver: Send {
     fn receive_size(&self) -> usize;

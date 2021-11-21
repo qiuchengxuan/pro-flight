@@ -1,10 +1,4 @@
 use pro_flight::{
-    components::{
-        flight_control::{mixer::ControlMixer, pid::PIDs},
-        flight_data_hub::FlightDataHUB,
-        pipeline,
-        variometer::Variometer,
-    },
     config,
     config::aircraft::Configuration,
     datastructures::{
@@ -16,7 +10,13 @@ use pro_flight::{
         },
         output::Output,
     },
-    sync::DataWriter,
+    service::{
+        aviation::{mixer::ControlMixer, pid::PIDs},
+        flight::data::FlightDataHUB,
+        imu,
+        info::Writer,
+        variometer::Variometer,
+    },
 };
 
 pub struct Config {
@@ -35,7 +35,7 @@ pub struct GNSS {
 
 pub struct Simulator {
     hub: &'static FlightDataHUB,
-    imu: pipeline::imu::IMU<'static>,
+    imu: imu::IMU<'static>,
     variometer: Variometer,
     configuration: Configuration,
     mixer: ControlMixer<'static>,
@@ -47,7 +47,7 @@ pub struct Simulator {
 impl Simulator {
     pub fn new(config: Config) -> Self {
         let hub = Box::leak(Box::new(FlightDataHUB::default()));
-        let imu = pipeline::imu::IMU::new(config.sample_rate, hub);
+        let imu = imu::IMU::new(config.sample_rate, hub);
         let reader = hub.reader();
         let variometer = Variometer::new(1000 / config.altimeter_rate);
         let configuration = config::get().aircraft.configuration;

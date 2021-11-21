@@ -7,6 +7,7 @@ pub mod peripherals;
 pub mod pid;
 pub mod receiver;
 pub mod setter;
+// pub mod steerpoints;
 pub mod yaml;
 
 use core::{mem, slice, str::Split};

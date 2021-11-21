@@ -39,13 +39,18 @@ use hal::{
     persist::PersistDatastore,
 };
 use pro_flight::{
-    components::{
-        cli::CLI, flight_control::FlightControl, flight_data_hub::FlightDataHUB, logger,
-        mixer::ControlMixer, pipeline, variometer::Variometer,
-    },
     config::{self, peripherals::serial::Config as SerialConfig},
     protocol::serial,
-    sync::{flag, DataWriter},
+    service::{
+        aviation::{mixer::ControlMixer, FlightControl},
+        cli::CLI,
+        flight::data::FlightDataHUB,
+        imu,
+        info::Writer as _,
+        logger,
+        sync::trigger,
+        variometer::Variometer,
+    },
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
@@ -161,7 +166,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
     let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
-    let mut imu = pipeline::imu::IMU::new(SAMPLE_RATE, &hub);
+    let mut imu = imu::IMU::new(SAMPLE_RATE, &hub);
     mpu6000.set_callback(move |accel, gyro| {
         hub.accelerometer.write(accel);
         hub.gyroscope.write(gyro);
@@ -203,7 +208,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         vertical_speed.write(vs.update(v.into()));
     });
 
-    let (setter, receiver) = flag();
+    let (setter, receiver) = trigger::trigger();
     let max7456 = max7456::init(spi, cs_osd).unwrap();
     let max7456 = max7456.into_dma(receiver, tx.clone(), reader).unwrap();
     thread.max7456.add_exec(max7456.run());

@@ -3,20 +3,20 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use super::{AgingDataReader, DataReader, DataWriter};
+use super::{AgingReader, Reader, Writer};
 
-pub struct Cell<T> {
+pub struct Bulletin<T> {
     buffer: UnsafeCell<[T; 2]>,
     counter: AtomicU32,
 }
 
-impl<T: Default + Copy> Default for Cell<T> {
+impl<T: Default + Copy> Default for Bulletin<T> {
     fn default() -> Self {
         Self { buffer: UnsafeCell::new([T::default(); 2]), counter: AtomicU32::new(0) }
     }
 }
 
-impl<T: Copy> DataWriter<T> for Cell<T> {
+impl<T: Copy> Writer<T> for Bulletin<T> {
     fn write(&self, data: T) {
         let counter = self.counter.load(Ordering::Relaxed);
         let buffer = unsafe { &mut *self.buffer.get() };
@@ -25,23 +25,23 @@ impl<T: Copy> DataWriter<T> for Cell<T> {
     }
 }
 
-unsafe impl<T> Send for Cell<T> {}
-unsafe impl<T> Sync for Cell<T> {} // FIXME: does not implement sync
+unsafe impl<T> Send for Bulletin<T> {}
+unsafe impl<T> Sync for Bulletin<T> {} // FIXME: does not implement sync
 
 #[derive(Copy, Clone)]
-pub struct CellReader<'a, T> {
-    cell: &'a Cell<T>,
+pub struct BulletinReader<'a, T> {
+    cell: &'a Bulletin<T>,
     counter: u32,
     age: usize,
 }
 
-impl<T: Copy> Cell<T> {
-    pub fn reader(&self) -> CellReader<T> {
-        CellReader { cell: self, counter: 0, age: 0 }
+impl<T: Copy> Bulletin<T> {
+    pub fn reader(&self) -> BulletinReader<T> {
+        BulletinReader { cell: self, counter: 0, age: 0 }
     }
 }
 
-impl<'a, T: Copy> DataReader<T> for CellReader<'a, T> {
+impl<'a, T: Copy> Reader<T> for BulletinReader<'a, T> {
     fn get(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.cell.buffer.get() };
         loop {
@@ -71,7 +71,7 @@ impl<'a, T: Copy> DataReader<T> for CellReader<'a, T> {
     }
 }
 
-impl<'a, T: Copy> AgingDataReader<T> for CellReader<'a, T> {
+impl<'a, T: Copy> AgingReader<T> for BulletinReader<'a, T> {
     fn get_aging_last(&mut self, max_age: usize) -> Option<T> {
         let counter = self.cell.counter.load(Ordering::Acquire);
         match counter {

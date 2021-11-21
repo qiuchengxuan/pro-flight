@@ -3,7 +3,7 @@ use core::{fmt, ops};
 use fixed_point::{fixed_point, FixedPoint};
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
-use serde::ser::SerializeMap;
+use serde::ser::SerializeStruct;
 
 pub mod axes;
 pub mod displacement;
@@ -170,11 +170,11 @@ impl serde::Serialize for Measurement {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let (x, y, z) = (self.axes.x as f32, self.axes.y as f32, self.axes.z as f32);
         let sensitive = self.sensitive as f32;
-        let mut map = serializer.serialize_map(Some(3))?;
-        map.serialize_entry("x", &(x / sensitive))?;
-        map.serialize_entry("y", &(y / sensitive))?;
-        map.serialize_entry("z", &(z / sensitive))?;
-        map.end()
+        let mut struct_ = serializer.serialize_struct("Measurement", 3)?;
+        struct_.serialize_field("x", &(x / sensitive))?;
+        struct_.serialize_field("y", &(y / sensitive))?;
+        struct_.serialize_field("z", &(z / sensitive))?;
+        struct_.end()
     }
 }
 

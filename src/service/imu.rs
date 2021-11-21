@@ -2,9 +2,6 @@ use nalgebra::UnitQuaternion;
 
 use crate::{
     algorithm::imu,
-    components::{
-        flight_data_hub::FlightDataHUB, positioning::Positioning, speedometer::Speedometer,
-    },
     config,
     datastructures::{
         coordinate::{Displacement, Position},
@@ -13,34 +10,39 @@ use crate::{
             VelocityVector,
         },
     },
-    sync::{
-        cell::{Cell, CellReader},
-        AgingDataReader, DataReader, DataWriter,
+    service::{
+        flight::data::FlightDataHUB,
+        info::{
+            bulletin::{Bulletin, BulletinReader},
+            AgingReader, Reader, Writer,
+        },
+        positioning::Positioning,
+        speedometer::Speedometer,
     },
 };
 
-type VelocityMeter<'a> = CellReader<'a, Velocity<i32, unit::CMpS>>;
-type GNSSSpeedometer<'a> = CellReader<'a, VelocityVector<i32, unit::MMpS>>;
-type Altimeter<'a> = CellReader<'a, Altitude>;
-type GNSS<'a> = CellReader<'a, Position>;
+type VelocityMeter<'a> = BulletinReader<'a, Velocity<i32, unit::CMpS>>;
+type GNSSSpeedometer<'a> = BulletinReader<'a, VelocityVector<i32, unit::MMpS>>;
+type Altimeter<'a> = BulletinReader<'a, Altitude>;
+type GNSS<'a> = BulletinReader<'a, Position>;
 
 pub struct IMU<'a> {
     aging: usize,
     // input
-    acceleration: CellReader<'a, Acceleration>,
-    gyro: CellReader<'a, Gyro>,
-    magnetometer: CellReader<'a, Magnetism>,
-    heading: CellReader<'a, Heading>,
-    course: CellReader<'a, Course>,
+    acceleration: BulletinReader<'a, Acceleration>,
+    gyro: BulletinReader<'a, Gyro>,
+    magnetometer: BulletinReader<'a, Magnetism>,
+    heading: BulletinReader<'a, Heading>,
+    course: BulletinReader<'a, Course>,
     // data process
     imu: imu::IMU,
     speedometer: Speedometer<VelocityMeter<'a>, GNSSSpeedometer<'a>>,
     positioning: Positioning<Altimeter<'a>, GNSS<'a>>,
     // output
-    quaternion: &'a Cell<UnitQuaternion<f32>>,
-    velocity: &'a Cell<VelocityVector<f32, unit::MpS>>,
-    position: &'a Cell<Position>,
-    displacement: &'a Cell<Displacement<unit::CentiMeter>>,
+    quaternion: &'a Bulletin<UnitQuaternion<f32>>,
+    velocity: &'a Bulletin<VelocityVector<f32, unit::MpS>>,
+    position: &'a Bulletin<Position>,
+    displacement: &'a Bulletin<Displacement<unit::CentiMeter>>,
 }
 
 impl<'a> IMU<'a> {

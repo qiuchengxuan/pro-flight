@@ -10,9 +10,9 @@ use self::{mixer::ControlMixer, pid::PIDs};
 use crate::{
     config::{aircraft::Configuration, peripherals::pwm as config},
     datastructures::{measurement::Gyro, output::Output},
-    sync::{
-        cell::{Cell, CellReader},
-        DataWriter,
+    service::info::{
+        bulletin::{Bulletin, BulletinReader},
+        Writer,
     },
 };
 
@@ -46,7 +46,7 @@ type PWM = Box<dyn PwmPin<Duty = u16> + Send>;
 
 pub struct FlightControl<'a> {
     mixer: ControlMixer<'a>,
-    output: &'a Cell<Output>,
+    output: &'a Bulletin<Output>,
     pwms: Vec<(&'static str, PWM)>,
 
     config_iteration: usize,
@@ -80,9 +80,9 @@ impl<'a> FlightControl<'a> {
     }
 
     pub fn new(
-        gyroscope: CellReader<'a, Gyro>,
+        gyroscope: BulletinReader<'a, Gyro>,
         mixer: ControlMixer<'a>,
-        output: &'a Cell<Output>,
+        output: &'a Bulletin<Output>,
         pwms: Vec<(&'static str, PWM)>,
     ) -> Self {
         let mut flight_control = Self {

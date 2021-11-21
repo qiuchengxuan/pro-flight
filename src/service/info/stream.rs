@@ -4,29 +4,29 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use super::{DataReader, DataWriter, WithCapacity};
+use super::{Reader, WithCapacity, Writer};
 
 const VALID: u32 = 1 << 31;
 const COUNTER_MASK: u32 = !VALID;
 
-pub struct OverwritingData<T> {
+pub struct Stream<T> {
     buffer: UnsafeCell<Vec<T>>,
     meta: AtomicU32,
 }
 
-impl<T: Copy + Clone> OverwritingData<T> {
+impl<T: Copy + Clone> Stream<T> {
     pub fn new(vec: Vec<T>) -> Self {
         Self { buffer: UnsafeCell::new(vec), meta: AtomicU32::new(0) }
     }
 }
 
-impl<T: Copy + Clone + Default> OverwritingData<T> {
+impl<T: Copy + Clone + Default> Stream<T> {
     pub fn sized(size: usize) -> Self {
         Self::new(vec![T::default(); size])
     }
 }
 
-impl<T> DataWriter<T> for OverwritingData<T> {
+impl<T> Writer<T> for Stream<T> {
     fn write(&self, value: T) {
         let buffer = unsafe { &mut *self.buffer.get() };
         let size = buffer.len();
@@ -39,26 +39,26 @@ impl<T> DataWriter<T> for OverwritingData<T> {
     }
 }
 
-pub struct OverwritingDataSource<'a, T> {
-    ring: &'a OverwritingData<T>,
+pub struct StreamReader<'a, T> {
+    ring: &'a Stream<T>,
     index: u32,
 }
 
-impl<T> OverwritingData<T> {
-    pub fn reader(&self) -> OverwritingDataSource<T> {
+impl<T> Stream<T> {
+    pub fn reader(&self) -> StreamReader<T> {
         let index = self.meta.load(Ordering::Relaxed) & COUNTER_MASK;
-        OverwritingDataSource { ring: self, index }
+        StreamReader { ring: self, index }
     }
 }
 
-impl<'a, T> WithCapacity for OverwritingDataSource<'a, T> {
+impl<'a, T> WithCapacity for StreamReader<'a, T> {
     fn capacity(&self) -> usize {
         let buffer = unsafe { &*self.ring.buffer.get() };
         buffer.len()
     }
 }
 
-impl<'a, T: Copy + Clone> DataReader<T> for OverwritingDataSource<'a, T> {
+impl<'a, T: Copy + Clone> Reader<T> for StreamReader<'a, T> {
     fn get(&mut self) -> Option<T> {
         let buffer = unsafe { &*self.ring.buffer.get() };
         loop {
@@ -90,7 +90,7 @@ impl<'a, T: Copy + Clone> DataReader<T> for OverwritingDataSource<'a, T> {
     }
 }
 
-impl<'a, T> Clone for OverwritingDataSource<'a, T> {
+impl<'a, T> Clone for StreamReader<'a, T> {
     fn clone(&self) -> Self {
         Self { ring: self.ring, index: self.ring.meta.load(Ordering::Relaxed) & COUNTER_MASK }
     }
@@ -99,9 +99,9 @@ impl<'a, T> Clone for OverwritingDataSource<'a, T> {
 mod test {
     #[test]
     fn test_ring_buffer() {
-        use super::{DataReader, DataWriter, OverwritingData};
+        use super::{Reader, Stream, Writer};
 
-        let ring: OverwritingData<usize> = OverwritingData::sized(32);
+        let ring: Stream<usize> = Stream::sized(32);
         let mut reader = ring.reader();
 
         assert_eq!(reader.get(), None);
@@ -124,9 +124,9 @@ mod test {
     fn test_ring_buffer_as_static() {
         use core::sync::atomic::Ordering;
 
-        use super::{DataReader, DataWriter, OverwritingData};
+        use super::{Reader, Stream, Writer};
 
-        let ring: OverwritingData<usize> = OverwritingData::sized(32);
+        let ring: Stream<usize> = Stream::sized(32);
         let mut reader = ring.reader();
 
         ring.meta.store(u32::MAX, Ordering::Relaxed);

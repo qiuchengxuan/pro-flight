@@ -1,4 +1,4 @@
-use serde::ser::SerializeMap;
+use serde::ser::SerializeStruct;
 
 use crate::datastructures::measurement::{Acceleration, Course, Gyro, Magnetism};
 
@@ -10,12 +10,12 @@ pub struct GNSS {
 
 impl serde::Serialize for GNSS {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(if self.fixed { 2 } else { 1 }))?;
-        map.serialize_entry("fixed", &self.fixed)?;
+        let mut struct_ = serializer.serialize_struct("GNSS", 2)?;
+        struct_.serialize_field("fixed", &self.fixed)?;
         if self.fixed {
-            map.serialize_entry("course", &self.course)?;
+            struct_.serialize_field("course", &self.course)?;
         }
-        map.end()
+        struct_.end()
     }
 }
 
@@ -40,12 +40,12 @@ impl Default for Sensor {
 
 impl serde::Serialize for Sensor {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(4))?;
-        map.serialize_entry("acceleration", &self.acceleration)?;
-        map.serialize_entry("gyro", &self.gyro)?;
-        map.serialize_entry("magnetism", &self.magnetism)?;
-        map.serialize_entry("gnss", &self.gnss)?;
-        map.end()
+        let mut struct_ = serializer.serialize_struct("Sensor", 4)?;
+        struct_.serialize_field("acceleration", &self.acceleration)?;
+        struct_.serialize_field("gyro", &self.gyro)?;
+        struct_.serialize_field("magnetism", &self.magnetism)?;
+        struct_.serialize_field("gnss", &self.gnss)?;
+        struct_.end()
     }
 }
 

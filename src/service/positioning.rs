@@ -3,7 +3,7 @@ use crate::{
         coordinate::{Displacement, Position},
         measurement::{displacement::DistanceVector, unit, Altitude, VelocityVector},
     },
-    sync::{AgingDataReader, DataReader},
+    service::info,
 };
 
 pub struct Positioning<A, GNSS> {
@@ -19,8 +19,8 @@ type Output = (Position, Displacement<unit::CentiMeter>);
 
 impl<A, GNSS> Positioning<A, GNSS>
 where
-    A: DataReader<Altitude>,
-    GNSS: AgingDataReader<Position> + DataReader<Position>,
+    A: info::Reader<Altitude>,
+    GNSS: info::AgingReader<Position> + info::Reader<Position>,
 {
     pub fn new(altimeter: A, gnss: GNSS, update_rate: usize) -> Self {
         Self {

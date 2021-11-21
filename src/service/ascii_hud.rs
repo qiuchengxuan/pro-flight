@@ -8,7 +8,6 @@ use ascii_osd_hud::{
 };
 
 use crate::{
-    components::flight_data_hub::FlightDataReader,
     config,
     datastructures::{
         coordinate::SphericalCoordinate,
@@ -20,6 +19,7 @@ use crate::{
         },
         Ratio,
     },
+    service::flight::data::FlightDataReader,
 };
 
 type Screen<const W: usize, const H: usize> = [[u8; W]; H];

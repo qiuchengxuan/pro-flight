@@ -2,11 +2,11 @@ use pid::Pid;
 
 use crate::{
     datastructures::{control::Control, measurement::Gyro},
-    sync::{cell::CellReader, DataReader},
+    service::info::{bulletin::BulletinReader, Reader},
 };
 
 pub struct PIDs<'a> {
-    gyroscope: CellReader<'a, Gyro>,
+    gyroscope: BulletinReader<'a, Gyro>,
     roll: Pid<f32>,
     pitch: Pid<f32>,
     yaw: Pid<f32>,
@@ -19,7 +19,7 @@ impl<'a> PIDs<'a> {
         Pid::new(kp, ki, kd, 100.0, 100.0, 100.0, 100.0, 0.0)
     }
 
-    pub fn new(gyroscope: CellReader<'a, Gyro>, config: &crate::config::PIDs) -> Self {
+    pub fn new(gyroscope: BulletinReader<'a, Gyro>, config: &crate::config::PIDs) -> Self {
         let roll = Self::config_to_pid(&config.roll);
         let pitch = Self::config_to_pid(&config.pitch);
         let yaw = Self::config_to_pid(&config.yaw);

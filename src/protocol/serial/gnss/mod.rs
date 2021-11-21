@@ -1,22 +1,21 @@
 use alloc::boxed::Box;
 
 use crate::{
-    components::flight_data_hub::FlightDataHUB,
     config::peripherals::serial::{GNSSConfig, GNSSProtocol},
     datastructures::{
         coordinate::Position,
         measurement::{unit, Course, Heading, VelocityVector},
     },
     protocol::serial::Receiver,
-    sync::cell::Cell,
+    service::{flight::data::FlightDataHUB, info::bulletin::Bulletin},
 };
 
 pub struct DataSource<'a> {
-    pub fixed: &'a Cell<bool>,
-    pub position: &'a Cell<Position>,
-    pub velocity: &'a Cell<VelocityVector<i32, unit::MMpS>>,
-    pub heading: &'a Cell<Heading>,
-    pub course: &'a Cell<Course>,
+    pub fixed: &'a Bulletin<bool>,
+    pub position: &'a Bulletin<Position>,
+    pub velocity: &'a Bulletin<VelocityVector<i32, unit::MMpS>>,
+    pub heading: &'a Bulletin<Heading>,
+    pub course: &'a Bulletin<Course>,
 }
 
 pub mod nmea;

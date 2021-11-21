@@ -1,5 +1,5 @@
 use nalgebra::UnitQuaternion;
-use serde::ser::SerializeMap;
+use serde::ser::SerializeStruct;
 
 use crate::datastructures::{
     measurement::{displacement::DistanceVector, unit, voltage::Voltage},
@@ -16,14 +16,14 @@ pub struct Misc {
 
 impl serde::Serialize for Misc {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(5))?;
-        map.serialize_entry("displacement", &self.displacement)?;
+        let mut struct_ = serializer.serialize_struct("Misc", 4)?;
+        struct_.serialize_field("displacement", &self.displacement)?;
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
-        map.serialize_entry("quaternion", &value[..])?;
-        map.serialize_entry("rssi", &self.rssi)?;
-        map.serialize_entry("voltage", &self.voltage)?;
-        map.end()
+        struct_.serialize_field("quaternion", &value[..])?;
+        struct_.serialize_field("rssi", &self.rssi)?;
+        struct_.serialize_field("voltage", &self.voltage)?;
+        struct_.end()
     }
 }
 

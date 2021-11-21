@@ -12,7 +12,7 @@ use crate::{
         measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
     },
     protocol::{serial, serial::gnss::DataSource},
-    sync::{cell::Cell, DataWriter},
+    service::info::{bulletin::Bulletin, Writer},
     sys::time,
 };
 
@@ -35,11 +35,11 @@ pub enum State {
 
 pub struct UBX<'a> {
     state: State,
-    fixed: &'a Cell<bool>,
-    position: &'a Cell<Position>,
-    velocity: &'a Cell<VelocityVector<i32, unit::MMpS>>,
-    heading: &'a Cell<Heading>,
-    course: &'a Cell<Course>,
+    fixed: &'a Bulletin<bool>,
+    position: &'a Bulletin<Position>,
+    velocity: &'a Bulletin<VelocityVector<i32, unit::MMpS>>,
+    heading: &'a Bulletin<Heading>,
+    course: &'a Bulletin<Course>,
     buffer: [u8; MAX_MESSAGE_SIZE],
 }
 
@@ -179,12 +179,11 @@ mod test {
         use hex_literal::hex;
 
         use crate::{
-            components::flight_data_hub::FlightDataHUB,
             protocol::serial::{
                 gnss::{ubx::message::Message, DataSource},
                 Receiver,
             },
-            sync::DataReader,
+            service::{flight::data::FlightDataHUB, info::Reader},
         };
 
         use super::{NavPositionVelocityTime, UBX};

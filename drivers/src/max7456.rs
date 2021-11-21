@@ -14,12 +14,11 @@ use max7456::{
 };
 use peripheral_register::Register;
 use pro_flight::{
-    components::{ascii_hud::AsciiHud, flight_data_hub::FlightDataReader},
     config,
     datastructures::Ratio,
     io,
     protocol::xmodem::XMODEM,
-    sync::FlagReceiver,
+    service::{ascii_hud::AsciiHud, flight::data::FlightDataReader, sync::trigger},
     sys::time::TickTimer,
 };
 
@@ -49,7 +48,7 @@ where
 
 pub struct DmaMAX7456<'a, CS, TX> {
     cs: CS,
-    rx: FlagReceiver,
+    rx: trigger::Receiver,
     tx: TX,
     reader: FlightDataReader<'a>,
     video_mode_0: Register<u8, VideoMode0>,
@@ -64,7 +63,7 @@ where
     type Error;
     fn into_dma(
         self,
-        rx: FlagReceiver,
+        rx: trigger::Receiver,
         tx: TX,
         reader: FlightDataReader<'a>,
     ) -> Result<DmaMAX7456<'a, CS, TX>, Self::Error>;
@@ -81,7 +80,7 @@ where
 
     fn into_dma(
         mut self,
-        rx: FlagReceiver,
+        rx: trigger::Receiver,
         tx: TX,
         reader: FlightDataReader<'a>,
     ) -> Result<DmaMAX7456<'a, CS, TX>, E> {

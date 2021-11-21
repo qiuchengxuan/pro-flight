@@ -17,7 +17,7 @@ use crate::{
         measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
     },
     protocol::{serial, serial::gnss::DataSource},
-    sync::{cell::Cell, DataWriter},
+    service::info::{bulletin::Bulletin, Writer},
     sys::time,
 };
 
@@ -54,11 +54,11 @@ pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
 
 pub struct NMEA<'a> {
     parser: Parser,
-    fixed: &'a Cell<bool>,
-    position: &'a Cell<Position>,
-    velocity: &'a Cell<VelocityVector<i32, unit::MMpS>>,
-    heading: &'a Cell<Heading>,
-    course: &'a Cell<Course>,
+    fixed: &'a Bulletin<bool>,
+    position: &'a Bulletin<Position>,
+    velocity: &'a Bulletin<VelocityVector<i32, unit::MMpS>>,
+    heading: &'a Bulletin<Heading>,
+    course: &'a Bulletin<Course>,
 }
 
 impl<'a> NMEA<'a> {

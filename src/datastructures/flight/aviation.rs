@@ -1,4 +1,4 @@
-use serde::ser::SerializeMap;
+use serde::ser::SerializeStruct;
 
 use crate::datastructures::measurement::{euler::Euler, Altitude};
 
@@ -18,10 +18,10 @@ impl From<Euler> for Attitude {
 
 impl serde::Serialize for Attitude {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("roll", &(self.roll / 10))?;
-        map.serialize_entry("pitch", &(self.pitch / 10))?;
-        map.end()
+        let mut struct_ = serializer.serialize_struct("Attitude", 2)?;
+        struct_.serialize_field("roll", &(self.roll / 10))?;
+        struct_.serialize_field("pitch", &(self.pitch / 10))?;
+        struct_.end()
     }
 }
 

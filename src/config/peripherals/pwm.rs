@@ -5,7 +5,7 @@ use core::{
 };
 
 use heapless::LinearMap;
-use serde::ser::SerializeMap;
+use serde::ser::{SerializeMap, SerializeStruct};
 
 use crate::config::setter::{Error, Setter, Value};
 
@@ -51,12 +51,12 @@ pub struct Motor {
 
 impl serde::Serialize for Motor {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(4))?;
-        map.serialize_entry("type", "motor")?;
-        map.serialize_entry("index", &self.index)?;
-        map.serialize_entry("protocol", &self.protocol)?;
-        map.serialize_entry("rate", &self.rate)?;
-        map.end()
+        let mut struct_ = serializer.serialize_struct("Motor", 4)?;
+        struct_.serialize_field("type", "motor")?;
+        struct_.serialize_field("index", &self.index)?;
+        struct_.serialize_field("protocol", &self.protocol)?;
+        struct_.serialize_field("rate", &self.rate)?;
+        struct_.end()
     }
 }
 

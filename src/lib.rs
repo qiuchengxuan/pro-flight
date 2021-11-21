@@ -27,13 +27,12 @@ extern crate serial_test;
 #[macro_use]
 pub mod io;
 #[macro_use]
-pub mod components;
+pub mod service;
 #[macro_use]
 pub mod datastructures;
 pub mod algorithm;
 pub mod config;
 pub mod protocol;
-pub mod sync;
 #[macro_use]
 pub mod sys;
 pub mod sysinfo;

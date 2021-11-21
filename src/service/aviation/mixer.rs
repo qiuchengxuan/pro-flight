@@ -1,15 +1,15 @@
 use crate::{
     datastructures::control::Control,
-    sync::{cell::CellReader, AgingDataReader},
+    service::info::{bulletin::BulletinReader, AgingReader},
 };
 
 pub struct ControlMixer<'a> {
-    receiver: CellReader<'a, Control>,
+    receiver: BulletinReader<'a, Control>,
     receiver_max_age: usize,
 }
 
 impl<'a> ControlMixer<'a> {
-    pub fn new(receiver: CellReader<'a, Control>, age: usize) -> Self {
+    pub fn new(receiver: BulletinReader<'a, Control>, age: usize) -> Self {
         Self { receiver, receiver_max_age: age }
     }
 

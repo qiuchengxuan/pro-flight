@@ -22,9 +22,9 @@ use crate::{
         output::Output,
         RSSI,
     },
-    sync::{
-        cell::{Cell, CellReader},
-        DataReader,
+    service::info::{
+        bulletin::{Bulletin, BulletinReader},
+        Reader,
     },
 };
 
@@ -32,12 +32,12 @@ macro_rules! flight_data {
     ($($names:ident : $types:ty),+) => {
         #[derive(Default)]
         pub struct FlightDataHUB {
-            $(pub $names: Cell<$types>),+
+            $(pub $names: Bulletin<$types>),+
         }
 
         #[derive(Copy, Clone)]
         pub struct FlightDataReader<'a> {
-            $(pub $names: CellReader<'a, $types>),+,
+            $(pub $names: BulletinReader<'a, $types>),+,
         }
 
         impl FlightDataHUB {

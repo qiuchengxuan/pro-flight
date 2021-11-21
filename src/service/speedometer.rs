@@ -4,7 +4,7 @@ use crate::{
     algorithm::ComplementaryFilter,
     config,
     datastructures::measurement::{unit, Velocity, VelocityVector, GRAVITY},
-    sync::{AgingDataReader, DataReader},
+    service::info,
 };
 
 pub struct Speedometer<A, GNSS> {
@@ -19,8 +19,8 @@ pub struct Speedometer<A, GNSS> {
 
 impl<A, GNSS> Speedometer<A, GNSS>
 where
-    A: DataReader<Velocity<i32, unit::CMpS>>,
-    GNSS: AgingDataReader<VelocityVector<i32, unit::MMpS>>,
+    A: info::Reader<Velocity<i32, unit::CMpS>>,
+    GNSS: info::AgingReader<VelocityVector<i32, unit::MMpS>>,
 {
     pub fn new(altimeter: A, gnss: GNSS, sample_rate: usize, gnss_rate: usize) -> Self {
         let config = &config::get().speedometer;
