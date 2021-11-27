@@ -165,9 +165,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
-    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
     let mut imu = imu::IMU::new(SAMPLE_RATE, &hub);
-    mpu6000.set_callback(move |accel, gyro| {
+    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |accel, gyro| {
         hub.accelerometer.write(accel);
         hub.gyroscope.write(gyro);
         imu.invoke();

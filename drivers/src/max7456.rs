@@ -1,11 +1,11 @@
 use alloc::boxed::Box;
-use core::{future::Future, ptr, time::Duration};
+use core::{future::Future, mem, ptr, time::Duration};
 
 use embedded_hal::{
     blocking::spi::{Transfer, Write},
     digital::v2::OutputPin,
 };
-use hal::dma::{BufferDescriptor, TransferOption, DMA};
+use hal::dma::{BufferDescriptor, TransferOption, TransferResult, DMA};
 use max7456::{
     character_memory::{build_store_char_operation, CHAR_DATA_SIZE, STORE_CHAR_BUFFER_SIZE},
     lines_writer::LinesWriter,
@@ -85,12 +85,12 @@ where
         reader: FlightDataReader<'a>,
     ) -> Result<DmaMAX7456<'a, CS, TX>, E> {
         let video_mode_0 = self.load(Registers::VideoMode0)?;
-        let mut bd = Box::new(BufferDescriptor::<u8, 800>::default());
         let (_, cs) = self.free();
         let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
-        bd.set_callback(move |_bytes| {
+        let callback = Box::leak(Box::new(move |_: TransferResult<u8>| {
             cs_.set_high().ok();
-        });
+        }));
+        let bd = Box::new(BufferDescriptor::<u8, 800>::with_callback(callback));
         Ok(DmaMAX7456 { cs, rx, tx, reader, video_mode_0, bd })
     }
 }
@@ -104,20 +104,20 @@ where
     async fn enable_display(&mut self, enable: bool) {
         let mut video_mode_0 = self.video_mode_0;
         video_mode_0.set(VideoMode0::EnableDisplay, enable as u8);
-        let buffer = self.bd.as_mut().try_get_buffer().unwrap();
+        let mut buffer = self.bd.as_mut().try_get_buffer().unwrap();
         buffer[0] = Registers::VideoMode0 as u8;
         buffer[1] = video_mode_0.value;
-        core::mem::drop(buffer);
+        mem::drop(buffer);
         self.cs.set_low().ok();
         self.tx.tx(&self.bd, TransferOption::default().size(2)).await;
     }
 
     async fn upload_char(&mut self, bytes: &[u8], index: u8) {
-        let buffer = self.bd.as_mut().try_get_buffer().unwrap();
+        let mut buffer = self.bd.as_mut().try_get_buffer().unwrap();
         let mut char_data = [0u8; CHAR_DATA_SIZE];
         char_data.copy_from_slice(bytes);
-        build_store_char_operation(&char_data, index, &mut buffer[..]);
-        core::mem::drop(buffer);
+        build_store_char_operation(&char_data, index, buffer.as_mut());
+        mem::drop(buffer);
         let timer = TickTimer::after(Duration::from_millis(13));
         self.cs.set_low().ok();
         self.tx.tx(&self.bd, TransferOption::default().size(STORE_CHAR_BUFFER_SIZE)).await;
@@ -152,10 +152,11 @@ where
                 self.upload_font().await;
                 self.rx.clear();
             }
-            let buffer = self.bd.try_get_buffer().unwrap();
+            let mut buffer = self.bd.try_get_buffer().unwrap();
             let screen = hud.draw();
             let mut writer = LinesWriter::new(screen, Default::default());
-            let size = writer.write(buffer).0.len();
+            let size = writer.write(buffer.as_mut()).0.len();
+            mem::drop(buffer);
             self.cs.set_low().ok();
             self.tx.tx(&self.bd, TransferOption::default().size(size)).await;
         }

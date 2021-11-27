@@ -143,18 +143,17 @@ impl<M: DmaChMap> Stream<M> {
             let address = address_reg.load_bits() as usize;
             let half = status.half_transfer.read_bit();
             let meta = unsafe { Meta::<u8>::from_raw(address) };
-            let buffer = unsafe { meta.get_buffer() };
-            let result =
-                if half { TransferResult::Half(buffer) } else { TransferResult::Complete(buffer) };
             if half {
                 clear.half_transfer.set_bit();
             }
             if status.transfer_complete.read_bit() {
-                meta.release();
+                unsafe { meta.release() };
                 clear.transfer_complete.set_bit();
             }
-            let handler = unsafe { meta.get_handler() };
-            handler.map(|f| f(result));
+            let buffer = unsafe { meta.get_buffer() };
+            let result =
+                if half { TransferResult::Half(buffer) } else { TransferResult::Complete(buffer) };
+            meta.callback.as_mut().map(|f| f(result));
             Yielded::<(), ()>(())
         });
         int.enable_int();
@@ -189,7 +188,7 @@ impl<M: DmaChMap> DMA for Stream<M> {
     where
         W: Copy + Default,
     {
-        let bytes = bd.take();
+        let bytes = bd.try_take().unwrap();
         self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();
@@ -219,7 +218,7 @@ impl<M: DmaChMap> DMA for Stream<M> {
     where
         W: Copy + Default,
     {
-        let buffer = bd.take();
+        let buffer = bd.try_take().unwrap();
         self.reg.memory0_address.store_bits(buffer.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();

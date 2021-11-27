@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use fixed_point::FixedPoint;
-use hal::dma::{BufferDescriptor, Peripheral, TransferOption, DMA};
+use hal::dma::{BufferDescriptor, Peripheral, TransferOption, TransferResult, DMA};
 use pro_flight::{algorithm::lpf::LPF, datastructures::measurement::voltage::Voltage};
 use stm32f4xx_hal::adc::config::{AdcConfig, Continuous, Dma, SampleTime, Sequence};
 
@@ -38,12 +38,13 @@ where
     D: DMA<Future = F>,
     H: FnMut(Voltage) + Send + 'static,
 {
-    let mut rx_bd = Box::new(BufferDescriptor::<u16, SAMPLE_SIZE>::default());
+    let mut voltage_adc = VoltageADC::default();
+    let callback = Box::leak(Box::new(move |result: TransferResult<u16>| {
+        handler(voltage_adc.convert(result.into()))
+    }));
+    let mut rx_bd = Box::new(BufferDescriptor::<u16, SAMPLE_SIZE>::with_callback(callback));
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
     trace!("Init voltage ADC DMA address at 0x{:x}", address as usize);
-    let mut voltage_adc = VoltageADC::default();
-    rx_bd.set_callback(move |result| handler(voltage_adc.convert(result.into())));
-
     dma.setup_peripheral(1, &mut adc);
     dma.setup_rx(Box::leak(rx_bd), TransferOption::circle());
 }

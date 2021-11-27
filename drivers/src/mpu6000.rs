@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::ptr;
 
 use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
-use hal::dma::{BufferDescriptor, Channel, Peripheral, TransferOption, DMA};
+use hal::dma::{Channel, Peripheral, TransferOption, TransferResult, BD, DMA};
 use mpu6000::{
     self,
     bus::RegAccess,
@@ -99,34 +99,44 @@ pub struct DmaMPU6000<RX, TX, CS> {
     rx: RX,
     tx: TX,
     cs: CS,
-    rx_bd: Box<BufferDescriptor<u8, { 1 + NUM_MEASUREMENT_REGS }>>,
-    tx_bd: Box<BufferDescriptor<u8, 1>>,
+    rx_bd: Box<BD<u8, { 1 + NUM_MEASUREMENT_REGS }>>,
+    tx_bd: Box<BD<u8, 1>>,
 }
 
-pub trait IntoDMA<RX: DMA, TX: DMA, CS> {
-    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel)) -> DmaMPU6000<RX, TX, CS>;
+pub trait IntoDMA<RX: DMA, TX: DMA, H, CS>
+where
+    H: FnMut(Acceleration, Measurement) + Send + 'static,
+{
+    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel), h: H) -> DmaMPU6000<RX, TX, CS>;
 }
 
-impl<E, SPI, CS, DELAY, RX: DMA, TX: DMA> IntoDMA<RX, TX, CS> for MPU6000<SpiBus<SPI, CS, DELAY>>
+impl<E, SPI, CS, DELAY, RX: DMA, TX: DMA, H> IntoDMA<RX, TX, H, CS>
+    for MPU6000<SpiBus<SPI, CS, DELAY>>
 where
     SPI: Peripheral,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
+    H: FnMut(Acceleration, Measurement) + Send + 'static,
 {
-    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel)) -> DmaMPU6000<RX, TX, CS> {
+    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel), mut h: H) -> DmaMPU6000<RX, TX, CS> {
         let (mut spi, cs, _) = self.free().free();
         let (mut rx, ch) = rx;
         rx.setup_peripheral(ch, &mut spi);
         let (mut tx, ch) = tx;
         tx.setup_peripheral(ch, &mut spi);
-        let mut rx_bd = Box::new(BufferDescriptor::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
         let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
-        rx_bd.set_callback(move |_bytes| {
+        let convertor = Converter::from(config::get().imu);
+        let rotation = config::get().board.rotation;
+        let callback = Box::leak(Box::new(move |result: TransferResult<u8>| {
             cs_.set_high().ok();
-        });
+            let bytes: &[u8] = result.into();
+            let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);
+            h(acceleration, gyro);
+        }));
+        let mut rx_bd = Box::new(BD::<u8, { 1 + NUM_MEASUREMENT_REGS }>::with_callback(callback));
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
         trace!("Init MPU6000 DMA address at 0x{:x}", address as usize);
         let byte = Register::AccelerometerXHigh as u8 | 0x80;
-        let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new([byte]));
+        let tx_bd = Box::new(BD::<u8, 1>::new([byte]));
         DmaMPU6000 { rx, tx, cs, rx_bd, tx_bd }
     }
 }
@@ -137,21 +147,6 @@ where
     TX: DMA<Future = TXF>,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
 {
-    pub fn set_callback<F>(&mut self, mut handler: F)
-    where
-        F: FnMut(Acceleration, Measurement) + Send + 'static,
-    {
-        let mut cs = unsafe { ptr::read(ptr::addr_of!(self.cs)) };
-        let convertor = Converter::from(config::get().imu);
-        let rotation = config::get().board.rotation;
-        self.rx_bd.set_callback(move |result| {
-            cs.set_high().ok();
-            let bytes: &[u8] = result.into();
-            let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);
-            handler(acceleration, gyro);
-        });
-    }
-
     pub fn trigger(&mut self) {
         self.cs.set_low().ok();
         if self.rx.is_busy() || self.tx.is_busy() {

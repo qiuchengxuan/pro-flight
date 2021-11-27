@@ -15,7 +15,7 @@ use embedded_hal::{
     },
     digital::v2::OutputPin,
 };
-use hal::dma::{BufferDescriptor, TransferOption, DMA};
+use hal::dma::{BufferDescriptor, TransferOption, TransferResult, DMA};
 use pro_flight::{datastructures::measurement::Pressure, sys::time::TickTimer};
 
 pub const SAMPLE_RATE: usize = 10; // actually 16
@@ -66,14 +66,14 @@ impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
     where
         H: FnMut(Pressure) + Send + 'static,
     {
-        let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::default());
-        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-        trace!("Init BMP280 DMA address at 0x{:x}", address as usize);
         let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
-        rx_bd.set_callback(move |result| {
+        let callback = Box::leak(Box::new(move |result: TransferResult<u8>| {
             cs_.set_high().ok();
             handler(compensator.convert(result.into()))
-        });
+        }));
+        let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::with_callback(callback));
+        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+        trace!("Init BMP280 DMA address at 0x{:x}", address as usize);
         let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new([Register::PressureMsb as u8 | 0x80]));
         Self { rx_bd, tx_bd, cs }
     }

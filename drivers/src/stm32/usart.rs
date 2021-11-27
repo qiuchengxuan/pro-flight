@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use embedded_hal::serial;
 use hal::{
-    dma::{BufferDescriptor, Peripheral, TransferOption, DMA},
+    dma::{BufferDescriptor, Peripheral, TransferOption, TransferResult, DMA},
     serial::Error,
 };
 use pro_flight::{config::SerialConfig, protocol::serial::Receiver};
@@ -31,19 +31,19 @@ where
     USART: Peripheral + core::fmt::Display + serial::Read<u8, Error = Error> + Send + 'static,
     D: DMA<Future = F>,
 {
+    info!("Init {}", usart);
     dma.setup_peripheral(channel, &mut usart);
     let receive_size = rx.receive_size();
-    let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::default());
-    let address = rx_bd.try_get_buffer().unwrap().as_ptr();
-    trace!("Init {} DMA address at 0x{:x}", usart, address as usize);
-    rx_bd.set_callback(move |result| match usart.read() {
+    let callback = Box::leak(Box::new(move |result: TransferResult<u8>| match usart.read() {
         Err(nb::Error::Other(Error::Parity)) => rx.reset(),
         Err(nb::Error::Other(Error::Framing)) => {
             rx.receive(result.into());
             rx.reset();
         }
         _ => rx.receive(result.into()),
-    });
-
+    }));
+    let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::with_callback(callback));
+    let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+    trace!("DMA address 0x{:x}", address as usize);
     dma.setup_rx(Box::leak(rx_bd), TransferOption::circle().size(receive_size));
 }
