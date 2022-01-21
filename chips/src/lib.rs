@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(asm)]
 
 extern crate alloc;
 #[cfg(feature = "stm32")]
