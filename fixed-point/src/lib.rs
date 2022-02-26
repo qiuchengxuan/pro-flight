@@ -1,8 +1,10 @@
 #![cfg_attr(not(test), no_std)]
 
-pub use fixed_point_macro::fixed_point;
+pub use fixed_point_macro::fixed;
 
 use core::{convert, fmt::Display, ops, str::FromStr};
+#[allow(unused_imports)] // false warning
+use num_traits::float::FloatCore;
 use num_traits::pow::Pow;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
@@ -20,10 +22,10 @@ impl<T, const D: u8> FixedPoint<T, D> {
 
 impl<T, const D: u8> FixedPoint<T, D>
 where
-    T: From<u8> + Pow<u32, Output = T> + ops::Mul<Output = T> + ops::Add<Output = T>,
+    T: From<u8> + Pow<u8, Output = T> + ops::Mul<Output = T> + ops::Add<Output = T>,
 {
-    pub fn new(integer: T, decimal: T) -> Self {
-        Self(integer * T::from(10).pow(D as u32) + decimal)
+    pub fn new(number: T, decimal: u8) -> Self {
+        Self(number * T::from(10).pow(D - decimal))
     }
 }
 
@@ -120,7 +122,7 @@ impl<T: Copy + Into<i32>, const D: u8> serde::Serialize for FixedPoint<T, D> {
 impl<'a, T: convert::TryFrom<isize>, const D: u8> serde::Deserialize<'a> for FixedPoint<T, D> {
     fn deserialize<DE: serde::Deserializer<'a>>(deserializer: DE) -> Result<Self, DE::Error> {
         let float = <f32>::deserialize(deserializer)?;
-        let v = (float * 10f32.pow(D as u8)) as isize;
+        let v = (float * 10f32.powi(D as i32)) as isize;
         T::try_from(v)
             .map(|v| Self(v))
             .map_err(|_| <DE::Error as serde::de::Error>::custom("Not fixed-point"))
@@ -133,53 +135,53 @@ mod test {
         use super::FixedPoint;
 
         let decimal: FixedPoint<i32, 0> = "0".parse().unwrap();
-        assert_eq!("0.0", format!("{}", decimal));
+        assert_eq!("0.0", format!("{decimal}"));
         let decimal: FixedPoint<i32, 1> = "0.0".parse().unwrap();
-        assert_eq!("0.0", format!("{}", decimal));
+        assert_eq!("0.0", format!("{decimal}"));
         let decimal: FixedPoint<i32, 1> = "0.1".parse().unwrap();
-        assert_eq!("0.1", format!("{}", decimal));
+        assert_eq!("0.1", format!("{decimal}"));
         let decimal: FixedPoint<i32, 2> = "0.01".parse().unwrap();
-        assert_eq!("0.01", format!("{}", decimal));
+        assert_eq!("0.01", format!("{decimal}"));
         let decimal: FixedPoint<i32, 2> = "0.11".parse().unwrap();
-        assert_eq!("0.11", format!("{}", decimal));
+        assert_eq!("0.11", format!("{decimal}"));
         let decimal: FixedPoint<i32, 2> = "0.1".parse().unwrap();
-        assert_eq!("0.1", format!("{}", decimal));
+        assert_eq!("0.1", format!("{decimal}"));
         let decimal: FixedPoint<i32, 2> = "1".parse().unwrap();
-        assert_eq!("1.0", format!("{}", decimal));
+        assert_eq!("1.0", format!("{decimal}"));
         let decimal: FixedPoint<i32, 2> = "1.001".parse().unwrap();
-        assert_eq!("1.0", format!("{}", decimal));
+        assert_eq!("1.0", format!("{decimal}"));
         let decimal: FixedPoint<i32, 3> = "0.001".parse().unwrap();
-        assert_eq!("0.001", format!("{}", decimal));
+        assert_eq!("0.001", format!("{decimal}"));
         let decimal: FixedPoint<i32, 3> = "0.0001".parse().unwrap();
-        assert_eq!("0.0", format!("{}", decimal));
+        assert_eq!("0.0", format!("{decimal}"));
         let decimal: FixedPoint<i32, 3> = "-0.1".parse().unwrap();
-        assert_eq!("-0.1", format!("{}", decimal));
+        assert_eq!("-0.1", format!("{decimal}"));
         let decimal: FixedPoint<i32, 3> = "-1.1".parse().unwrap();
-        assert_eq!("-1.1", format!("{}", decimal));
+        assert_eq!("-1.1", format!("{decimal}"));
     }
 
     #[test]
     fn test_fixed_point_macro() {
-        use fixed_point_macro::fixed_point;
+        use fixed_point_macro::fixed;
 
         use super::FixedPoint;
 
-        let decimal = fixed_point!(0.0, 2u16);
-        assert_eq!("0.0", format!("{}", decimal));
-        let decimal = fixed_point!(0.1, 2u16);
-        assert_eq!("0.1", format!("{}", decimal));
-        let decimal = fixed_point!(0.11, 2u16);
-        assert_eq!("0.11", format!("{}", decimal));
-        let decimal = fixed_point!(1.0, 2u16);
-        assert_eq!("1.0", format!("{}", decimal));
-        let decimal = fixed_point!(1.01, 2u16);
-        assert_eq!("1.01", format!("{}", decimal));
-        let decimal = fixed_point!(1.10, 2u16);
-        assert_eq!("1.1", format!("{}", decimal));
-        let decimal = fixed_point!(-0.1, 2i16);
-        assert_eq!("-0.1", format!("{}", decimal));
-        let decimal = fixed_point!(-1.1, 2i16);
-        assert_eq!("-1.1", format!("{}", decimal));
+        let decimal = fixed!(0.0u16, 2);
+        assert_eq!("0.0", format!("{decimal}"));
+        let decimal = fixed!(0.1u16, 2);
+        assert_eq!("0.1", format!("{decimal}"));
+        let decimal = fixed!(0.11u16);
+        assert_eq!("0.11 2", format!("{} {}", decimal, decimal.decimal_length()));
+        let decimal = fixed!(1.0u16, 2);
+        assert_eq!("1.0", format!("{decimal}"));
+        let decimal = fixed!(1_1.0_1u16);
+        assert_eq!("11.01", format!("{decimal}"));
+        let decimal = fixed!(1.10u16);
+        assert_eq!("1.1", format!("{decimal}"));
+        let decimal = fixed!(-0.1i16, 2);
+        assert_eq!("-0.1", format!("{decimal}"));
+        let decimal = fixed!(-1.1i16, 2);
+        assert_eq!("-1.1", format!("{decimal}"));
     }
 
     #[test]

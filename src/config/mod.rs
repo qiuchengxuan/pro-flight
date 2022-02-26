@@ -12,7 +12,7 @@ pub mod yaml;
 
 use core::{mem, slice, str::Split};
 
-use fixed_point::{fixed_point, FixedPoint};
+use fixed_point::{fixed, FixedPoint};
 
 pub use self::pid::PIDs;
 use crate::{
@@ -50,7 +50,7 @@ impl Setter for Axes {
 impl Setter for Bias {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or(fixed_point!(1.0, 5i32));
+        let value = value.parse()?.unwrap_or(fixed!(1.0, 5));
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
@@ -64,7 +64,7 @@ impl Setter for Bias {
 impl Setter for Gain {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or(fixed_point!(1.0, 4u16));
+        let value = value.parse()?.unwrap_or(fixed!(1.0, 4));
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
@@ -75,7 +75,7 @@ impl Setter for Gain {
     }
 }
 
-const DEFAULT_KP: FixedPoint<u16, 3> = fixed_point!(0.25, 3u16);
+const DEFAULT_KP: FixedPoint<u16, 3> = fixed!(0.25, 3);
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct Speedometer {

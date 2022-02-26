@@ -1,6 +1,6 @@
 use core::{fmt, ops};
 
-use fixed_point::{fixed_point, FixedPoint};
+use fixed_point::{fixed, FixedPoint};
 use integer_sqrt::IntegerSquareRoot;
 use nalgebra::Vector3;
 use serde::ser::SerializeStruct;
@@ -50,7 +50,7 @@ pub struct Bias {
 
 macro_rules! bias {
     ($x:literal, $y:literal, $z:literal) => {
-        Bias { x: fixed_point!($x, 5i32), y: fixed_point!($y, 5i32), z: fixed_point!($z, 5i32) }
+        Bias { x: fixed!($x), y: fixed!($y), z: fixed!($z) }
     };
 }
 
@@ -69,7 +69,7 @@ pub struct Gain {
 
 macro_rules! gain {
     ($x:literal, $y:literal, $z:literal) => {
-        Gain { x: fixed_point!($x, 4u16), y: fixed_point!($y, 4u16), z: fixed_point!($z, 4u16) }
+        Gain { x: fixed!($x), y: fixed!($y), z: fixed!($z) }
     };
 }
 
@@ -284,7 +284,7 @@ mod test {
     #[test]
     fn test_gain() {
         use super::{Axes, Gain, Measurement};
-        use fixed_point::{fixed_point, FixedPoint};
+        use fixed_point::{fixed, FixedPoint};
 
         let measurement = Measurement { axes: Axes { x: 100, y: 200, z: 300 }, sensitive: 0 };
         let measurement = measurement.gain(&gain!(1.01, 1.02, 1.03));

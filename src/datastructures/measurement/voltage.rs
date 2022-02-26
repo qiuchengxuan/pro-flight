@@ -8,7 +8,7 @@ pub struct Voltage(pub FixedPoint<u16, 3>); // voltage
 #[macro_export]
 macro_rules! voltage {
     ($v:expr) => {
-        Voltage(fixed_point::fixed_point!($v, 3u16))
+        Voltage(fixed_point::fixed!($v, 3))
     };
 }
 

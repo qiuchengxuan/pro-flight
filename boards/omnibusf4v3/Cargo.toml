@@ -54,3 +54,4 @@ debug = true
 panic = "abort"
 codegen-units = 1
 opt-level = "z"
+strip = true
