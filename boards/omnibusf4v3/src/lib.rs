@@ -1,5 +1,4 @@
 #![feature(allocator_api)]
-#![feature(const_fn_fn_ptr_basics)]
 #![feature(lang_items)]
 #![feature(proc_macro_hygiene)]
 #![feature(slice_ptr_get)]
