@@ -1,8 +1,8 @@
 use pid::Pid;
 
 use crate::{
-    datastructures::{control::Control, measurement::Gyro},
     service::info::{bulletin::BulletinReader, Reader},
+    types::{control::Control, measurement::Gyro},
 };
 
 pub struct PIDs<'a> {

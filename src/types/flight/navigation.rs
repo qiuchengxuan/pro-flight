@@ -1,4 +1,4 @@
-use crate::datastructures::{
+use crate::types::{
     coordinate::Position,
     measurement::{unit, VelocityVector},
     waypoint::Steerpoint,

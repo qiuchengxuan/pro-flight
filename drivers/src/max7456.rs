@@ -14,12 +14,11 @@ use max7456::{
 };
 use peripheral_register::Register;
 use pro_flight::{
-    config,
-    datastructures::Ratio,
-    io,
+    config, io,
     protocol::xmodem::XMODEM,
     service::{ascii_hud::AsciiHud, flight::data::FlightDataReader, sync::trigger},
     sys::time::TickTimer,
+    types::Ratio,
 };
 
 pub fn init<E, PE, SPI, CS>(spi: SPI, cs: CS) -> Result<MAX7456<SPI, CS>, E>

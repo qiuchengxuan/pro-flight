@@ -9,7 +9,8 @@ use ascii_osd_hud::{
 
 use crate::{
     config,
-    datastructures::{
+    service::flight::data::FlightDataReader,
+    types::{
         coordinate::SphericalCoordinate,
         flight::aviation::Attitude,
         measurement::{
@@ -19,7 +20,6 @@ use crate::{
         },
         Ratio,
     },
-    service::flight::data::FlightDataReader,
 };
 
 type Screen<const W: usize, const H: usize> = [[u8; W]; H];
@@ -123,7 +123,7 @@ mod test {
     fn test_speed_vector() {
         use ascii_osd_hud::telemetry as hud;
 
-        use crate::datastructures::{
+        use crate::types::{
             coordinate::SphericalCoordinate,
             measurement::{
                 unit::{Knot, Meter},

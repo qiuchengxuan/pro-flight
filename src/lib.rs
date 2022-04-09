@@ -29,7 +29,7 @@ pub mod io;
 #[macro_use]
 pub mod service;
 #[macro_use]
-pub mod datastructures;
+pub mod types;
 pub mod algorithm;
 pub mod config;
 pub mod protocol;

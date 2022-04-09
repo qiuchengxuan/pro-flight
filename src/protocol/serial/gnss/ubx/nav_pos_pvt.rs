@@ -1,6 +1,6 @@
 use chrono::naive::{NaiveDate, NaiveTime};
 
-use crate::datastructures::{
+use crate::types::{
     coordinate,
     coordinate::{latitude, longitude},
 };
@@ -171,7 +171,7 @@ mod test {
     fn test_ubx_nav_pos_pvt() {
         use hex_literal::hex;
 
-        use crate::datastructures::coordinate::{Latitude, Longitude};
+        use crate::types::coordinate::{Latitude, Longitude};
 
         use super::NavPositionVelocityTime;
 

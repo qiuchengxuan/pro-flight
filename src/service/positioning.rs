@@ -1,9 +1,9 @@
 use crate::{
-    datastructures::{
+    service::info,
+    types::{
         coordinate::{Displacement, Position},
         measurement::{displacement::DistanceVector, unit, Altitude, VelocityVector},
     },
-    service::info,
 };
 
 pub struct Positioning<A, GNSS> {

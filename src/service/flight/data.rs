@@ -3,7 +3,11 @@ use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
 
 use crate::{
-    datastructures::{
+    service::info::{
+        bulletin::{Bulletin, BulletinReader},
+        Reader,
+    },
+    types::{
         control::Control,
         coordinate::{Displacement, Position},
         flight::{
@@ -21,10 +25,6 @@ use crate::{
         },
         output::Output,
         RSSI,
-    },
-    service::info::{
-        bulletin::{Bulletin, BulletinReader},
-        Reader,
     },
 };
 

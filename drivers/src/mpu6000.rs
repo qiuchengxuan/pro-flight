@@ -12,8 +12,8 @@ use mpu6000::{
 pub use mpu6000::{bus::SpiBus, MPU6000, SPI_MODE};
 use pro_flight::{
     config,
-    datastructures::measurement::{Acceleration, Axes, Measurement, Rotation},
     sys::time::TickTimer,
+    types::measurement::{Acceleration, Axes, Measurement, Rotation},
 };
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);

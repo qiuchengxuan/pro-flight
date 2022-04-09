@@ -2,7 +2,7 @@ use core::fmt::{self, Write};
 
 use heapless::String;
 
-use crate::datastructures::measurement::{
+use crate::types::measurement::{
     distance::Distance,
     unit::{CentiMeter, Meter},
 };
@@ -114,7 +114,7 @@ mod test {
     #[test]
     fn test_longitude() {
         use super::Longitude;
-        use crate::datastructures::measurement::{distance::Distance, unit::CentiMeter};
+        use crate::types::measurement::{distance::Distance, unit::CentiMeter};
 
         let longitude = Longitude::from_str("E116°44'54").unwrap();
         assert_eq!("E116°44'54.000", format!("{}", longitude));

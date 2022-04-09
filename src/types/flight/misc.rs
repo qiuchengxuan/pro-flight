@@ -1,7 +1,7 @@
 use nalgebra::UnitQuaternion;
 use serde::ser::SerializeStruct;
 
-use crate::datastructures::{
+use crate::types::{
     measurement::{displacement::DistanceVector, unit, voltage::Voltage},
     RSSI,
 };

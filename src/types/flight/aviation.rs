@@ -1,6 +1,6 @@
 use serde::ser::SerializeStruct;
 
-use crate::datastructures::measurement::{euler::Euler, Altitude};
+use crate::types::measurement::{euler::Euler, Altitude};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Attitude {

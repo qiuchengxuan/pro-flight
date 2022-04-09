@@ -9,8 +9,8 @@ use git_version::git_version;
 use indoc::indoc;
 
 use crate::{
-    service::logger,
     io::{self, Read},
+    service::logger,
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");

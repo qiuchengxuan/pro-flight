@@ -5,13 +5,13 @@ use sbus_parser::receiver::Receiver;
 
 use crate::{
     config,
-    datastructures::{
-        control::{Control, ControlType},
-        RSSI,
-    },
     protocol::serial,
     service::info,
     sys::time::TickTimer,
+    types::{
+        control::{Control, ControlType},
+        RSSI,
+    },
 };
 
 #[inline]

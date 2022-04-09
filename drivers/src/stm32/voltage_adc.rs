@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use fixed_point::FixedPoint;
 use hal::dma::{BufferDescriptor, Peripheral, TransferOption, TransferResult, DMA};
-use pro_flight::{algorithm::lpf::LPF, datastructures::measurement::voltage::Voltage};
+use pro_flight::{algorithm::lpf::LPF, types::measurement::voltage::Voltage};
 use stm32f4xx_hal::adc::config::{AdcConfig, Continuous, Dma, SampleTime, Sequence};
 
 pub struct VoltageADC(LPF<u16>);

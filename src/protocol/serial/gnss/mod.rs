@@ -2,12 +2,12 @@ use alloc::boxed::Box;
 
 use crate::{
     config::peripherals::serial::{GNSSConfig, GNSSProtocol},
-    datastructures::{
+    protocol::serial::Receiver,
+    service::{flight::data::FlightDataHUB, info::bulletin::Bulletin},
+    types::{
         coordinate::Position,
         measurement::{unit, Course, Heading, VelocityVector},
     },
-    protocol::serial::Receiver,
-    service::{flight::data::FlightDataHUB, info::bulletin::Bulletin},
 };
 
 pub struct DataSource<'a> {

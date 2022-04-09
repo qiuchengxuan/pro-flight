@@ -1,6 +1,6 @@
 use serde::ser::SerializeStruct;
 
-use crate::datastructures::measurement::{Acceleration, Course, Gyro, Magnetism};
+use crate::types::measurement::{Acceleration, Course, Gyro, Magnetism};
 
 #[derive(Copy, Clone, Debug)]
 pub struct GNSS {
@@ -58,7 +58,7 @@ mod test {
         use serde_json::json;
 
         use super::GNSS;
-        use crate::datastructures::measurement::Course;
+        use crate::types::measurement::Course;
 
         let gnss = GNSS { fixed: false, course: Course::from_str("1.1").unwrap() };
         assert_eq!(json!({"fixed": false}), serde_json::to_value(&gnss).unwrap());

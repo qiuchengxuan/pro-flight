@@ -7,13 +7,13 @@ use chrono::naive::NaiveDateTime;
 use fixed_point::FixedPoint;
 
 use crate::{
-    datastructures::{
-        coordinate::Position,
-        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
-    },
     protocol::{serial, serial::gnss::DataSource},
     service::info::{bulletin::Bulletin, Writer},
     sys::time,
+    types::{
+        coordinate::Position,
+        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
+    },
 };
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};

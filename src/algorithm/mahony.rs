@@ -103,7 +103,7 @@ mod test {
     fn test_mahony_course() {
         use nalgebra::Vector3;
 
-        use crate::datastructures::measurement::euler::Euler;
+        use crate::types::measurement::euler::Euler;
 
         use super::{MagnetismOrHeading, Mahony};
 

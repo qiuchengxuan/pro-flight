@@ -3,7 +3,7 @@ use core::str::Split;
 use heapless::LinearMap;
 use serde::ser::SerializeMap;
 
-use crate::datastructures::control::ControlType;
+use crate::types::control::ControlType;
 
 use super::setter::{Error, Setter, Value};
 

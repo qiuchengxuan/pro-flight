@@ -3,13 +3,6 @@ use nalgebra::UnitQuaternion;
 use crate::{
     algorithm::imu,
     config,
-    datastructures::{
-        coordinate::{Displacement, Position},
-        measurement::{
-            unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity,
-            VelocityVector,
-        },
-    },
     service::{
         flight::data::FlightDataHUB,
         info::{
@@ -18,6 +11,13 @@ use crate::{
         },
         positioning::Positioning,
         speedometer::Speedometer,
+    },
+    types::{
+        coordinate::{Displacement, Position},
+        measurement::{
+            unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity,
+            VelocityVector,
+        },
     },
 };
 

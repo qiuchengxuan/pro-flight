@@ -3,7 +3,7 @@ pub mod misc;
 pub mod navigation;
 pub mod sensor;
 
-use crate::datastructures::{control::Control, output::Output};
+use crate::types::{control::Control, output::Output};
 
 #[derive(Copy, Clone, Default, Debug, Serialize)]
 pub struct FlightData {

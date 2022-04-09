@@ -2,7 +2,7 @@ use core::str::Split;
 
 use fixed_point::FixedPoint;
 
-use crate::datastructures::measurement::{Bias, Gain, Rotation};
+use crate::types::measurement::{Bias, Gain, Rotation};
 
 use super::setter::{Error, Setter, Value};
 

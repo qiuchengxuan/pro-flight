@@ -2,7 +2,7 @@ use serde::ser::SerializeMap;
 
 use crate::{
     config::{fcs::Configuration, peripherals::pwm::ServoType},
-    datastructures::{control::Control, vec::Vec},
+    types::{control::Control, vec::Vec},
 };
 
 #[derive(Copy, Clone, Debug, Default)]

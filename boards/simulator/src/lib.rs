@@ -10,7 +10,7 @@ pub use simulator::{Config, Simulator, GNSS};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_std::sync::Mutex;
-use pro_flight::datastructures::{
+use pro_flight::types::{
     control::Control,
     measurement::{distance::Distance, unit, Acceleration, Gyro},
 };

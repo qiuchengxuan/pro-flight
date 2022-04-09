@@ -12,13 +12,13 @@ use nmea0183::{
 };
 
 use crate::{
-    datastructures::{
-        coordinate::{latitude, longitude, Position},
-        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
-    },
     protocol::{serial, serial::gnss::DataSource},
     service::info::{bulletin::Bulletin, Writer},
     sys::time,
+    types::{
+        coordinate::{latitude, longitude, Position},
+        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
+    },
 };
 
 impl Into<longitude::Longitude> for Longitude {

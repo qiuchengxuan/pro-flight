@@ -9,9 +9,7 @@ pub mod longitude;
 pub use latitude::Latitude;
 pub use longitude::Longitude;
 
-use crate::datastructures::measurement::{
-    displacement::DistanceVector, distance::Distance, unit, Altitude,
-};
+use crate::types::measurement::{displacement::DistanceVector, distance::Distance, unit, Altitude};
 
 #[derive(Copy, Clone, Default, Serialize, PartialEq, Debug)]
 pub struct SphericalCoordinate<U: Copy> {
@@ -91,7 +89,7 @@ impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<U>> for Position
 mod test {
     #[test]
     fn test_spherical_coordinate() {
-        use crate::datastructures::measurement::{
+        use crate::types::measurement::{
             displacement::DistanceVector, distance::Distance, unit::Meter,
         };
 

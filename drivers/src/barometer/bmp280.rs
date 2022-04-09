@@ -16,7 +16,7 @@ use embedded_hal::{
     digital::v2::OutputPin,
 };
 use hal::dma::{BufferDescriptor, TransferOption, TransferResult, DMA};
-use pro_flight::{datastructures::measurement::Pressure, sys::time::TickTimer};
+use pro_flight::{sys::time::TickTimer, types::measurement::Pressure};
 
 pub const SAMPLE_RATE: usize = 10; // actually 16
 

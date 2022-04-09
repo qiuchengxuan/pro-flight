@@ -3,8 +3,8 @@ use nalgebra::Vector3;
 use crate::{
     algorithm::ComplementaryFilter,
     config,
-    datastructures::measurement::{unit, Velocity, VelocityVector, GRAVITY},
     service::info,
+    types::measurement::{unit, Velocity, VelocityVector, GRAVITY},
 };
 
 pub struct Speedometer<A, GNSS> {

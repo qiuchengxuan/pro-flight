@@ -9,11 +9,11 @@ use heapless::LinearMap;
 use self::{mixer::ControlMixer, pid::PIDs};
 use crate::{
     config::{fcs::Configuration, peripherals::pwm as config},
-    datastructures::{measurement::Gyro, output::Output},
     service::info::{
         bulletin::{Bulletin, BulletinReader},
         Writer,
     },
+    types::{measurement::Gyro, output::Output},
 };
 
 fn to_motor_pwm_duty(max_duty: u16, rate: u16, value: u16) -> u16 {

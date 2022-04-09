@@ -1,4 +1,4 @@
-use crate::datastructures::measurement::{unit, Altitude, Velocity};
+use crate::types::measurement::{unit, Altitude, Velocity};
 
 pub struct Variometer {
     prev: Altitude,

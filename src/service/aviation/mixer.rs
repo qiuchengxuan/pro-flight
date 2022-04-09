@@ -1,6 +1,6 @@
 use crate::{
-    datastructures::control::Control,
     service::info::{bulletin::BulletinReader, AgingReader},
+    types::control::Control,
 };
 
 pub struct ControlMixer<'a> {

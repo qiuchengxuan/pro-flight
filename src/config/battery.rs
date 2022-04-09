@@ -2,7 +2,7 @@ use core::str::Split;
 
 use fixed_point::FixedPoint;
 
-use crate::datastructures::measurement::voltage::Voltage;
+use crate::types::measurement::voltage::Voltage;
 
 use super::setter::{Error, Setter, Value};
 

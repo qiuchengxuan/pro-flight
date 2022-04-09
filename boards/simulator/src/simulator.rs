@@ -1,7 +1,14 @@
 use pro_flight::{
     config,
     config::fcs::Configuration,
-    datastructures::{
+    service::{
+        aviation::{mixer::ControlMixer, pid::PIDs},
+        flight::data::FlightDataHUB,
+        imu,
+        info::Writer,
+        variometer::Variometer,
+    },
+    types::{
         control::Control,
         coordinate::Position,
         flight::FlightData,
@@ -9,13 +16,6 @@ use pro_flight::{
             distance::Distance, unit, Acceleration, Course, Gyro, Heading, VelocityVector,
         },
         output::Output,
-    },
-    service::{
-        aviation::{mixer::ControlMixer, pid::PIDs},
-        flight::data::FlightDataHUB,
-        imu,
-        info::Writer,
-        variometer::Variometer,
     },
 };
 

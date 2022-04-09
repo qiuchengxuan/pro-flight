@@ -13,8 +13,8 @@ use core::{mem, slice, str::Split};
 use fixed_point::{fixed, FixedPoint};
 
 use crate::{
-    datastructures::measurement::{Axes, Bias, Gain},
     io::Read,
+    types::measurement::{Axes, Bias, Gain},
 };
 pub use battery::Battery;
 pub use controller::Controller;

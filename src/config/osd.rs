@@ -4,7 +4,7 @@ use core::{
     time::Duration,
 };
 
-use crate::datastructures::Ratio;
+use crate::types::Ratio;
 
 use super::setter::{Error, Setter, Value};
 

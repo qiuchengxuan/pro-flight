@@ -3,7 +3,7 @@ use nalgebra::{UnitQuaternion, Vector3};
 use crate::{
     algorithm::mahony::{MagnetismOrHeading, Mahony},
     config::imu::IMU as Config,
-    datastructures::measurement::{
+    types::measurement::{
         euler::DEGREE_PER_DAG, Acceleration, Bias, Gain, Gyro, Heading, Magnetism,
     },
 };

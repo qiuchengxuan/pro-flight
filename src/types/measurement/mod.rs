@@ -259,7 +259,7 @@ mod test {
     #[test]
     fn test_distance_unit_convert() {
         use super::{Altitude, Distance};
-        use crate::datastructures::measurement::unit::{CentiMeter, Feet, Meter, NauticalMile};
+        use crate::types::measurement::unit::{CentiMeter, Feet, Meter, NauticalMile};
 
         let altitude = Altitude::new(1000, CentiMeter);
         assert_eq!(altitude.to_unit(Meter), Distance::new(10, Meter));
@@ -272,7 +272,7 @@ mod test {
     #[test]
     fn test_speed_unit_convert() {
         use super::Velocity;
-        use crate::datastructures::measurement::unit::{FTpM, KMpH, Knot, Meter};
+        use crate::types::measurement::unit::{FTpM, KMpH, Knot, Meter};
 
         let knot = Velocity::new(186, KMpH);
         assert_eq!(knot.to_unit(Knot), Velocity::new(100, Knot));
