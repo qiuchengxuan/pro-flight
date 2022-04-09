@@ -1,35 +1,32 @@
-pub mod aircraft;
 pub mod battery;
-pub mod board;
+pub mod controller;
+pub mod fcs;
 pub mod imu;
+pub mod ins;
 pub mod osd;
 pub mod peripherals;
-pub mod pid;
-pub mod receiver;
 pub mod setter;
-// pub mod steerpoints;
 pub mod yaml;
 
 use core::{mem, slice, str::Split};
 
 use fixed_point::{fixed, FixedPoint};
 
-pub use self::pid::PIDs;
 use crate::{
     datastructures::measurement::{Axes, Bias, Gain},
     io::Read,
 };
-pub use aircraft::Aircraft;
 pub use battery::Battery;
-pub use board::Board;
+pub use controller::Controller;
+pub use fcs::FCS;
 pub use imu::IMU;
+pub use ins::INS;
 pub use osd::{Offset, Standard, OSD};
 pub use peripherals::{
     pwm::{PWMs, Protocol, PWM},
     serial::{Config as SerialConfig, Serials},
     Peripherals,
 };
-pub use receiver::Receiver;
 use setter::{Error, Setter, Value};
 use yaml::YamlParser;
 
@@ -75,57 +72,31 @@ impl Setter for Gain {
     }
 }
 
-const DEFAULT_KP: FixedPoint<u16, 3> = fixed!(0.25, 3);
-
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
-pub struct Speedometer {
-    pub kp: FixedPoint<u16, 3>,
-}
-
-impl Default for Speedometer {
-    fn default() -> Self {
-        Self { kp: DEFAULT_KP }
-    }
-}
-
-impl Setter for Speedometer {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
-            "kp" => self.kp = value.parse()?.unwrap_or(DEFAULT_KP),
-            _ => return Err(Error::MalformedPath),
-        }
-        Ok(())
-    }
-}
-
 #[repr(C, align(4))]
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     #[serde(skip)]
     version: u8,
-    pub aircraft: Aircraft,
     pub battery: Battery,
-    pub board: Board,
+    pub fcs: FCS,
     pub imu: IMU,
+    pub ins: INS,
     pub osd: OSD,
     pub peripherals: Peripherals,
-    pub pids: PIDs,
-    pub receiver: Receiver,
-    pub speedometer: Speedometer,
+    pub controller: Controller,
 }
 
 impl Setter for Config {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         match path.next().ok_or(Error::MalformedPath)? {
-            "aircraft" => self.aircraft.set(path, value),
             "battery" => self.battery.set(path, value),
-            "board" => self.board.set(path, value),
+            "fcs" => self.fcs.set(path, value),
             "imu" => self.imu.set(path, value),
+            "ins" => self.ins.set(path, value),
             "osd" => self.osd.set(path, value),
             "peripherals" => self.peripherals.set(path, value),
-            "pids" => self.pids.set(path, value),
-            "receiver" => self.receiver.set(path, value),
-            "speedometer" => self.speedometer.set(path, value),
+            "controller" => self.controller.set(path, value),
             _ => Err(Error::MalformedPath),
         }
     }

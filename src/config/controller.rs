@@ -54,11 +54,11 @@ impl serde::Serialize for Inputs {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
-pub struct Receiver {
+pub struct Controller {
     pub inputs: Inputs,
 }
 
-impl Setter for Receiver {
+impl Setter for Controller {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         let key = path.next().ok_or(Error::MalformedPath)?;
         if key != "inputs" {

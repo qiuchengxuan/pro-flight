@@ -23,7 +23,7 @@ where
     GNSS: info::AgingReader<VelocityVector<i32, unit::MMpS>>,
 {
     pub fn new(altimeter: A, gnss: GNSS, sample_rate: usize, gnss_rate: usize) -> Self {
-        let config = &config::get().speedometer;
+        let config = &config::get().ins.speedometer;
         Self {
             altimeter,
             gnss,

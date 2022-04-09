@@ -125,7 +125,7 @@ where
         tx.setup_peripheral(ch, &mut spi);
         let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
         let convertor = Converter::from(config::get().imu);
-        let rotation = config::get().board.rotation;
+        let rotation = config::get().imu.rotation;
         let callback = Box::leak(Box::new(move |result: TransferResult<u8>| {
             cs_.set_high().ok();
             let bytes: &[u8] = result.into();

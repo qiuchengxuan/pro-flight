@@ -1,24 +1,25 @@
-aircraft:
-  configuration: airplane
 imu:
   mahony:
     kp: 0.25
     ki: 0.005
-pids:
-  roll:
-    max-rate: 30
-    kp: 1.0
-    ki: 0.4
-    kd: 0.2
-  pitch:
-    max-rate: 10
-    kp: 0.58
-    ki: 0.5
-    kd: 0.22
-  yaw:
-    max-rate: 10
-    kp: 0.7
-    ki: 0.45
-    kd: 0.2
-speedometer:
-  kp: 0.25
+ins:
+  speedometer:
+    kp: 0.25
+fcs:
+  configuration: airplane
+  pids:
+    roll:
+      max-rate: 30
+      kp: 1.0
+      ki: 0.4
+      kd: 0.2
+    pitch:
+      max-rate: 10
+      kp: 0.58
+      ki: 0.5
+      kd: 0.22
+    yaw:
+      max-rate: 10
+      kp: 0.7
+      ki: 0.45
+      kd: 0.2

@@ -8,7 +8,7 @@ use heapless::LinearMap;
 
 use self::{mixer::ControlMixer, pid::PIDs};
 use crate::{
-    config::{aircraft::Configuration, peripherals::pwm as config},
+    config::{fcs::Configuration, peripherals::pwm as config},
     datastructures::{measurement::Gyro, output::Output},
     service::info::{
         bulletin::{Bulletin, BulletinReader},
@@ -76,7 +76,7 @@ impl<'a> FlightControl<'a> {
             }
         }
         self.motors.sort_by(|a, b| a.0.index.partial_cmp(&b.0.index).unwrap());
-        self.pids.reconfigure(&config.pids)
+        self.pids.reconfigure(&config.fcs.pids)
     }
 
     pub fn new(
@@ -90,8 +90,8 @@ impl<'a> FlightControl<'a> {
             output,
             pwms,
             config_iteration: crate::config::iteration(),
-            configuration: crate::config::get().aircraft.configuration,
-            pids: PIDs::new(gyroscope, &crate::config::get().pids),
+            configuration: crate::config::get().fcs.configuration,
+            pids: PIDs::new(gyroscope, &crate::config::get().fcs.pids),
             motors: heapless::Vec::new(),
             servos: heapless::LinearMap::new(),
         };

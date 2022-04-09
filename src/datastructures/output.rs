@@ -1,7 +1,7 @@
 use serde::ser::SerializeMap;
 
 use crate::{
-    config::{aircraft::Configuration, peripherals::pwm::ServoType},
+    config::{fcs::Configuration, peripherals::pwm::ServoType},
     datastructures::{control::Control, vec::Vec},
 };
 

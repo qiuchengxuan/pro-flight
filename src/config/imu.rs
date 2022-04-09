@@ -2,7 +2,7 @@ use core::str::Split;
 
 use fixed_point::FixedPoint;
 
-use crate::datastructures::measurement::{Bias, Gain};
+use crate::datastructures::measurement::{Bias, Gain, Rotation};
 
 use super::setter::{Error, Setter, Value};
 
@@ -77,6 +77,7 @@ pub struct IMU {
     pub accelerometer: Accelerometer,
     pub magnetometer: Magnetometer,
     pub mahony: Mahony,
+    pub rotation: Rotation,
 }
 
 impl Setter for IMU {
@@ -85,6 +86,10 @@ impl Setter for IMU {
             "accelerometer" => self.accelerometer.set(path, value),
             "magnetometer" => self.magnetometer.set(path, value),
             "mahony" => self.mahony.set(path, value),
+            "rotation" => {
+                self.rotation = value.parse()?.unwrap_or(Rotation::NoRotation);
+                Ok(())
+            }
             _ => return Err(Error::MalformedPath),
         }
     }

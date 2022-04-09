@@ -1,6 +1,6 @@
 use pro_flight::{
     config,
-    config::aircraft::Configuration,
+    config::fcs::Configuration,
     datastructures::{
         control::Control,
         coordinate::Position,
@@ -50,10 +50,10 @@ impl Simulator {
         let imu = imu::IMU::new(config.sample_rate, hub);
         let reader = hub.reader();
         let variometer = Variometer::new(1000 / config.altimeter_rate);
-        let configuration = config::get().aircraft.configuration;
+        let configuration = config::get().fcs.configuration;
         let mut mixer = ControlMixer::new(reader.input, 50);
         hub.output.write(Output::from(&mixer.mix(), configuration));
-        let pids = PIDs::new(hub.reader().gyroscope, &config::get().pids);
+        let pids = PIDs::new(hub.reader().gyroscope, &config::get().fcs.pids);
         Self { hub, imu, variometer, configuration, mixer, pids, acceleration: false, gyro: false }
     }
 

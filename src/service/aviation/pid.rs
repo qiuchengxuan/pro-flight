@@ -14,12 +14,12 @@ pub struct PIDs<'a> {
 }
 
 impl<'a> PIDs<'a> {
-    fn config_to_pid(config: &crate::config::pid::PID) -> Pid<f32> {
+    fn config_to_pid(config: &crate::config::fcs::PID) -> Pid<f32> {
         let (kp, ki, kd) = (config.kp.into(), config.ki.into(), config.kd.into());
         Pid::new(kp, ki, kd, 100.0, 100.0, 100.0, 100.0, 0.0)
     }
 
-    pub fn new(gyroscope: BulletinReader<'a, Gyro>, config: &crate::config::PIDs) -> Self {
+    pub fn new(gyroscope: BulletinReader<'a, Gyro>, config: &crate::config::fcs::PIDs) -> Self {
         let roll = Self::config_to_pid(&config.roll);
         let pitch = Self::config_to_pid(&config.pitch);
         let yaw = Self::config_to_pid(&config.yaw);
@@ -28,7 +28,7 @@ impl<'a> PIDs<'a> {
         Self { gyroscope, roll, pitch, yaw, max_rates }
     }
 
-    pub fn reconfigure(&mut self, config: &crate::config::PIDs) {
+    pub fn reconfigure(&mut self, config: &crate::config::fcs::PIDs) {
         *self = Self::new(self.gyroscope, config);
     }
 

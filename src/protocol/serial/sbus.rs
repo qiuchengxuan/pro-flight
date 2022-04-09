@@ -85,7 +85,7 @@ where
 
         let mut counter = 0;
         let mut input = Control::default();
-        for (id, cfg) in config::get().receiver.inputs.0.iter() {
+        for (id, cfg) in config::get().controller.inputs.0.iter() {
             let channel = cfg.channel as usize - 1;
             if channel > packet.channels.len() {
                 continue;
