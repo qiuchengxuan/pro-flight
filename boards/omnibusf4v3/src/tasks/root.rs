@@ -39,18 +39,14 @@ use hal::{
     persist::PersistDatastore,
 };
 use pro_flight::{
+    cli::CLI,
     config::{self, peripherals::serial::Config as SerialConfig},
+    fcs::{mixer::ControlMixer, FlightControlSystem},
+    ins,
+    ins::variometer::Variometer,
+    logger,
     protocol::serial,
-    service::{
-        aviation::{mixer::ControlMixer, FlightControl},
-        cli::CLI,
-        flight::data::FlightDataHUB,
-        imu,
-        info::Writer as _,
-        logger,
-        sync::trigger,
-        variometer::Variometer,
-    },
+    service::{flight::data::FlightDataHUB, info::Writer as _, sync::trigger},
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
@@ -165,11 +161,11 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
-    let mut imu = imu::IMU::new(SAMPLE_RATE, &hub);
+    let mut ins = ins::INS::new(SAMPLE_RATE, &hub);
     let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |accel, gyro| {
         hub.accelerometer.write(accel);
         hub.gyroscope.write(gyro);
-        imu.invoke();
+        ins.invoke();
     });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
     thread.mpu6000.add_fn(never_complete(move || int.clear_interrupt_pending_bit()));
@@ -251,8 +247,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
     let mixer = ControlMixer::new(reader.input, 50);
-    let mut flight_control = FlightControl::new(reader.gyroscope, mixer, &hub.output, pwms);
-    thread.servo.add_fn(never_complete(move || flight_control.update()));
+    let mut fcs = FlightControlSystem::new(reader.gyroscope, mixer, &hub.output, pwms);
+    thread.servo.add_fn(never_complete(move || fcs.update()));
 
     let int = make_trigger(thread.servo, periph_exti1!(reg));
     let mut servos = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(20));

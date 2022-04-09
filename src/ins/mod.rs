@@ -1,5 +1,12 @@
 use nalgebra::UnitQuaternion;
 
+pub mod positioning;
+pub mod speedometer;
+pub mod variometer;
+
+use positioning::Positioning;
+use speedometer::Speedometer;
+
 use crate::{
     algorithm::imu,
     config,
@@ -9,8 +16,6 @@ use crate::{
             bulletin::{Bulletin, BulletinReader},
             AgingReader, Reader, Writer,
         },
-        positioning::Positioning,
-        speedometer::Speedometer,
     },
     types::{
         coordinate::{Displacement, Position},
@@ -26,7 +31,7 @@ type GNSSSpeedometer<'a> = BulletinReader<'a, VelocityVector<i32, unit::MMpS>>;
 type Altimeter<'a> = BulletinReader<'a, Altitude>;
 type GNSS<'a> = BulletinReader<'a, Position>;
 
-pub struct IMU<'a> {
+pub struct INS<'a> {
     aging: usize,
     // input
     acceleration: BulletinReader<'a, Acceleration>,
@@ -45,7 +50,7 @@ pub struct IMU<'a> {
     displacement: &'a Bulletin<Displacement<unit::CentiMeter>>,
 }
 
-impl<'a> IMU<'a> {
+impl<'a> INS<'a> {
     pub fn new(sample_rate: usize, hub: &'a FlightDataHUB) -> Self {
         let config = config::get();
         let reader = hub.reader();

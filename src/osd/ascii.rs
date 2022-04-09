@@ -28,7 +28,7 @@ pub type ScreenConsumer<const W: usize, const H: usize> = fn(&Screen<W, H>);
 
 const NO_GPS: &str = "NO GPS";
 
-pub struct AsciiHud<'a, const W: usize, const H: usize> {
+pub struct OSD<'a, const W: usize, const H: usize> {
     hud: HUD,
     reader: FlightDataReader<'a>,
     screen: Box<[[u8; W]; H]>,
@@ -54,7 +54,7 @@ fn hud_coordinate<U: Copy>(c: SphericalCoordinate<U>) -> hud::SphericalCoordinat
     hud::SphericalCoordinate { rho: c.rho.value() as u16, theta: c.theta, phi: c.phi }
 }
 
-impl<'a, const W: usize, const H: usize> AsciiHud<'a, W, H> {
+impl<'a, const W: usize, const H: usize> OSD<'a, W, H> {
     pub fn new(reader: FlightDataReader<'a>, pixel_ratio: PixelRatio) -> Self {
         let cfg = &config::get().osd;
         let hud = HUD::new(&default_symbol_table(), cfg.fov, pixel_ratio, cfg.aspect_ratio.into());

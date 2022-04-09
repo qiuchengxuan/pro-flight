@@ -10,7 +10,7 @@ use indoc::indoc;
 
 use crate::{
     io::{self, Read},
-    service::logger,
+    logger,
 };
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -78,17 +78,17 @@ Usage:
 #[macro_export]
 macro_rules! __command {
     (bootloader,[$persist:ident]) => {
-        $crate::service::cli::Command::new("bootloader", "Reboot to bootloader", move |_| {
+        $crate::cli::Command::new("bootloader", "Reboot to bootloader", move |_| {
             let mut sysinfo: $crate::sysinfo::SystemInfo = $persist.load();
             sysinfo.reboot_reason = RebootReason::Bootloader;
             $persist.save(&sysinfo);
-            unsafe { $crate::service::cli::reboot() };
+            unsafe { $crate::cli::reboot() };
         })
     };
     (osd,[$setter:ident]) => {
-        $crate::service::cli::Command::new("osd", "OSD related command", move |cmd| {
+        $crate::cli::Command::new("osd", "OSD related command", move |cmd| {
             if cmd.trim() != "upload-font" {
-                println!("{}", $crate::service::cli::OSD_CMD_USAGE);
+                println!("{}", $crate::cli::OSD_CMD_USAGE);
                 return;
             }
             $setter.set();
@@ -98,7 +98,7 @@ macro_rules! __command {
         })
     };
     (save,[$nvram:ident]) => {
-        $crate::service::cli::Command::new("save", "Save configuration", move |_| {
+        $crate::cli::Command::new("save", "Save configuration", move |_| {
             if let Some(err) = $nvram.store(config::get()).err() {
                 println!("Save configuration failed: {:?}", err);
                 $nvram.reset().ok();
@@ -106,7 +106,7 @@ macro_rules! __command {
         })
     };
     (telemetry,[$reader:ident]) => {
-        $crate::service::cli::Command::new("telemetry", "Show flight data", move |_| {
+        $crate::cli::Command::new("telemetry", "Show flight data", move |_| {
             println!("{}", $reader.read())
         })
     };

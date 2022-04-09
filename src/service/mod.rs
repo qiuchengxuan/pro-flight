@@ -1,11 +1,3 @@
-pub mod ascii_hud;
-pub mod aviation;
-pub mod cli;
 pub mod flight;
-pub mod imu;
 pub mod info;
-pub mod logger;
-pub mod positioning;
-pub mod speedometer;
 pub mod sync;
-pub mod variometer;

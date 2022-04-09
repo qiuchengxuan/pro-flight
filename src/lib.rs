@@ -27,13 +27,18 @@ extern crate serial_test;
 #[macro_use]
 pub mod io;
 #[macro_use]
-pub mod service;
-#[macro_use]
 pub mod types;
-pub mod algorithm;
-pub mod config;
-pub mod protocol;
 #[macro_use]
 pub mod sys;
+
+pub mod algorithm;
+pub mod cli;
+pub mod config;
+pub mod fcs;
+pub mod ins;
+pub mod logger;
+pub mod osd;
+pub mod protocol;
+pub mod service;
 pub mod sysinfo;
 pub mod task;

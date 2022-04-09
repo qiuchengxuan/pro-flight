@@ -44,7 +44,7 @@ fn to_servo_pwm_duty(max_duty: u16, value: i16, min: i8, max: i8, reversed: bool
 
 type PWM = Box<dyn PwmPin<Duty = u16> + Send>;
 
-pub struct FlightControl<'a> {
+pub struct FlightControlSystem<'a> {
     mixer: ControlMixer<'a>,
     output: &'a Bulletin<Output>,
     pwms: Vec<(&'static str, PWM)>,
@@ -56,7 +56,7 @@ pub struct FlightControl<'a> {
     servos: LinearMap<config::ServoType, (config::Servo, usize), 4>,
 }
 
-impl<'a> FlightControl<'a> {
+impl<'a> FlightControlSystem<'a> {
     fn reconfigure(&mut self) {
         self.servos.clear();
         self.motors.clear();

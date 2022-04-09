@@ -15,8 +15,9 @@ use max7456::{
 use peripheral_register::Register;
 use pro_flight::{
     config, io,
+    osd::ascii::OSD,
     protocol::xmodem::XMODEM,
-    service::{ascii_hud::AsciiHud, flight::data::FlightDataReader, sync::trigger},
+    service::{flight::data::FlightDataReader, sync::trigger},
     sys::time::TickTimer,
     types::Ratio,
 };
@@ -145,14 +146,14 @@ where
     TX: DMA<Future = TXF>,
 {
     pub async fn run(mut self) {
-        let mut hud = AsciiHud::<29, 15>::new(self.reader, Ratio(12, 18).into());
+        let mut osd = OSD::<29, 15>::new(self.reader, Ratio(12, 18).into());
         loop {
             if self.rx.get() {
                 self.upload_font().await;
                 self.rx.clear();
             }
             let mut buffer = self.bd.try_get_buffer().unwrap();
-            let screen = hud.draw();
+            let screen = osd.draw();
             let mut writer = LinesWriter::new(screen, Default::default());
             let size = writer.write(buffer.as_mut()).0.len();
             mem::drop(buffer);

@@ -1,13 +1,10 @@
 use pro_flight::{
     config,
     config::fcs::Configuration,
-    service::{
-        aviation::{mixer::ControlMixer, pid::PIDs},
-        flight::data::FlightDataHUB,
-        imu,
-        info::Writer,
-        variometer::Variometer,
-    },
+    fcs::{mixer::ControlMixer, pid::PIDs},
+    ins,
+    ins::variometer::Variometer,
+    service::{flight::data::FlightDataHUB, info::Writer},
     types::{
         control::Control,
         coordinate::Position,
@@ -35,7 +32,7 @@ pub struct GNSS {
 
 pub struct Simulator {
     hub: &'static FlightDataHUB,
-    imu: imu::IMU<'static>,
+    ins: ins::INS<'static>,
     variometer: Variometer,
     configuration: Configuration,
     mixer: ControlMixer<'static>,
@@ -47,14 +44,14 @@ pub struct Simulator {
 impl Simulator {
     pub fn new(config: Config) -> Self {
         let hub = Box::leak(Box::new(FlightDataHUB::default()));
-        let imu = imu::IMU::new(config.sample_rate, hub);
+        let ins = ins::INS::new(config.sample_rate, hub);
         let reader = hub.reader();
         let variometer = Variometer::new(1000 / config.altimeter_rate);
         let configuration = config::get().fcs.configuration;
         let mut mixer = ControlMixer::new(reader.input, 50);
         hub.output.write(Output::from(&mixer.mix(), configuration));
         let pids = PIDs::new(hub.reader().gyroscope, &config::get().fcs.pids);
-        Self { hub, imu, variometer, configuration, mixer, pids, acceleration: false, gyro: false }
+        Self { hub, ins, variometer, configuration, mixer, pids, acceleration: false, gyro: false }
     }
 
     pub fn get_telemetry(&self) -> FlightData {
@@ -75,8 +72,8 @@ impl Simulator {
     pub fn update_acceleration(&mut self, acceleration: Acceleration) {
         self.hub.accelerometer.write(acceleration);
         if self.gyro {
-            trace!("Invoke IMU update");
-            self.imu.invoke();
+            trace!("Invoke INS update");
+            self.ins.invoke();
             self.update_output();
             self.gyro = false;
         } else {
@@ -87,8 +84,8 @@ impl Simulator {
     pub fn update_gyro(&mut self, gyro: Gyro) {
         self.hub.gyroscope.write(gyro);
         if self.acceleration {
-            trace!("Invoke IMU update");
-            self.imu.invoke();
+            trace!("Invoke INS update");
+            self.ins.invoke();
             self.update_output();
             self.acceleration = false;
         } else {
