@@ -32,21 +32,21 @@ Progress
   - [x] IMU
   - [x] Logger
   - [x] YAML-like config
+  - [x] software interrupt based event
+* FCS
+  - [x] PWM & ESC
+  - [x] PID
+* INS
   - [x] Displacement integral
   - [x] Complementary filter
-  - [x] software interrupt based event
-  - [x] PWM & ESC
-* fight-control
-  - [x] PID
 * IO
   - [x] USB console serial
   - [x] DMA buffer descriptor
-* HAL
-  - [x] Gyroscope/Accelerometer
 * OSD
   - [x] MAX7456 (With XMODEM font upload)
 * Sensor
   - [x] MPU6000
+  - [x] Gyroscope/Accelerometer
   - [x] Battery Voltage ADC
   - [x] Barometer
 * protocol
@@ -91,123 +91,37 @@ Priority map
 | Telemtry  | OSD                            |
 | Main      | LED/CLI                        |
 
-data-flow
+Framework
 =========
 
-* Speedometer
-
-  ```plantuml
-  @startuml
-  ditaa
-
-  +-----------+ Pressure +-----------+       Derivative
-  | Barometer |--------->| Altimeter |-----------------+
-  +-----------+          +-----------+                 |
-                                                       v
-  +---------------+ Accel  +-------+            +-------------+
-  | Accelerometer |------->|       |            |             |
-  +---------------+        |       | Integral   |             |
-                           |  IMU  |----------->| Speedometer |
-  +-----------+     Gyro   |       |            |             |
-  | Gyroscope |----------->|       |            |             |
-  +-----------+            +-------+            +-------------+
-                                                       ^
-  +-----------+                           Velocity     |
-  | GNSS      |----------------------------------------+
-  +-----------+
-  @enduml
-  ```
-
-* SINS
-
-  ```plantuml
-  @startuml
-  ditaa
-
-  +-----------+ Pressure +-----------+       Altitude
-  | Barometer |--------->| Altimeter |-------------+
-  +-----------+          +-----------+             |
-                                                   v
-  +---------------+ Accel  +-------+            +------+
-  | Accelerometer |------->|       |            |      |
-  +---------------+        |       | Integral   |      |
-                           |  IMU  |-------+--->| SINS |
-  +-----------+     Gyro   |       |       |    |      |
-  | Gyroscope |----------->|       |       |    |      |
-  +-----------+            +-------+       |    +------+
-                                           |       ^
-                        +-------------+    |       |
-                        | Speedometer |----+       |
-                        +-------------+            |
-  +-----------+  Position                          |
-  | GNSS      |------------------------------------+
-  +-----------+
-  @enduml
-  ```
-
-* Output
-
-  ```plantuml
-  @startuml
-  ditaa
-  +-------------+         +-----+
-  | Speedometer |-------->|     |  AoA
-  +-------------+         | AoA |----------------+
-                     +--->|     |                |
-                     |    +-----+                v
-  +-----+ Attitude   |                     +-----------+
-  | IMU |------------+-------------------->| Stablizer |-------+
-  +-----+                                  +-----------+       |
-                                                               |
-  +------+ Steerpoint   +-----------+                          |
-  | SINS |------------->| Autopilot |---------------+          |
-  +------+              +-----------+               |          |      +-----------+    +----------+
-                                                    |          +----->|           |    |          |
-  +----------+ Remote controller +---------------+  +---------------->|   Mixer   |--->|   PWMs   |
-  | Receiver |------------------>| Configuration |------------------->|           |    |          |
-  +----------+                   +---------------+                    +-----------+    +----------+
-  @enduml
-  ```
-
-* Telemetry
-
-  ```plantuml
-  @startuml
-  ditaa
-
-  +-------------+       Speed vector                            +----------+
-  | Speedometer |----+------------------------+             +-->| Blackbox |
-  +-------------+    |                        |             |   +----------+
-                     |     +-----+            v             |
-                     +---->|     |  AoA   +-----------+     |
-                           | AoA |------->| Telemetry |-----+
-                     +---->|     |        +-----------+     |
-                     |     +-----+          ^ ^             |
-  +-----+            |                      | |             |
-  | IMU |------------+----------------------+ |             |
-  +-----+    Attitude                         |             |
-                                              |             |
-  +------+   Postion & Steerpoint             |             |   +----------+
-  | SINS |------------------------------------+             +-->| HUD(OSD) |
-  +------+                                                      +----------+
-  @enduml
-  ```
-
-* flight-control
-
-  ```plantuml
-  @startuml
-  ditaa
-  +-----------+                   Max-rate
-  | Gyroscope |-----------------+   |
-  +-----------+                 |   |
-                                v   v
-  +----------+    +-------+    +-----+    +--------+
-  | Receiver |--->|       |    |     |--->| Motors |
-  +----------+    |       |    |     |    +--------+
-                  | Mixer |--->| PID |
-  +----------+    |       |    |     |    +--------+
-  | AP       |--->|       |    |     |--->| Servos |
-  +----------+    +-------+    +-----+    +--------+
-  @enduml
-  ```
+```mermaid
+graph LR
+    subgraph Sensors
+        Accelerometer
+        Gyroscope
+        Magnetometer
+        style Magnetometer stroke-dasharray: 5 5
+        Barometer
+        GNSS
+    end
+    Accelerometer -->|"Acceleration(RAW)"| IMU
+    Gyroscope -->|"Gyro(RAW)"| IMU
+    Magnetometer -.-> |Magnetism| IMU
+    GNSS -->|Heading/Course| IMU
+    Barometer -->|Pressure| Altimeter
+    subgraph INS
+        Speedometer --> Positioning
+    end
+    IMU -->|"Acceleration(CAL)<br/>Attitude"| Speedometer
+    GNSS -->|datetime| System-clock
+    GNSS -->|V/S<br/>G/S| Speedometer
+    GNSS -->|Coordinate| Positioning
+    Altimeter -->|Altitude| Variometer
+    Altimeter -->|Altitude| Positioning
+    Variometer -->|V/S| Speedometer
+    subgraph FCS
+        PIDs --> Servos
+    end
+    Controller -->|Input| PIDs
+    IMU -->|"Gyro(CAL)"| PIDs
+```

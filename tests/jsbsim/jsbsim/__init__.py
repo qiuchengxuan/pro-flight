@@ -6,6 +6,7 @@ from .gyroscope import Gyro, Gyroscope
 from .positioning import Position, Positioning
 from .session import Session
 from .speedometer import Speed, Speedometer
+from .variometer import Variometer
 from .velocity import Velocity, VelocityMeter
 
 
@@ -19,6 +20,7 @@ class JSBSim:
         self._gyroscope = Gyroscope(session)
         self._positioning = Positioning(session)
         self._speedometer = Speedometer(session)
+        self._variometer = Variometer(session)
         self._velocitymeter = VelocityMeter(session)
         self._session = session
 
@@ -59,8 +61,8 @@ class JSBSim:
         return self._altimeter.get_altitude()
 
     @property
-    def vertical_speed(self) -> float:  # ft/s
-        return self._altimeter.get_vertical_speed()
+    def vario(self) -> float:  # ft/s
+        return self._variometer.get_vario()
 
     def step(self, control: Control):
         self._fcs.set(control)
