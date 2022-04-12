@@ -1,92 +1,71 @@
-use nalgebra::UnitQuaternion;
+use core::time;
 
+pub mod out;
 pub mod positioning;
 pub mod speedometer;
 pub mod variometer;
 
 use positioning::Positioning;
 use speedometer::Speedometer;
+use variometer::Variometer;
 
 use crate::{
-    algorithm::imu,
-    config,
-    service::{
-        flight::data::FlightDataHUB,
-        info::{
-            bulletin::{Bulletin, BulletinReader},
-            AgingReader, Reader, Writer,
-        },
-    },
-    types::{
-        coordinate::{Displacement, Position},
-        measurement::{
-            unit, Acceleration, Altitude, Course, Gyro, Heading, Magnetism, Velocity,
-            VelocityVector,
-        },
-    },
+    config, datastore, imu,
+    types::{coordinate::Position, sensor::Readout},
 };
 
-type VelocityMeter<'a> = BulletinReader<'a, Velocity<i32, unit::CMpS>>;
-type GNSSSpeedometer<'a> = BulletinReader<'a, VelocityVector<i32, unit::MMpS>>;
-type Altimeter<'a> = BulletinReader<'a, Altitude>;
-type GNSS<'a> = BulletinReader<'a, Position>;
-
-pub struct INS<'a> {
-    aging: usize,
-    // input
-    acceleration: BulletinReader<'a, Acceleration>,
-    gyro: BulletinReader<'a, Gyro>,
-    magnetometer: BulletinReader<'a, Magnetism>,
-    heading: BulletinReader<'a, Heading>,
-    course: BulletinReader<'a, Course>,
-    // data process
+pub struct INS {
+    interval: time::Duration,
     imu: imu::IMU,
-    speedometer: Speedometer<VelocityMeter<'a>, GNSSSpeedometer<'a>>,
-    positioning: Positioning<Altimeter<'a>, GNSS<'a>>,
-    // output
-    quaternion: &'a Bulletin<UnitQuaternion<f32>>,
-    velocity: &'a Bulletin<VelocityVector<f32, unit::MpS>>,
-    position: &'a Bulletin<Position>,
-    displacement: &'a Bulletin<Displacement<unit::CentiMeter>>,
+    variometer: Variometer,
+    speedometer: Speedometer,
+    positioning: Positioning,
+    initial: Option<Position>,
 }
 
-impl<'a> INS<'a> {
-    pub fn new(sample_rate: usize, hub: &'a FlightDataHUB) -> Self {
+impl INS {
+    pub fn new(sample_rate: usize, variometer: Variometer) -> Self {
+        let interval = time::Duration::from_micros((1000_000 / sample_rate) as u64);
         let config = config::get();
-        let reader = hub.reader();
-        let speedometer =
-            Speedometer::new(reader.vertical_speed, reader.gnss_velocity, sample_rate, 10);
-        let positioning = Positioning::new(reader.altimeter, reader.gnss_position, sample_rate);
+        let speedometer = Speedometer::new(sample_rate);
+        let positioning = Positioning::new(sample_rate);
         Self {
-            aging: sample_rate / 10,
-            acceleration: reader.accelerometer,
-            gyro: reader.gyroscope,
-            magnetometer: reader.magnetometer,
-            heading: reader.gnss_heading,
-            course: reader.gnss_course,
+            interval,
             imu: imu::IMU::new(sample_rate, &config.imu),
+            variometer,
             speedometer,
             positioning,
-            quaternion: &hub.imu,
-            velocity: &hub.speedometer,
-            position: &hub.positioning,
-            displacement: &hub.displacement,
+            initial: None,
         }
     }
 
-    pub fn invoke(&mut self) {
-        let acceleration = self.acceleration.get_last().unwrap();
-        let gyro = self.gyro.get_last().unwrap();
-        let magnetism = self.magnetometer.get_last();
-        let aging = self.aging;
-        let heading = self.heading.get_aging_last(aging).and(self.course.get_aging_last(aging));
-        if self.imu.update_imu(acceleration, gyro, magnetism, heading) {
-            self.quaternion.write(self.imu.quaternion());
-            let v = self.speedometer.update(self.imu.acceleration());
-            self.velocity.write(v);
-            let (p, d) = self.positioning.update(v);
-            self.position.write(p);
-            self.displacement.write(d)
+    pub fn update(&mut self, acceleration: Readout, gyro: Readout) {
+        let ds = datastore::acquire();
+        let gnss = ds.read_gnss(Some(self.interval));
+        let heading = gnss.map(|g| g.fixed.map(|f| f.heading)).flatten().flatten();
+        let input = imu::Input { acceleration, gyro, magnetism: None, heading };
+        let imu = match self.imu.update_imu(input) {
+            Some(imu) => imu,
+            None => return,
+        };
+        ds.write_imu(imu);
+
+        let altitude = ds.read_altitude(Some(self.interval));
+        let vs = altitude.map(|alt| self.variometer.update(alt));
+        let vv = self.speedometer.update(imu.acceleration.0.raw, vs, gnss);
+        let gnss_position = gnss.map(|g| g.fixed.map(|f| f.position)).flatten();
+        if self.initial.is_none() && gnss_position.is_some() {
+            self.initial = gnss_position;
         }
+        self.positioning.update(vv, altitude, gnss_position);
+        let p = self.positioning.position();
+        let d = self.positioning.displacement();
+        let ins = out::INS { velocity_vector: vv, position: p, displacement: d };
+        ds.write_ins(ins);
+    }
+
+    /// Testing only
+    pub fn skip_calibration(&mut self) {
+        self.imu.skip_calibration()
     }
 }

@@ -13,7 +13,7 @@ pub use mpu6000::{bus::SpiBus, MPU6000, SPI_MODE};
 use pro_flight::{
     config,
     sys::time::TickTimer,
-    types::measurement::{Acceleration, Axes, Measurement, Rotation},
+    types::sensor::{Axes, Readout, Rotation},
 };
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
@@ -43,23 +43,23 @@ impl From<config::imu::IMU> for Converter {
 }
 
 impl Converter {
-    fn convert_acceleration(&self, accel: &mpu6000::Acceleration) -> Measurement {
+    fn convert_acceleration(&self, accel: &mpu6000::Acceleration) -> Readout {
         let axes = Axes { x: -accel.0 as i32, y: -accel.1 as i32, z: -accel.2 as i32 };
         let sensitive: f32 = self.accelerometer.into();
-        Measurement { axes, sensitive: sensitive as u16 }
+        Readout { axes, sensitive: sensitive as u16 }
     }
 
-    fn convert_gyro(&self, gyro: &mpu6000::Gyro) -> Measurement {
+    fn convert_gyro(&self, gyro: &mpu6000::Gyro) -> Readout {
         let axes =
             Axes { x: (gyro.0 as i32) * 10, y: (gyro.1 as i32) * 10, z: (gyro.2 as i32) * 10 };
         let sensitive: f32 = self.gyroscope.into();
-        Measurement { axes, sensitive: (sensitive * 10.0) as u16 }
+        Readout { axes, sensitive: (sensitive * 10.0) as u16 }
     }
 
-    pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> (Acceleration, Measurement) {
+    pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> (Readout, Readout) {
         let acceleration: mpu6000::Acceleration = bytes[..6].into();
         let gyro: mpu6000::Gyro = bytes[8..].into();
-        let acceleration = Acceleration(self.convert_acceleration(&acceleration).rotate(rotation));
+        let acceleration = self.convert_acceleration(&acceleration).rotate(rotation);
         let gyro = self.convert_gyro(&gyro).rotate(rotation);
         (acceleration, gyro)
     }
@@ -105,7 +105,7 @@ pub struct DmaMPU6000<RX, TX, CS> {
 
 pub trait IntoDMA<RX: DMA, TX: DMA, H, CS>
 where
-    H: FnMut(Acceleration, Measurement) + Send + 'static,
+    H: FnMut(Readout, Readout) + Send + 'static,
 {
     fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel), h: H) -> DmaMPU6000<RX, TX, CS>;
 }
@@ -115,7 +115,7 @@ impl<E, SPI, CS, DELAY, RX: DMA, TX: DMA, H> IntoDMA<RX, TX, H, CS>
 where
     SPI: Peripheral,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
-    H: FnMut(Acceleration, Measurement) + Send + 'static,
+    H: FnMut(Readout, Readout) + Send + 'static,
 {
     fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel), mut h: H) -> DmaMPU6000<RX, TX, CS> {
         let (mut spi, cs, _) = self.free().free();

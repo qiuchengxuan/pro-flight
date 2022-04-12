@@ -83,6 +83,8 @@ impl FromStr for GNSSProtocol {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type")]
+#[serde(rename = "GNSS")]
 pub struct GNSSConfig {
     pub baudrate: u32,
     pub protocol: GNSSProtocol,
@@ -117,9 +119,16 @@ impl SbusConfig {
 #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type")]
 #[repr(u8)]
+pub enum RemoteControl {
+    SBUS(SbusConfig),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+#[repr(u8)]
 pub enum Config {
     GNSS(GNSSConfig),
-    SBUS(SbusConfig),
+    RC(RemoteControl),
 }
 
 impl Setter for Config {
@@ -128,7 +137,7 @@ impl Setter for Config {
         if key == "type" {
             *self = match value.0 {
                 Some("GNSS") => Self::GNSS(GNSSConfig::default()),
-                Some("SBUS") => Self::SBUS(SbusConfig::default()),
+                Some("SBUS") => Self::RC(RemoteControl::SBUS(SbusConfig::default())),
                 Some(_) => return Err(Error::UnexpectedValue),
                 _ => return Err(Error::ExpectValue),
             };
@@ -140,7 +149,7 @@ impl Setter for Config {
                 "protocol" => gnss.protocol = value.parse()?.unwrap_or(GNSSProtocol::NMEA),
                 _ => return Err(Error::MalformedPath),
             },
-            Self::SBUS(ref mut sbus) => match key {
+            Self::RC(RemoteControl::SBUS(ref mut sbus)) => match key {
                 "fast" => sbus.fast = value.parse()?.unwrap_or(false),
                 "rx-inverted" => sbus.rx_inverted = value.parse()?.unwrap_or(true),
                 "half-duplex" => sbus.half_duplex = value.parse()?.unwrap_or(false),

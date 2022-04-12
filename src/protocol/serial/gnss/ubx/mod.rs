@@ -6,20 +6,17 @@ use core::mem::{size_of, transmute};
 use chrono::naive::NaiveDateTime;
 use fixed_point::FixedPoint;
 
-use crate::{
-    protocol::{serial, serial::gnss::DataSource},
-    service::info::{bulletin::Bulletin, Writer},
-    sys::time,
-    types::{
-        coordinate::Position,
-        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
-    },
+use super::out::{Fixed, GNSS};
+use crate::types::{
+    coordinate::Position,
+    measurement::{unit, Altitude, Course, Distance, Heading, Velocity, VelocityVector, ENU},
 };
 
 use message::{Message, CHECKSUM_SIZE, PAYLOAD_OFFSET, UBX_HEADER0, UBX_HEADER1};
 use nav_pos_pvt::{FixType as UBXFixType, NavPositionVelocityTime};
 
 const MAX_MESSAGE_SIZE: usize = size_of::<Message<NavPositionVelocityTime>>();
+pub const CHUNK_SIZE: usize = MAX_MESSAGE_SIZE;
 
 #[derive(Copy, Clone)]
 pub enum State {
@@ -33,81 +30,63 @@ pub enum State {
     Remain(usize),
 }
 
-pub struct UBX<'a> {
+pub struct UBX {
     state: State,
-    fixed: &'a Bulletin<bool>,
-    position: &'a Bulletin<Position>,
-    velocity: &'a Bulletin<VelocityVector<i32, unit::MMpS>>,
-    heading: &'a Bulletin<Heading>,
-    course: &'a Bulletin<Course>,
     buffer: [u8; MAX_MESSAGE_SIZE],
 }
 
-impl<'a> UBX<'a> {
-    pub fn new(data_source: DataSource<'a>) -> Self {
-        Self {
-            state: State::WaitHeader0,
-            fixed: data_source.fixed,
-            position: data_source.position,
-            velocity: data_source.velocity,
-            heading: data_source.heading,
-            course: data_source.course,
-            buffer: [0u8; MAX_MESSAGE_SIZE],
-        }
+impl UBX {
+    pub fn new() -> Self {
+        Self { state: State::WaitHeader0, buffer: [0u8; MAX_MESSAGE_SIZE] }
     }
 
-    fn handle_pvt_message(&mut self) {
+    fn handle_pvt_message(&mut self) -> Option<GNSS> {
         let pvt_message: &Message<NavPositionVelocityTime> = unsafe { transmute(&self.buffer) };
         if !pvt_message.validate_checksum() {
-            return;
+            return None;
         }
 
         let payload = &pvt_message.payload;
 
-        match (payload.date(), payload.time()) {
-            (Some(date), Some(time)) => {
-                time::update(&NaiveDateTime::new(date, time)).ok();
+        let datetime = match (payload.date(), payload.time()) {
+            (Some(date), Some(time)) => Some(NaiveDateTime::new(date, time)),
+            _ => None,
+        };
+
+        match payload.fix_type {
+            UBXFixType::ThreeDemension | UBXFixType::GNSSPlusDeadReckoningCombined => {
+                let altitude = Distance::new(payload.height_above_msl / 10, unit::CentiMeter);
+                let position = Position {
+                    latitude: payload.latitude.into(),
+                    longitude: payload.longitude.into(),
+                    altitude: Altitude(altitude),
+                };
+
+                let h = payload.heading_of_motion;
+                let course =
+                    Course(FixedPoint(if h > 0 { h } else { 360_00000 + h } as i32 / 10000));
+
+                let h = payload.heading_of_vehicle;
+                let heading = match payload.flags1.heading_of_vehicle_valid() {
+                    true => Some(Heading(FixedPoint(
+                        if h > 0 { h } else { 360_00000 + h } as i32 / 10000,
+                    ))),
+                    false => None,
+                };
+                let (x, y, z) =
+                    (payload.velocity_east, payload.velocity_north, -payload.velocity_down);
+                let ground_speed = Velocity::new(payload.ground_speed, unit::MMs);
+                let velocity_vector = Some(VelocityVector::new(x, y, z, unit::MMs, ENU));
+                let fixed = Fixed { position, course, heading, ground_speed, velocity_vector };
+                Some(GNSS { datetime, fixed: Some(fixed) })
             }
-            _ => (),
-        }
-
-        self.fixed.write(match payload.fix_type {
-            UBXFixType::TwoDemension | UBXFixType::ThreeDemension => true,
-            _ => false,
-        });
-
-        if payload.fix_type == UBXFixType::ThreeDemension {
-            self.position.write(Position {
-                latitude: payload.latitude.into(),
-                longitude: payload.longitude.into(),
-                altitude: Distance::new(payload.height_above_msl / 10, unit::CentiMeter),
-            });
-            let (x, y, z) = (payload.velocity_east, payload.velocity_north, -payload.velocity_down);
-            self.velocity.write(VelocityVector::new(x, y, z, unit::MMpS));
-
-            let course = payload.heading_of_motion;
-            let course = if course > 0 { course } else { 360_00000 + course } as i32;
-            let course_valid = payload.ground_speed / 1000 > 0;
-            if course_valid {
-                self.course.write(FixedPoint(course / 10000));
-            }
-
-            let heading = payload.heading_of_vehicle;
-            let heading = if heading > 0 { heading } else { 360_00000 + heading } as i32;
-            if payload.flags1.heading_of_vehicle_valid() {
-                self.heading.write(FixedPoint(heading / 10000));
-            }
+            _ => Some(GNSS { datetime, fixed: None }),
         }
     }
-}
 
-impl<'a> serial::Receiver for UBX<'a> {
-    fn receive_size(&self) -> usize {
-        MAX_MESSAGE_SIZE
-    }
-
-    fn receive(&mut self, mut bytes: &[u8]) {
+    pub fn receive(&mut self, mut bytes: &[u8]) -> Option<GNSS> {
         let mut message: &mut Message<()> = unsafe { transmute(&mut self.buffer) };
+        let mut gnss: Option<GNSS> = None;
         while bytes.len() > 0 {
             match (self.state, bytes[0]) {
                 (State::WaitHeader0, UBX_HEADER0) => {
@@ -140,7 +119,7 @@ impl<'a> serial::Receiver for UBX<'a> {
                 (State::Skip(size), _) => {
                     if bytes.len() < size {
                         self.state = State::Skip(size - bytes.len());
-                        return;
+                        return None;
                     }
                     bytes = &bytes[size..];
                     self.state = State::WaitHeader0;
@@ -152,10 +131,10 @@ impl<'a> serial::Receiver for UBX<'a> {
                     if bytes.len() < size {
                         buffer[..bytes.len()].copy_from_slice(bytes);
                         self.state = State::Remain(size - bytes.len());
-                        return;
+                        return None;
                     }
                     buffer[..size].copy_from_slice(&bytes[..size]);
-                    self.handle_pvt_message();
+                    gnss = self.handle_pvt_message();
                     bytes = &bytes[size..];
                     self.state = State::WaitHeader0;
                     continue;
@@ -166,9 +145,10 @@ impl<'a> serial::Receiver for UBX<'a> {
             }
             bytes = &bytes[1..];
         }
+        gnss
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.state = State::WaitHeader0;
     }
 }
@@ -178,15 +158,7 @@ mod test {
     fn test_message() {
         use hex_literal::hex;
 
-        use crate::{
-            protocol::serial::{
-                gnss::{ubx::message::Message, DataSource},
-                Receiver,
-            },
-            service::{flight::data::FlightDataHUB, info::Reader},
-        };
-
-        use super::{NavPositionVelocityTime, UBX};
+        use super::{message::Message, NavPositionVelocityTime, UBX};
 
         assert_eq!(core::mem::size_of::<Message<NavPositionVelocityTime>>(), 100);
 
@@ -201,20 +173,10 @@ mod test {
              00 00 00 00 00 00 00 00 00 00 00 00
              D6 73"
         );
-        let hub = FlightDataHUB::default();
-        let mut reader = hub.reader();
-        let data_source = DataSource {
-            fixed: &hub.gnss_fixed,
-            position: &hub.gnss_position,
-            velocity: &hub.gnss_velocity,
-            heading: &hub.gnss_heading,
-            course: &hub.gnss_course,
-        };
-        let mut ubx = UBX::new(data_source);
-        let position = &mut reader.gnss_position;
-        ubx.receive(&message[0..64]);
-        assert_eq!(position.get().is_none(), true);
-        ubx.receive(&message[64..message.len()]);
-        assert_eq!(position.get().is_some(), true);
+        let mut ubx = UBX::new();
+        let gnss = ubx.receive(&message[0..64]);
+        assert_eq!(gnss.is_none(), true);
+        let gnss = ubx.receive(&message[64..message.len()]);
+        assert_eq!(gnss.is_some(), true);
     }
 }

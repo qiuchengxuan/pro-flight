@@ -1,52 +1,78 @@
-use crate::{
-    service::info,
-    types::{
-        coordinate::{Displacement, Position},
-        measurement::{displacement::DistanceVector, unit, Altitude, VelocityVector},
+use crate::types::{
+    coordinate::Position,
+    measurement::{
+        unit::{CentiMeter, Meter, Ms},
+        Altitude, Displacement, Distance, VelocityVector, ENU, Z,
     },
 };
 
-pub struct Positioning<A, GNSS> {
-    altimeter: A,
-    gnss: GNSS,
-    interval: f32,
-    velocity: VelocityVector<f32, unit::MpS>,
-    current: Position,                              // updated from GNSS
-    displacement: DistanceVector<f32, unit::Meter>, // relative to current position
+#[derive(PartialEq)]
+enum AltitudeSource {
+    Barometer,
+    GNSS,
 }
 
-type Output = (Position, Displacement<unit::CentiMeter>);
+pub struct Positioning {
+    interval: f32,
+    velocity_vector: VelocityVector<f32, Ms, ENU>,
+    initial: Position,
+    displacement: Displacement<f32, Meter, ENU>, // relative to initial position
+    altitude_source: AltitudeSource,
+}
 
-impl<A, GNSS> Positioning<A, GNSS>
-where
-    A: info::Reader<Altitude>,
-    GNSS: info::AgingReader<Position> + info::Reader<Position>,
-{
-    pub fn new(altimeter: A, gnss: GNSS, update_rate: usize) -> Self {
+impl Positioning {
+    pub fn new(update_rate: usize) -> Self {
         Self {
-            altimeter,
-            gnss,
             interval: 1.0 / update_rate as f32,
-            velocity: Default::default(),
-            current: Default::default(),
+            velocity_vector: Default::default(),
+            initial: Default::default(),
             displacement: Default::default(),
+            altitude_source: AltitudeSource::GNSS,
         }
     }
 
-    pub fn update(&mut self, v: VelocityVector<f32, unit::MpS>) -> Output {
-        if let Some(position) = self.gnss.get() {
-            self.current = position;
-            self.displacement = DistanceVector::default();
-        } else {
-            if let Some(altitude) = self.altimeter.get() {
-                self.current.altitude = altitude;
-                self.displacement.z = Default::default();
+    pub fn update(
+        &mut self,
+        v: VelocityVector<f32, Ms, ENU>,
+        altitude: Option<Altitude>,
+        gnss: Option<Position>,
+    ) {
+        if let Some(mut altitude) = altitude {
+            if self.altitude_source == AltitudeSource::GNSS {
+                self.altitude_source = AltitudeSource::Barometer;
+                if altitude.is_zero() {
+                    altitude += Distance::new(1, CentiMeter);
+                }
+                self.initial.altitude = altitude;
             }
-            let integral = (self.velocity + (v - self.velocity) / 2.0) * self.interval;
-            self.displacement += integral.to_unit(unit::Meter);
+            let height = self.initial.altitude - altitude;
+            self.displacement.raw[Z] = height.t(|v| v as f32).u(Meter).raw;
         }
-        self.velocity = v;
-        let displacement = self.displacement.to_unit(unit::CentiMeter).convert(|v| v as i32);
-        (self.current + displacement, displacement)
+        if let Some(position) = gnss {
+            if self.initial.latitude.0 == 0 {
+                let altitude = self.initial.altitude;
+                self.initial = position;
+                if !altitude.is_zero() {
+                    self.initial.altitude = altitude;
+                }
+            }
+            let displacement = position - self.initial;
+            let z = self.displacement.raw[Z];
+            self.displacement = displacement.t(|v| v as f32).u(Meter);
+            if self.altitude_source == AltitudeSource::Barometer {
+                self.displacement.raw[Z] = z;
+            }
+        }
+        let integral = (self.velocity_vector + v) / 2.0 * self.interval;
+        self.displacement.raw += integral.u(Meter).raw;
+        self.velocity_vector = v;
+    }
+
+    pub fn displacement(&self) -> Displacement<f32, Meter, ENU> {
+        self.displacement
+    }
+
+    pub fn position(&self) -> Position {
+        self.initial + self.displacement.u(CentiMeter).t(|v| v as i32)
     }
 }

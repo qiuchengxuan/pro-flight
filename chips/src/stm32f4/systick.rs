@@ -1,6 +1,7 @@
 use core::{
     mem::MaybeUninit,
     sync::atomic::{AtomicU32, Ordering},
+    time::Duration,
 };
 
 use drone_core::{fib::Yielded, thr::ThrToken};
@@ -14,15 +15,15 @@ static mut SYS_TICK_PERIPH: MaybeUninit<SysTickPeriph> = MaybeUninit::uninit();
 static COUNTER: AtomicU32 = AtomicU32::new(0);
 
 #[no_mangle]
-fn get_jiffies() -> u64 {
+fn get_jiffies() -> Duration {
     let systick = unsafe { &mut *SYS_TICK_PERIPH.as_mut_ptr() };
     let counter = COUNTER.load(Ordering::Acquire);
     let val = SYSCLK / RATE - 1 - systick.stk_val.current.read_bits();
     let counter2 = COUNTER.load(Ordering::Relaxed);
     if counter < counter2 {
-        return counter2 as u64 * 1000_000;
+        return Duration::from_millis(counter2 as u64);
     }
-    counter as u64 * 1000_000 + (val * 1000 / (SYSCLK / RATE / 1000)) as u64
+    Duration::from_nanos(counter as u64 * 1000_000 + (val * 1000 / (SYSCLK / RATE / 1000)) as u64)
 }
 
 pub fn init(systick: SysTickPeriph, thread: impl ThrToken) {

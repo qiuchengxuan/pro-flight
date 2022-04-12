@@ -17,7 +17,7 @@ use pro_flight::{
     config, io,
     osd::ascii::OSD,
     protocol::xmodem::XMODEM,
-    service::{flight::data::FlightDataReader, sync::trigger},
+    sync::event::{Event, Subscriber},
     sys::time::TickTimer,
     types::Ratio,
 };
@@ -46,30 +46,25 @@ where
     Ok(max7456)
 }
 
-pub struct DmaMAX7456<'a, CS, TX> {
+pub struct DmaMAX7456<CS, TX> {
+    refresh_rate: u8,
     cs: CS,
-    rx: trigger::Receiver,
+    event: Event,
     tx: TX,
-    reader: FlightDataReader<'a>,
     video_mode_0: Register<u8, VideoMode0>,
     bd: Box<BufferDescriptor<u8, 800>>,
 }
 
-pub trait IntoDMA<'a, O, CS, TXF, TX>
+pub trait IntoDMA<O, CS, TXF, TX>
 where
     TXF: Future<Output = O>,
     TX: DMA<Future = TXF>,
 {
     type Error;
-    fn into_dma(
-        self,
-        rx: trigger::Receiver,
-        tx: TX,
-        reader: FlightDataReader<'a>,
-    ) -> Result<DmaMAX7456<'a, CS, TX>, Self::Error>;
+    fn into_dma(self, event: Event, tx: TX) -> Result<DmaMAX7456<CS, TX>, Self::Error>;
 }
 
-impl<'a, E, PE, SPI, CS, O, TXF, TX> IntoDMA<'a, O, CS, TXF, TX> for MAX7456<SPI, CS>
+impl<E, PE, SPI, CS, O, TXF, TX> IntoDMA<O, CS, TXF, TX> for MAX7456<SPI, CS>
 where
     SPI: Write<u8, Error = E> + Transfer<u8, Error = E>,
     CS: OutputPin<Error = PE> + Send + 'static,
@@ -78,12 +73,8 @@ where
 {
     type Error = E;
 
-    fn into_dma(
-        mut self,
-        rx: trigger::Receiver,
-        tx: TX,
-        reader: FlightDataReader<'a>,
-    ) -> Result<DmaMAX7456<'a, CS, TX>, E> {
+    fn into_dma(mut self, event: Event, tx: TX) -> Result<DmaMAX7456<CS, TX>, E> {
+        let refresh_rate = config::get().osd.refresh_rate;
         let video_mode_0 = self.load(Registers::VideoMode0)?;
         let (_, cs) = self.free();
         let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
@@ -91,11 +82,11 @@ where
             cs_.set_high().ok();
         }));
         let bd = Box::new(BufferDescriptor::<u8, 800>::with_callback(callback));
-        Ok(DmaMAX7456 { cs, rx, tx, reader, video_mode_0, bd })
+        Ok(DmaMAX7456 { refresh_rate, cs, event, tx, video_mode_0, bd })
     }
 }
 
-impl<'a, E, O, CS, TXF, TX> DmaMAX7456<'a, CS, TX>
+impl<E, O, CS, TXF, TX> DmaMAX7456<CS, TX>
 where
     CS: OutputPin<Error = E> + Send + 'static,
     TXF: Future<Output = O>,
@@ -139,18 +130,19 @@ where
     }
 }
 
-impl<'a, E, O, CS, TXF, TX> DmaMAX7456<'a, CS, TX>
+impl<E, O, CS, TXF, TX> DmaMAX7456<CS, TX>
 where
     CS: OutputPin<Error = E> + Send + 'static,
     TXF: Future<Output = O>,
     TX: DMA<Future = TXF>,
 {
     pub async fn run(mut self) {
-        let mut osd = OSD::<29, 15>::new(self.reader, Ratio(12, 18).into());
+        let interval = Duration::from_millis((1000 / self.refresh_rate as usize) as u64);
+        let mut osd = OSD::<29, 15>::new(interval, Ratio(12, 18).into());
         loop {
-            if self.rx.get() {
+            if self.event.wait() {
                 self.upload_font().await;
-                self.rx.clear();
+                self.event.clear();
             }
             let mut buffer = self.bd.try_get_buffer().unwrap();
             let screen = osd.draw();

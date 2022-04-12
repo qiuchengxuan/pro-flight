@@ -10,13 +10,14 @@ import sys
 import time
 
 import pexpect
-from jsbsim import JSBSim
-from jsbsim.fcs import Control
 from lxml import etree
 from lxml.builder import E, ElementMaker
+
+from jsbsim import JSBSim
+from jsbsim.fcs import Control
 from simulator import GNSS, Axes
 from simulator import Control as Input
-from simulator import Position, Simulator, Velocity
+from simulator import Fixed, Position, Simulator
 
 XSI = 'http://www.w3.org/2001/XMLSchema-instance'
 HREF = 'http://jsbsim.sf.net/JSBSimScript.xsl'
@@ -30,7 +31,7 @@ RASCAL_XML = 'aircraft/rascal/rascal.xml'
 
 def initialize() -> str:
     initialize = E.initialize(
-        E.ubody('0.0', unit='FT/SEC'),
+        E.ubody('200.0', unit='FT/SEC'),
         E.vbody('0.0', unit='FT/SEC'),
         E.wbody('0.0', unit='FT/SEC'),
         E.longitude('-95.163839', unit='DEG'),
@@ -52,6 +53,7 @@ def make_script(input_port: int) -> str:
             E.description('Start the engine'),
             E.condition('simulation/sim-time-sec le 0.01'),
             E.set(name='propulsion/engine[0]/set-running', value='1'),
+            E.set(name='accelerations/Nz', value='1.0'),
             name='Set engine running'
         ),
     ]
@@ -92,6 +94,30 @@ def start_simulator(simulator: str, sock: str, simulator_config: str):
     return subprocess.Popen(cmd, shell=True)
 
 
+def jsbsim_to_simulator(jsbsim_api: JSBSim, simulator_api: Simulator, iteration: int):
+    simulator_api.update_input(Input(throttle=1.0))
+    altitude_cm = jsbsim_api.altitude * 30.48
+    if iteration % ALTIMETER_RATE == 0:
+        simulator_api.update_altitude(int(altitude_cm))
+    if iteration % GNSS_RATE == 0:
+        p = jsbsim_api.position
+        v = jsbsim_api.velocity
+        gnss = GNSS(
+            fixed=Fixed(
+                Position(str(p.latitude), str(p.longitude), int(altitude_cm)),
+                round(v.course(), 1),
+                jsbsim_api.speed.gs,
+                [int(v.x * 303), int(v.y * 303), int(v.z * 303)],  # ft/s to mm/s
+                round(jsbsim_api.attitude.true_heading, 1)
+            )
+        )
+        simulator_api.update_gnss(gnss)
+    accel = jsbsim_api.acceleration
+    simulator_api.update_acceleration(Axes(accel.x, accel.y, accel.z))
+    gyro = jsbsim_api.gyro
+    simulator_api.update_gyro(Axes(gyro.x, gyro.y, gyro.z))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--simulator', help='Pro-flight simulator executable path', type=str)
@@ -121,45 +147,32 @@ def main():
     print('total %dms' % total)
     try:
         for i in range(total):
-            simulator_api.update_input(Input(throttle=1.0))
-            accel = jsbsim_api.acceleration
-            simulator_api.update_acceleration(Axes(accel.x, accel.y, accel.z))
-            gyro = jsbsim_api.gyro
-            simulator_api.update_gyro(Axes(gyro.roll, gyro.pitch, gyro.yaw))
-            altitude_cm = jsbsim_api.altitude * 30.48
-            if i % ALTIMETER_RATE == 0:
-                simulator_api.update_altitude(int(altitude_cm))
-            if i % GNSS_RATE == 0:
-                p = jsbsim_api.position
-                v = jsbsim_api.velocity
-                gnss = GNSS(
-                    round(jsbsim_api.attitude.true_heading, 1),
-                    round(v.course(), 1),
-                    Position(str(p.latitude), str(p.longitude), int(altitude_cm)),
-                    Velocity(int(v.x * 303), int(v.y * 303), int(v.z * 303))  # ft/s to mm/s
-                )
-                simulator_api.update_gnss(gnss)
+            jsbsim_to_simulator(jsbsim_api, simulator_api, i)
 
-            output = simulator_api.get_output()
-            jsbsim_api.step(Control(output.engine, output.aileron, output.elevator, output.rudder))
+            telemetry = simulator_api.get_telemetry()
+            atti = jsbsim_api.attitude
+            fcs = telemetry.fcs.normalize()
+            jsbsim_api.step(Control(fcs.engines[0], fcs.aileron_right, fcs.elevator, fcs.rudder))
             status = '%dkt, %dft,' % (jsbsim_api.speed.cas, jsbsim_api.height)
             atti = jsbsim_api.attitude
-            attitude = 'atti=[%.2f, %.2f, %.2f]' % (atti.roll, atti.pitch, atti.true_heading)
-            gyro = 'gyro=[%.2f, %.2f, %.2f]' % (gyro.roll, gyro.pitch, gyro.yaw)
-            control = 'ctrl=[%.2f, %.2f, %.2f @%.2f]' % (
-                output.aileron, output.elevator, output.rudder, output.engine
+            attitude = 'atti={%.2f %.2f, %.2f}' % (atti.roll, atti.pitch, atti.true_heading)
+            control = 'ctrl={T: %.2f| %.2f %.2f %.2f}' % (
+                fcs.engines[0], fcs.aileron_right, fcs.elevator, fcs.rudder
             )
-            print('%dms: ' % (i + 1) + ' '.join([status, attitude, gyro, control]))
+            print('%dms: ' % (i + 1) + ' '.join([status, attitude, control]))
+            simulator_api.tick()
             if jsbsim_api.height <= 1:
                 print('Crashed after %dms' % i)
                 break
     except KeyboardInterrupt:
         pass
-    finally:
-        jsbsim.kill(signal.SIGINT)
-        simulator.kill()
-        for path in [RASCAL_XML, 'aircraft/rascal/takeoff.xml', 'rascal_test.xml', sock]:
+    jsbsim.kill(signal.SIGINT)
+    simulator.kill()
+    for path in [RASCAL_XML, 'aircraft/rascal/takeoff.xml', 'rascal_test.xml', sock]:
+        try:
             os.remove(path)
+        except FileNotFoundError:
+            pass
 
 
 if __name__ == '__main__':

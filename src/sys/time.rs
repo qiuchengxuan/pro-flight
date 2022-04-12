@@ -57,10 +57,10 @@ pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
 }
 
 #[derive(Default)]
-pub struct TickTimer(jiffies::Jiffies);
+pub struct TickTimer(Duration);
 
 impl TickTimer {
-    pub fn after<T: Into<jiffies::Jiffies>>(duration: T) -> Self {
+    pub fn after<T: Into<Duration>>(duration: T) -> Self {
         let mut timer = Self::default();
         timer.start(duration);
         timer
@@ -76,9 +76,9 @@ impl Future for TickTimer {
 }
 
 impl CountDown for TickTimer {
-    type Time = jiffies::Jiffies;
+    type Time = Duration;
 
-    fn start<T: Into<jiffies::Jiffies>>(&mut self, duration: T) {
+    fn start<T: Into<Duration>>(&mut self, duration: T) {
         self.0 = jiffies::get() + duration.into();
     }
 

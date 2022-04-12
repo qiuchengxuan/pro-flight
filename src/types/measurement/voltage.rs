@@ -3,7 +3,7 @@ use core::{cmp, str::FromStr};
 use fixed_point::FixedPoint;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
-pub struct Voltage(pub FixedPoint<u16, 3>); // voltage
+pub struct Voltage(pub FixedPoint<u16, 3>);
 
 #[macro_export]
 macro_rules! voltage {

@@ -16,20 +16,28 @@ impl LPF<f32> {
     }
 }
 
-impl LPF<u16> {
-    pub fn new(sample_rate: f32, freq: f32) -> Self {
-        let rc = 1.0 / (2.0 * core::f32::consts::PI * freq);
-        let alpha = ((1.0 / (1.0 + rc * sample_rate)) * 1000.0) as u16;
-        Self { alpha, value: 0 }
-    }
+macro_rules! impl_lpf {
+    ($type:ty, $aux_type:ty) => {
+        impl LPF<$type> {
+            pub fn new(sample_rate: f32, freq: f32) -> Self {
+                let rc = 1.0 / (2.0 * core::f32::consts::PI * freq);
+                let alpha = ((1.0 / (1.0 + rc * sample_rate)) * 1000.0) as $type;
+                Self { alpha, value: 0 }
+            }
 
-    pub fn filter(&mut self, sample: u16) -> u16 {
-        let alpha = self.alpha as usize;
-        let value = self.value as usize;
-        self.value = (((1000 - alpha) * value + alpha * sample as usize) / 1000) as u16;
-        self.value
-    }
+            pub fn filter(&mut self, sample: $type) -> $type {
+                let alpha = self.alpha as $aux_type;
+                let value = self.value as $aux_type;
+                self.value =
+                    (((1000 - alpha) * value + alpha * sample as $aux_type) / 1000) as $type;
+                self.value
+            }
+        }
+    };
 }
+
+impl_lpf!(u16, u32);
+impl_lpf!(i16, i32);
 
 mod test {
     #[test]

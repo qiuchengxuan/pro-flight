@@ -48,7 +48,7 @@ pub struct PID {
 impl Setter for PID {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         match path.next().ok_or(Error::MalformedPath)? {
-            "max-rate" => self.max_rate = value.parse()?.unwrap_or_default(),
+            "max-rate" => self.max_rate = value.parse()?.unwrap_or(30),
             "kp" => self.kp = value.parse()?.unwrap_or(FixedPoint(1_0)),
             "ki" => self.ki = value.parse()?.unwrap_or(FixedPoint(1_0)),
             "kd" => self.kd = value.parse()?.unwrap_or(FixedPoint(1_0)),

@@ -1,24 +1,19 @@
 use alloc::boxed::Box;
 
-use crate::{config::peripherals::serial::Config, service::flight::data::FlightDataHUB};
+use crate::config::peripherals::serial::Config;
 
 pub trait Receiver: Send {
-    fn receive_size(&self) -> usize;
+    fn chunk_size(&self) -> usize;
     fn receive(&mut self, bytes: &[u8]);
     fn reset(&mut self);
 }
 
 pub mod gnss;
-pub mod sbus;
+pub mod rc;
 
-use sbus::SBUS;
-
-pub fn make_receiver<'a>(
-    config: &Config,
-    hub: &'a FlightDataHUB,
-) -> Option<Box<dyn Receiver + 'a>> {
+pub fn make_receiver(config: &Config) -> Option<Box<dyn Receiver>> {
     match config {
-        Config::SBUS(sbus) => Some(Box::new(SBUS::new(&hub.rssi, sbus.fast, &hub.input))),
-        Config::GNSS(gnss) => gnss::make_receiver(gnss, hub),
+        Config::RC(rc) => Some(Box::new(rc::RemoteControl::from(rc))),
+        Config::GNSS(gnss) => Some(Box::new(gnss::GNSSReceiver::from(gnss.protocol))),
     }
 }

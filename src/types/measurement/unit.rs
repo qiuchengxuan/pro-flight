@@ -1,6 +1,14 @@
 pub trait Velocity {}
 pub trait Distance {}
 
+#[derive(Copy, Clone, Default, Debug)]
+#[allow(non_camel_case_types)]
+pub struct M2s;
+
+#[derive(Copy, Clone, Default, Debug)]
+#[allow(non_camel_case_types)]
+pub struct DEGs;
+
 macro_rules! units {
     ($($class:ident => ($value:expr, $name:expr, $trait:ty)),+) => {
         $(
@@ -43,11 +51,11 @@ macro_rules! velocity_units {
 }
 
 velocity_units! {
-    MMpS => (1.0, "mm/s"),
-    CMpS => (10.0, "cm/s"),
-    MpS => (1000.0, "m/s"),
-    FTpM => (303.0 / 60.0, "ft/min"),
-    KMpH => (1000_000.0 / 3600.0 , "km/h"),
+    MMs => (1.0, "mm/s"),
+    CMs => (10.0, "cm/s"),
+    Ms => (1000.0, "m/s"),
+    FTmin => (303.0 / 60.0, "ft/min"),
+    KMh => (1000_000.0 / 3600.0 , "km/h"),
     Knot => (1852_000.0 / 3600.0, "knot")
 }
 
@@ -65,3 +73,9 @@ distance_units! {
     KiloMeter => (1000_000.0, "km"),
     NauticalMile => (1852_000.0, "nm")
 }
+
+pub type MM = MilliMeter;
+pub type CM = CentiMeter;
+pub type FT = Feet;
+pub type KM = KiloMeter;
+pub type NM = NauticalMile;

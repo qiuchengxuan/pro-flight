@@ -13,7 +13,7 @@ class Acceleration:
 class Accelerometer(WithSession):
     def get(self) -> Acceleration:
         return Acceleration(
-            self._session.get('accelerations/Ny', float),
-            self._session.get('accelerations/Nx', float),
-            -self._session.get('accelerations/Nz', float)
+            -self._session.get('accelerations/n-pilot-y-norm', float),
+            -self._session.get('accelerations/n-pilot-x-norm', float),
+            self._session.get('accelerations/n-pilot-z-norm', float)
         )

@@ -2,10 +2,9 @@ use core::{fmt::Write, str::FromStr};
 
 pub mod control;
 pub mod coordinate;
-pub mod flight;
 #[macro_use]
 pub mod measurement;
-pub mod output;
+pub mod sensor;
 pub mod vec;
 pub mod waypoint;
 

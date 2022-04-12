@@ -40,13 +40,18 @@ use hal::{
 };
 use pro_flight::{
     cli::CLI,
-    config::{self, peripherals::serial::Config as SerialConfig},
-    fcs::{mixer::ControlMixer, FlightControlSystem},
+    config::{
+        self,
+        peripherals::serial::{Config as SerialConfig, RemoteControl as RC},
+    },
+    datastore,
+    fcs::FCS,
     ins,
     ins::variometer::Variometer,
     logger,
     protocol::serial,
-    service::{flight::data::FlightDataHUB, info::Writer as _, sync::trigger},
+    servo::pwm::PWMs,
+    sync::event,
     sys::time::{self, TickTimer},
     sysinfo::{RebootReason, SystemInfo},
 };
@@ -146,9 +151,6 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Err(error) => error!("Load config failed: {:?}", error),
     }
 
-    let hub: &'static FlightDataHUB = Box::leak(Box::new(FlightDataHUB::default()));
-    let mut reader = hub.reader();
-
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
     let spi = Spi1::new(periph_spi1!(reg), pins, baudrate, mpu6000::SPI_MODE);
@@ -161,11 +163,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
-    let mut ins = ins::INS::new(SAMPLE_RATE, &hub);
-    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |accel, gyro| {
-        hub.accelerometer.write(accel);
-        hub.gyroscope.write(gyro);
-        ins.invoke();
+    let variometer = Variometer::new(bmp280::SAMPLE_RATE);
+    let mut ins = ins::INS::new(SAMPLE_RATE, variometer);
+    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |acceleration, gyro| {
+        ins.update(acceleration, gyro);
     });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
     thread.mpu6000.add_fn(never_complete(move || int.clear_interrupt_pending_bit()));
@@ -173,12 +174,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     thread.mpu6000.enable_int();
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma2_stream2);
-    let voltmeter = &hub.voltmeter;
     let mut adc = Adc::adc2(peripherals.ADC2, true, voltage_adc::adc_config());
     let vbat = gpio_c.pc2.into_analog();
     adc.configure_channel(&vbat, voltage_adc::SEQUENCE, voltage_adc::SAMPLE_TIME);
     adc.start_conversion();
-    voltage_adc::init(adc.into_dma(), dma_rx, move |voltage| voltmeter.write(voltage));
+    voltage_adc::init(adc.into_dma(), dma_rx, move |voltage| {
+        datastore::acquire().write_voltage(voltage)
+    });
 
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
@@ -196,16 +198,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let compensator = Compensator(bmp280.read_calibration().unwrap_or_default());
     let (spi, cs_baro, _) = bmp280.free().free();
 
-    let (altimeter, vertical_speed) = (&hub.altimeter, &hub.vertical_speed);
-    let mut vs = Variometer::new(1000 / bmp280::SAMPLE_RATE);
     let mut bmp280 = DmaBMP280::new(cs_baro, compensator, move |v| {
-        altimeter.write(v.into());
-        vertical_speed.write(vs.update(v.into()));
+        datastore::acquire().write_altitude(v.into())
     });
 
-    let (setter, receiver) = trigger::trigger();
+    let event = event::Event::default();
     let max7456 = max7456::init(spi, cs_osd).unwrap();
-    let max7456 = max7456.into_dma(receiver, tx.clone(), reader).unwrap();
+    let max7456 = max7456.into_dma(event.clone(), tx.clone()).unwrap();
     thread.max7456.add_exec(max7456.run());
     let int = make_trigger(thread.max7456, periph_exti3!(reg));
     let standard = config::get().osd.standard;
@@ -219,7 +218,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let serial_config = usart::to_serial_config(&config);
         let usart1 = Serial::usart1(peripherals.USART1, pins, serial_config, clocks).unwrap();
         let dma_rx = dma::Stream::new(periph_dma2_ch5!(reg), thread.dma2_stream5);
-        if let Some(receiver) = serial::make_receiver(config, &hub) {
+        if let Some(receiver) = serial::make_receiver(config) {
             usart::init(usart1.into_dma(), dma_rx, 4, receiver);
         }
     }
@@ -227,7 +226,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     // TODO: USART3 or I2C-2
 
     if let Some(config) = config::get().peripherals.serials.get("USART6") {
-        if let SerialConfig::SBUS(sbus_config) = config {
+        if let SerialConfig::RC(RC::SBUS(sbus_config)) = config {
             if sbus_config.rx_inverted {
                 gpio_c.pc8.into_push_pull_output().set_high().ok();
                 trace!("USART6 rx inverted");
@@ -237,7 +236,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let serial_config = usart::to_serial_config(&config);
         let usart6 = Serial::usart6(peripherals.USART6, pins, serial_config, clocks).unwrap();
         let dma_rx = dma::Stream::new(periph_dma2_ch1!(reg), thread.dma2_stream1);
-        if let Some(receiver) = serial::make_receiver(config, &hub) {
+        if let Some(receiver) = serial::make_receiver(config) {
             usart::init(usart6.into_dma(), dma_rx, 5, receiver);
         }
     }
@@ -246,9 +245,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
     let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
-    let mixer = ControlMixer::new(reader.input, 50);
-    let mut fcs = FlightControlSystem::new(reader.gyroscope, mixer, &hub.output, pwms);
-    thread.servo.add_fn(never_complete(move || fcs.update()));
+    let mut servos = PWMs::new(pwms);
+    let mut fcs = FCS::new(SAMPLE_RATE);
+    thread.servo.add_fn(never_complete(move || {
+        fcs.update();
+        servos.update();
+    }));
 
     let int = make_trigger(thread.servo, periph_exti1!(reg));
     let mut servos = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(20));
@@ -260,7 +262,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     }));
 
     let commands =
-        commands!((bootloader, [persist]), (osd, [setter]), (save, [nvram]), (telemetry, [reader]));
+        commands!((bootloader, [persist]), (osd, [event]), (save, [nvram]), (telemetry, []));
     let mut cli = CLI::new(commands);
     loop {
         TickTimer::after(Duration::from_millis(1)).root_wait();

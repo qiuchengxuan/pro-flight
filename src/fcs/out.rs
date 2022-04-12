@@ -2,7 +2,7 @@ use serde::ser::SerializeMap;
 
 use crate::{
     config::{fcs::Configuration, peripherals::pwm::ServoType},
-    types::{control::Control, vec::Vec},
+    types::{control, vec::Vec},
 };
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -23,45 +23,45 @@ impl serde::Serialize for FixedWing {
 }
 
 impl FixedWing {
-    fn from(control: &Control, configuration: Configuration) -> Self {
+    fn from(axes: control::Axes, configuration: Configuration) -> Self {
         let mut control_surface: Vec<(ServoType, i16), 4> = Vec::new();
         match configuration {
             Configuration::Airplane => {
-                control_surface.push((ServoType::AileronLeft, -control.roll)).ok();
-                control_surface.push((ServoType::AileronRight, control.roll)).ok();
-                control_surface.push((ServoType::Elevator, control.pitch)).ok();
-                control_surface.push((ServoType::Rudder, control.yaw)).ok();
+                control_surface.push((ServoType::AileronLeft, -axes.roll)).ok();
+                control_surface.push((ServoType::AileronRight, axes.roll)).ok();
+                control_surface.push((ServoType::Elevator, axes.pitch)).ok();
+                control_surface.push((ServoType::Rudder, axes.yaw)).ok();
             }
             Configuration::FlyingWing => {
-                control_surface.push((ServoType::ElevonLeft, -control.roll + control.pitch)).ok();
-                control_surface.push((ServoType::ElevonRight, control.roll + control.pitch)).ok();
+                control_surface.push((ServoType::ElevonLeft, -axes.roll + axes.pitch)).ok();
+                control_surface.push((ServoType::ElevonRight, axes.roll + axes.pitch)).ok();
             }
             Configuration::VTail => {
-                control_surface.push((ServoType::AileronLeft, -control.roll)).ok();
-                control_surface.push((ServoType::AileronRight, control.roll)).ok();
-                let value = control.yaw + control.pitch;
+                control_surface.push((ServoType::AileronLeft, -axes.roll)).ok();
+                control_surface.push((ServoType::AileronRight, axes.roll)).ok();
+                let value = axes.yaw + axes.pitch;
                 control_surface.push((ServoType::RuddervatorLeft, value)).ok();
-                let value = -control.yaw + control.pitch;
+                let value = -axes.yaw + axes.pitch;
                 control_surface.push((ServoType::RuddervatorRight, value)).ok();
             }
         }
-        Self { engines: [control.throttle; 1], control_surface }
+        Self { engines: [axes.throttle; 1], control_surface }
     }
 }
 
 #[derive(Copy, Clone, Debug, Serialize)]
 #[serde(untagged)]
-pub enum Output {
+pub enum FCS {
     FixedWing(FixedWing),
 }
 
-impl Output {
-    pub fn from(control: &Control, configuration: Configuration) -> Output {
-        Self::FixedWing(FixedWing::from(control, configuration))
+impl FCS {
+    pub fn from(axes: control::Axes, configuration: Configuration) -> FCS {
+        Self::FixedWing(FixedWing::from(axes, configuration))
     }
 }
 
-impl Default for Output {
+impl Default for FCS {
     fn default() -> Self {
         Self::FixedWing(FixedWing::default())
     }

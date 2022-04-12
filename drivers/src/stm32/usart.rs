@@ -5,7 +5,10 @@ use hal::{
     dma::{BufferDescriptor, Peripheral, TransferOption, TransferResult, DMA},
     serial::Error,
 };
-use pro_flight::{config::SerialConfig, protocol::serial::Receiver};
+use pro_flight::{
+    config::peripherals::serial::{Config as SerialConfig, RemoteControl as RC},
+    protocol::serial::Receiver,
+};
 use stm32f4xx_hal::{
     prelude::*,
     serial::config::{Config, DmaConfig, Parity, StopBits, WordLength},
@@ -16,7 +19,7 @@ pub fn to_serial_config(config: &SerialConfig) -> Config {
         SerialConfig::GNSS(gnss) => {
             Config { baudrate: gnss.baudrate.bps(), dma: DmaConfig::Rx, ..Default::default() }
         }
-        SerialConfig::SBUS(sbus) => Config {
+        SerialConfig::RC(RC::SBUS(sbus)) => Config {
             baudrate: sbus.baudrate().bps(),
             stopbits: StopBits::STOP2,
             parity: Parity::ParityEven,
@@ -33,7 +36,7 @@ where
 {
     info!("Init {}", usart);
     dma.setup_peripheral(channel, &mut usart);
-    let receive_size = rx.receive_size();
+    let chunk_size = rx.chunk_size();
     let callback = Box::leak(Box::new(move |result: TransferResult<u8>| match usart.read() {
         Err(nb::Error::Other(Error::Parity)) => rx.reset(),
         Err(nb::Error::Other(Error::Framing)) => {
@@ -45,5 +48,5 @@ where
     let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::with_callback(callback));
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
     trace!("DMA address 0x{:x}", address as usize);
-    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle().size(receive_size));
+    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle().size(chunk_size));
 }

@@ -72,8 +72,8 @@ peripherals:
       type: aileron-left
     PWM6:
       type: rudder
-controller:
-  inputs:
+inputs:
+  axes:
     roll:
       channel: 1
     pitch:

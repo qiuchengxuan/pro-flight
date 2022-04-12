@@ -1,7 +1,7 @@
 pub mod battery;
-pub mod controller;
 pub mod fcs;
 pub mod imu;
+pub mod inputs;
 pub mod ins;
 pub mod osd;
 pub mod peripherals;
@@ -14,17 +14,16 @@ use fixed_point::{fixed, FixedPoint};
 
 use crate::{
     io::Read,
-    types::measurement::{Axes, Bias, Gain},
+    types::sensor::{Axes, Bias, Gain},
 };
 pub use battery::Battery;
-pub use controller::Controller;
 pub use fcs::FCS;
 pub use imu::IMU;
+pub use inputs::Inputs;
 pub use ins::INS;
 pub use osd::{Offset, Standard, OSD};
 pub use peripherals::{
     pwm::{PWMs, Protocol, PWM},
-    serial::{Config as SerialConfig, Serials},
     Peripherals,
 };
 use setter::{Error, Setter, Value};
@@ -84,7 +83,7 @@ pub struct Config {
     pub ins: INS,
     pub osd: OSD,
     pub peripherals: Peripherals,
-    pub controller: Controller,
+    pub inputs: Inputs,
 }
 
 impl Setter for Config {
@@ -96,7 +95,7 @@ impl Setter for Config {
             "ins" => self.ins.set(path, value),
             "osd" => self.osd.set(path, value),
             "peripherals" => self.peripherals.set(path, value),
-            "controller" => self.controller.set(path, value),
+            "inputs" => self.inputs.set(path, value),
             _ => Err(Error::MalformedPath),
         }
     }
@@ -129,7 +128,7 @@ pub fn get() -> &'static Config {
     unsafe { CONFIG.as_ref().unwrap() }
 }
 
-static mut CONFIG_ITERATION: usize = 0;
+static mut CONFIG_ITERATION: usize = 1;
 
 pub fn load<E>(reader: &mut dyn Read<Error = E>) -> &'static Config {
     let mut buffer = [0u8; 2048];

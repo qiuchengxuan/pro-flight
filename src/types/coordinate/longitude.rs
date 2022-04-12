@@ -3,8 +3,8 @@ use core::fmt::{self, Write};
 use heapless::String;
 
 use crate::types::measurement::{
-    distance::Distance,
     unit::{CentiMeter, Meter},
+    Distance,
 };
 
 pub const SUB_SECOND: i32 = 1000;
@@ -53,7 +53,7 @@ impl<U: Copy + Into<i32> + Default> core::ops::Add<Distance<i32, U>> for Longitu
     type Output = Self;
 
     fn add(self, delta: Distance<i32, U>) -> Self {
-        let cm = delta.to_unit(CentiMeter).value() as i64;
+        let cm = delta.u(CentiMeter).raw as i64;
         let seconds = self.0 + (cm * SUB_SECOND as i64 * 10 / 30_715) as i32;
         if seconds.abs() > MAX_SECONDS {
             return Self(-(seconds % MAX_SECONDS));
@@ -66,7 +66,7 @@ impl<U: Copy + Into<i32> + Default> core::ops::Sub<Distance<i32, U>> for Longitu
     type Output = Self;
 
     fn sub(self, delta: Distance<i32, U>) -> Self {
-        let cm = delta.to_unit(CentiMeter).value() as i64;
+        let cm = delta.u(CentiMeter).raw as i64;
         let seconds = self.0 - (cm * SUB_SECOND as i64 * 10 / 30_715) as i32;
         if seconds.abs() > MAX_SECONDS {
             return Self(-(seconds % MAX_SECONDS));
@@ -114,7 +114,7 @@ mod test {
     #[test]
     fn test_longitude() {
         use super::Longitude;
-        use crate::types::measurement::{distance::Distance, unit::CentiMeter};
+        use crate::types::measurement::{unit::CentiMeter, Distance};
 
         let longitude = Longitude::from_str("E116°44'54").unwrap();
         assert_eq!("E116°44'54.000", format!("{}", longitude));

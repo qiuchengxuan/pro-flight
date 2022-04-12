@@ -9,7 +9,7 @@ pub mod longitude;
 pub use latitude::Latitude;
 pub use longitude::Longitude;
 
-use crate::types::measurement::{displacement::DistanceVector, distance::Distance, unit, Altitude};
+use crate::types::measurement::{unit, Altitude, Displacement, Distance, ENU};
 
 #[derive(Copy, Clone, Default, Serialize, PartialEq, Debug)]
 pub struct SphericalCoordinate<U: Copy> {
@@ -18,33 +18,31 @@ pub struct SphericalCoordinate<U: Copy> {
     pub phi: i8,               // polar angle, [-90, 90]
 }
 
-impl<U: Copy + Default> From<DistanceVector<f32, U>> for SphericalCoordinate<U> {
-    fn from(vector: DistanceVector<f32, U>) -> SphericalCoordinate<U> {
+impl<U: Copy + Default> From<Displacement<f32, U, ENU>> for SphericalCoordinate<U> {
+    fn from(vector: Displacement<f32, U, ENU>) -> SphericalCoordinate<U> {
         let rho = vector.scalar();
-        if rho.value().classify() == FpCategory::Zero {
-            return SphericalCoordinate { rho: rho.convert(|v| v as u32), theta: 0, phi: 0 };
+        if rho.raw.classify() == FpCategory::Zero {
+            return Self::default();
         }
         let (x, y, z) = vector.into();
         let theta = x.atan2(y).to_degrees() as i16;
         let phi = if z >= 0.0 {
-            90 - (z / rho.value()).acos().to_degrees() as i8
+            90 - (z / rho.raw).acos().to_degrees() as i8
         } else {
-            (-z / rho.value()).acos().to_degrees() as i8 - 90
+            (-z / rho.raw).acos().to_degrees() as i8 - 90
         };
-        SphericalCoordinate { rho: rho.convert(|v| v as u32), theta, phi }
+        SphericalCoordinate { rho: rho.t(|v| v as u32), theta, phi }
     }
 }
 
 impl<U: Copy + Default + Into<u32>> SphericalCoordinate<U> {
-    pub fn to_unit<V>(self, unit: V) -> SphericalCoordinate<V>
+    pub fn u<V>(self, unit: V) -> SphericalCoordinate<V>
     where
         V: Copy + Default + Into<u32> + unit::Distance,
     {
-        SphericalCoordinate { rho: self.rho.to_unit(unit), theta: self.theta, phi: self.phi }
+        SphericalCoordinate { rho: self.rho.u(unit), theta: self.theta, phi: self.phi }
     }
 }
-
-pub type Displacement<U> = DistanceVector<i32, U>;
 
 #[derive(Default, Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Position {
@@ -54,34 +52,34 @@ pub struct Position {
 }
 
 impl core::ops::Sub for Position {
-    type Output = Displacement<unit::Meter>;
+    type Output = Displacement<i32, unit::Meter, ENU>;
 
     fn sub(self, other: Self) -> Self::Output {
         let x = self.longitude - other.longitude;
         let y = self.latitude - other.latitude;
         let height = self.altitude - other.altitude;
-        Self::Output { x, y, z: height.to_unit(unit::Meter).into() }
+        Displacement::new(x.raw, y.raw, height.u(unit::Meter).raw, unit::Meter, ENU)
     }
 }
 
-impl<U: Copy + Default + Into<i32>> core::ops::Add<Displacement<U>> for Position {
+impl<U: Copy + Default + Into<i32>> core::ops::Add<Displacement<i32, U, ENU>> for Position {
     type Output = Self;
 
-    fn add(self, displacement: Displacement<U>) -> Self {
-        let longitude = self.longitude + displacement.x;
-        let latitude = self.latitude + displacement.y;
-        let altitude = self.altitude + displacement.z.to_unit(unit::CentiMeter);
+    fn add(self, displacement: Displacement<i32, U, ENU>) -> Self {
+        let longitude = self.longitude + displacement.x();
+        let latitude = self.latitude + displacement.y();
+        let altitude = self.altitude + displacement.z().u(unit::CentiMeter);
         Self { latitude, longitude, altitude }
     }
 }
 
-impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<U>> for Position {
+impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<i32, U, ENU>> for Position {
     type Output = Self;
 
-    fn sub(self, displacement: Displacement<U>) -> Self {
-        let longitude = self.longitude - displacement.x;
-        let latitude = self.latitude - displacement.y;
-        let altitude = self.altitude - displacement.z.to_unit(unit::CentiMeter);
+    fn sub(self, displacement: Displacement<i32, U, ENU>) -> Self {
+        let longitude = self.longitude - displacement.x();
+        let latitude = self.latitude - displacement.y();
+        let altitude = self.altitude - displacement.z().u(unit::CentiMeter);
         Self { latitude, longitude, altitude }
     }
 }
@@ -89,23 +87,21 @@ impl<U: Copy + Default + Into<i32>> core::ops::Sub<Displacement<U>> for Position
 mod test {
     #[test]
     fn test_spherical_coordinate() {
-        use crate::types::measurement::{
-            displacement::DistanceVector, distance::Distance, unit::Meter,
-        };
+        use crate::types::measurement::{unit::Meter, Displacement, Distance, ENU};
 
         use super::SphericalCoordinate;
 
-        let vector = DistanceVector::default();
+        let vector = Displacement::new(0.0, 0.0, 0.0, Meter, ENU);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
         let expected = SphericalCoordinate { rho: Distance::default(), theta: 0, phi: 0 };
         assert_eq!(coordinate, expected);
 
-        let vector = DistanceVector::new(60.0, 100.0, 0.0, Meter);
+        let vector = Displacement::new(60.0, 100.0, 0.0, Meter, ENU);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
         let expected = SphericalCoordinate { rho: Distance::new(116, Meter), theta: 30, phi: 0 };
         assert_eq!(coordinate, expected);
 
-        let vector = DistanceVector::new(-60.0, 100.0, 0.0, Meter);
+        let vector = Displacement::new(-60.0, 100.0, 0.0, Meter, ENU);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
         assert_eq!(coordinate, SphericalCoordinate {
             rho: Distance::new(116, Meter),
@@ -113,7 +109,7 @@ mod test {
             phi: 0
         });
 
-        let vector = DistanceVector::new(0.0, 100.0, 60.0, Meter);
+        let vector = Displacement::new(0.0, 100.0, 60.0, Meter, ENU);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
         assert_eq!(coordinate, SphericalCoordinate {
             rho: Distance::new(116, Meter),
@@ -121,7 +117,7 @@ mod test {
             phi: 31
         });
 
-        let vector = DistanceVector::new(0.0, 100.0, -60.0, Meter);
+        let vector = Displacement::new(0.0, 100.0, -60.0, Meter, ENU);
         let coordinate: SphericalCoordinate<Meter> = vector.into();
         assert_eq!(coordinate, SphericalCoordinate {
             rho: Distance::new(116, Meter),

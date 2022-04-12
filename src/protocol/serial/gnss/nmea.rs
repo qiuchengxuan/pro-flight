@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_point::FixedPoint;
 #[allow(unused_imports)] // false warning
@@ -11,15 +9,13 @@ use nmea0183::{
     Parser, MAX_MESSAGE_SIZE,
 };
 
-use crate::{
-    protocol::{serial, serial::gnss::DataSource},
-    service::info::{bulletin::Bulletin, Writer},
-    sys::time,
-    types::{
-        coordinate::{latitude, longitude, Position},
-        measurement::{distance::Distance, unit, Course, Heading, VelocityVector},
-    },
+use super::out::{Fixed, GNSS};
+use crate::types::{
+    coordinate::{latitude, longitude, Position},
+    measurement::{unit, Altitude, Course, Distance, Heading, Velocity},
 };
+
+pub const CHUNK_SIZE: usize = MAX_MESSAGE_SIZE;
 
 impl Into<longitude::Longitude> for Longitude {
     fn into(self) -> longitude::Longitude {
@@ -42,7 +38,7 @@ impl Into<latitude::Latitude> for Latitude {
 }
 
 fn to_fixed_point(decimal: nmea0183::types::IntegerDecimal) -> FixedPoint<i32, 1> {
-    FixedPoint(decimal.0)
+    FixedPoint(decimal.real() / (decimal.exp() as i32 / 10))
 }
 
 pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
@@ -52,97 +48,60 @@ pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
     )
 }
 
-pub struct NMEA<'a> {
+pub struct NMEA {
     parser: Parser,
-    fixed: &'a Bulletin<bool>,
-    position: &'a Bulletin<Position>,
-    velocity: &'a Bulletin<VelocityVector<i32, unit::MMpS>>,
-    heading: &'a Bulletin<Heading>,
-    course: &'a Bulletin<Course>,
+    rmc: Option<RMC>,
+    gga: Option<GGA>,
 }
 
-impl<'a> NMEA<'a> {
-    pub fn new(data_source: DataSource<'a>) -> Self {
-        Self {
-            parser: Parser::new(),
-            fixed: data_source.fixed,
-            position: data_source.position,
-            velocity: data_source.velocity,
-            heading: data_source.heading,
-            course: data_source.course,
-        }
+fn nmea_to_gnss(rmc: &RMC, gga: &GGA) -> GNSS {
+    let datetime = Some(rmc_to_datetime(rmc));
+    if !rmc.status.0 || rmc.position_mode == PositionMode::NoFix || gga.quality == Quality::NoFix {
+        return GNSS { datetime, ..Default::default() };
     }
 
-    fn handle_rmc(&mut self, rmc: &RMC) {
-        time::update(&rmc_to_datetime(rmc)).ok();
-
-        match rmc.position_mode {
-            PositionMode::Autonomous | PositionMode::Differential => (),
-            _ => return,
-        };
-
-        if !rmc.status.0 {
-            self.velocity.write(VelocityVector::default());
-            return;
-        }
-
-        let course_valid = rmc.speed.integer() > 0;
-        if course_valid {
-            self.course.write(to_fixed_point(rmc.course));
-        }
-        if let Some(heading) = rmc.heading {
-            self.heading.write(to_fixed_point(heading));
-        }
-
-        let course: f32 = rmc.course.into();
-        let speed: f32 = rmc.speed.into();
-        let x = speed * course.to_radians().sin();
-        let y = speed * course.to_radians().cos();
-        let velocity = VelocityVector::new(x, y, 0.0, unit::Knot);
-        self.velocity.write(velocity.to_unit(unit::MMpS).convert(|v| v as i32));
-    }
-
-    fn handle_gga(&mut self, gga: &GGA) {
-        let fixed = match gga.quality {
-            Quality::Autonomous | Quality::Differential => true,
-            _ => false,
-        };
-        self.fixed.write(fixed);
-        if !fixed {
-            return;
-        }
-        let latitude = gga.latitude.into();
-        let longitude = gga.longitude.into();
-
-        let integer = gga.altitude.integer() as i32;
-        let decimal = gga.altitude.decimal() as i32;
-        let decimal_part = match gga.altitude.decimal_length() {
-            0 => 0,
-            1 => decimal * 10,
-            _ => decimal / 10i32.pow(gga.altitude.decimal_length() as u32 - 2),
-        };
-        let altitude = Distance::new(integer * 100 + decimal_part, unit::CentiMeter);
-        self.position.write(Position { latitude, longitude, altitude });
-    }
+    let heading = rmc.heading.map(|h| Heading(to_fixed_point(h)));
+    let course = Course(to_fixed_point(rmc.course));
+    let latitude = gga.latitude.into();
+    let longitude = gga.longitude.into();
+    let alt = gga.altitude;
+    let altitude =
+        Altitude(Distance::new(alt.real(), unit::Meter).u(unit::CentiMeter) / alt.exp() as i32);
+    let position = Position { latitude, longitude, altitude };
+    let ground_speed =
+        Velocity::new(rmc.speed.real(), unit::Knot).u(unit::MMs) / rmc.speed.exp() as i32;
+    let fixed = Fixed { position, course, heading, ground_speed, velocity_vector: None };
+    GNSS { datetime, fixed: Some(fixed) }
 }
 
-impl<'a> serial::Receiver for NMEA<'a> {
-    fn receive_size(&self) -> usize {
-        MAX_MESSAGE_SIZE
+impl NMEA {
+    pub fn new() -> Self {
+        Self { parser: Parser::new(), rmc: None, gga: None }
     }
 
-    fn receive(&mut self, bytes: &[u8]) {
-        let messages: Vec<Message> = self.parser.parse_bytes(&bytes).collect();
-        for message in messages.iter() {
+    pub fn receive(&mut self, bytes: &[u8]) -> Option<GNSS> {
+        let mut retval = None;
+        for message in self.parser.parse_bytes(&bytes) {
             match message {
-                Message::GGA(gga) => self.handle_gga(&gga),
-                Message::RMC(rmc) => self.handle_rmc(&rmc),
+                Message::GGA(gga) => self.gga = Some(gga),
+                Message::RMC(rmc) => self.rmc = Some(rmc),
+                _ => continue,
+            };
+            match (&self.rmc, &self.gga) {
+                (Some(rmc), Some(gga)) => {
+                    retval = Some(nmea_to_gnss(&rmc, &gga));
+                    self.rmc = None;
+                    self.gga = None;
+                }
                 _ => continue,
             }
         }
+        retval
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.parser.reset();
+        self.rmc = None;
+        self.gga = None;
     }
 }

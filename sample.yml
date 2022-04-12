@@ -89,17 +89,17 @@ peripherals:
       min-angle: -80
       max-angle: 80
       reversed: false
-controller:
-  inputs:
+inputs:
+  axes:
     throttle:
       channel: 3
-      scale: 110
+      scale: 1.1
     roll:
       channel: 1
-      scale: 100
+      scale: 1.0
     pitch:
       channel: 2
-      scale: 100
+      scale: 1.0
     yaw:
       channel: 4
-      scale: 100
+      scale: 1.0

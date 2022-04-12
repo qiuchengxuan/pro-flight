@@ -58,12 +58,14 @@ Progress
 
 **WIP**
 
-* IO
-  - [ ] SDCARD read & write
-  - [ ] DMA based SDCARD read & write
+* OSD
+  - [ ] FCS page for troubleshooting
 
 **Future**
 
+* IO
+  - [ ] SDCARD read & write
+  - [ ] DMA based SDCARD read & write
 * logging
   - [ ] Blackbox
 * navigation

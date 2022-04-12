@@ -1,57 +1,71 @@
 #[macro_use]
 extern crate log;
 extern crate pro_flight;
-#[macro_use]
-extern crate serde;
 
 pub mod simulator;
 
-pub use simulator::{Config, Simulator, GNSS};
+pub use simulator::{Config, Simulator};
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use async_std::sync::Mutex;
-use pro_flight::types::{
-    control::Control,
-    measurement::{distance::Distance, unit, Acceleration, Gyro},
+use std::{
+    sync::atomic::{AtomicUsize, Ordering},
+    time,
 };
 
+use actix_web::{get, post, put, web, App, HttpResponse, HttpServer, Responder};
+use async_std::sync::Mutex;
+use pro_flight::{
+    protocol::serial::gnss::out::GNSS,
+    types::{
+        control,
+        measurement::{unit, Acceleration, Altitude, Distance, Gyro, ENU},
+    },
+};
+
+static TICK: AtomicUsize = AtomicUsize::new(0);
+
 #[no_mangle]
-fn get_jiffies() -> u64 {
-    std::time::Instant::now().elapsed().as_nanos() as u64
+fn get_jiffies() -> time::Duration {
+    time::Duration::from_millis(TICK.load(Ordering::Relaxed) as u64)
 }
 
 static SIMULATOR: Mutex<Option<Simulator>> = Mutex::new(None);
 
-#[get("/telemetry")]
-async fn get_telemetry() -> impl Responder {
-    web::Json(SIMULATOR.lock().await.as_ref().unwrap().get_telemetry())
-}
-
-#[post("/input")]
-async fn update_input(input: web::Json<Control>) -> impl Responder {
-    SIMULATOR.lock().await.as_mut().unwrap().update_input(*input);
+#[post("/tick")]
+async fn tick() -> impl Responder {
+    TICK.fetch_add(1, Ordering::Relaxed);
     HttpResponse::Ok()
 }
 
-#[post("/sensors/accelerometer")]
-async fn update_acceleration(acceleration: web::Json<Acceleration>) -> impl Responder {
+#[get("/telemetry")]
+async fn get_telemetry() -> impl Responder {
+    web::Json(SIMULATOR.lock().await.as_ref().unwrap().collect())
+}
+
+#[put("/input")]
+async fn update_input(axes: web::Json<control::Axes>) -> impl Responder {
+    SIMULATOR.lock().await.as_mut().unwrap().update_input(*axes);
+    HttpResponse::Ok()
+}
+
+#[put("/sensors/accelerometer")]
+async fn update_acceleration(acceleration: web::Json<Acceleration<ENU>>) -> impl Responder {
     SIMULATOR.lock().await.as_mut().unwrap().update_acceleration(*acceleration);
     HttpResponse::Ok()
 }
 
-#[post("/sensors/gyroscope")]
-async fn update_gyro(gyro: web::Json<Gyro>) -> impl Responder {
+#[put("/sensors/gyroscope")]
+async fn update_gyro(gyro: web::Json<Gyro<unit::DEGs>>) -> impl Responder {
     SIMULATOR.lock().await.as_mut().unwrap().update_gyro(*gyro);
     HttpResponse::Ok()
 }
 
-#[post("/sensors/altimeter")]
+#[put("/sensors/altimeter")]
 async fn update_altitude(altitude: web::Json<Distance<i32, unit::CentiMeter>>) -> impl Responder {
-    SIMULATOR.lock().await.as_mut().unwrap().update_altitude(*altitude);
+    SIMULATOR.lock().await.as_mut().unwrap().update_altitude(Altitude(*altitude));
     HttpResponse::Ok()
 }
 
-#[post("/sensors/gnss")]
+#[put("/sensors/gnss")]
 async fn update_gnss(gnss: web::Json<GNSS>) -> impl Responder {
     SIMULATOR.lock().await.as_mut().unwrap().update_gnss(*gnss);
     HttpResponse::Ok()
@@ -61,6 +75,7 @@ pub async fn start(config: Config, listen: &str) -> std::io::Result<()> {
     *SIMULATOR.lock().await = Some(Simulator::new(config));
     let server = HttpServer::new(|| {
         App::new()
+            .service(tick)
             .service(get_telemetry)
             .service(update_input)
             .service(update_acceleration)

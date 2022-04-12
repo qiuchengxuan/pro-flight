@@ -1,18 +1,13 @@
 use pro_flight::{
-    config,
-    config::fcs::Configuration,
-    fcs::{mixer::ControlMixer, pid::PIDs},
-    ins,
-    ins::variometer::Variometer,
-    service::{flight::data::FlightDataHUB, info::Writer},
+    collection::{Collection, Collector},
+    datastore,
+    fcs::FCS,
+    ins::{variometer::Variometer, INS},
+    protocol::serial::gnss::out::GNSS,
     types::{
-        control::Control,
-        coordinate::Position,
-        flight::FlightData,
-        measurement::{
-            distance::Distance, unit, Acceleration, Course, Gyro, Heading, VelocityVector,
-        },
-        output::Output,
+        control,
+        measurement::{unit, Acceleration, Altitude, Gyro, ENU},
+        sensor::{Axes, Readout},
     },
 };
 
@@ -22,86 +17,74 @@ pub struct Config {
     pub gnss_rate: usize,
 }
 
-#[derive(Copy, Clone, Debug, Deserialize)]
-pub struct GNSS {
-    heading: Heading,
-    course: Course,
-    position: Position,
-    velocity: VelocityVector<i32, unit::MMpS>,
-}
-
 pub struct Simulator {
-    hub: &'static FlightDataHUB,
-    ins: ins::INS<'static>,
-    variometer: Variometer,
-    configuration: Configuration,
-    mixer: ControlMixer<'static>,
-    pids: PIDs<'static>,
-    acceleration: bool,
-    gyro: bool,
+    ins: INS,
+    fcs: FCS,
+    acceleration: Option<Readout>,
+    gyro: Option<Readout>,
 }
 
 impl Simulator {
     pub fn new(config: Config) -> Self {
-        let hub = Box::leak(Box::new(FlightDataHUB::default()));
-        let ins = ins::INS::new(config.sample_rate, hub);
-        let reader = hub.reader();
         let variometer = Variometer::new(1000 / config.altimeter_rate);
-        let configuration = config::get().fcs.configuration;
-        let mut mixer = ControlMixer::new(reader.input, 50);
-        hub.output.write(Output::from(&mixer.mix(), configuration));
-        let pids = PIDs::new(hub.reader().gyroscope, &config::get().fcs.pids);
-        Self { hub, ins, variometer, configuration, mixer, pids, acceleration: false, gyro: false }
+        let mut ins = INS::new(config.sample_rate, variometer);
+        ins.skip_calibration();
+        let mut fcs = FCS::new(1000);
+        fcs.update();
+        Self { ins, fcs, acceleration: None, gyro: None }
     }
 
-    pub fn get_telemetry(&self) -> FlightData {
-        self.hub.reader().read()
+    pub fn collect(&self) -> Collection {
+        Collector::new(datastore::acquire()).collect(None)
     }
 
-    fn update_output(&mut self) {
-        let control = self.pids.next_control(self.mixer.mix());
-        let output = Output::from(&control, self.configuration);
-        self.hub.output.write(output);
+    pub fn update_input(&mut self, axes: control::Axes) {
+        let ds = datastore::acquire();
+        ds.write_control(control::Control { rssi: 100, axes });
+        self.fcs.update();
     }
 
-    pub fn update_input(&mut self, input: Control) {
-        self.hub.input.write(input);
-        self.update_output();
-    }
-
-    pub fn update_acceleration(&mut self, acceleration: Acceleration) {
-        self.hub.accelerometer.write(acceleration);
-        if self.gyro {
-            trace!("Invoke INS update");
-            self.ins.invoke();
-            self.update_output();
-            self.gyro = false;
-        } else {
-            self.acceleration = true;
+    pub fn update_acceleration(&mut self, acceleration: Acceleration<ENU>) {
+        let acceleration = Readout {
+            axes: Axes {
+                x: (acceleration.0.raw[0] * 32768.0) as i32,
+                y: (acceleration.0.raw[1] * 32768.0) as i32,
+                z: (acceleration.0.raw[2] * 32768.0) as i32,
+            },
+            sensitive: 32768,
+        };
+        match self.gyro.take() {
+            Some(gyro) => {
+                trace!("Invoke INS update");
+                self.ins.update(acceleration, gyro)
+            }
+            None => self.acceleration = Some(acceleration),
         }
     }
 
-    pub fn update_gyro(&mut self, gyro: Gyro) {
-        self.hub.gyroscope.write(gyro);
-        if self.acceleration {
-            trace!("Invoke INS update");
-            self.ins.invoke();
-            self.update_output();
-            self.acceleration = false;
-        } else {
-            self.gyro = true;
+    pub fn update_gyro(&mut self, gyro: Gyro<unit::DEGs>) {
+        let gyro = Readout {
+            axes: Axes {
+                x: (gyro.0.raw[0] * 32768.0) as i32,
+                y: (gyro.0.raw[1] * 32768.0) as i32,
+                z: (gyro.0.raw[2] * 32768.0) as i32,
+            },
+            sensitive: 32768,
+        };
+        match self.acceleration.take() {
+            Some(acceleration) => {
+                trace!("Invoke INS update");
+                self.ins.update(acceleration, gyro)
+            }
+            None => self.gyro = Some(gyro),
         }
     }
 
-    pub fn update_altitude(&mut self, altitude: Distance<i32, unit::CentiMeter>) {
-        self.hub.altimeter.write(altitude);
-        self.hub.vertical_speed.write(self.variometer.update(altitude.into()));
+    pub fn update_altitude(&mut self, altitude: Altitude) {
+        datastore::acquire().write_altitude(altitude);
     }
 
     pub fn update_gnss(&mut self, gnss: GNSS) {
-        self.hub.gnss_heading.write(gnss.heading);
-        self.hub.gnss_course.write(gnss.course);
-        self.hub.gnss_velocity.write(gnss.velocity);
-        self.hub.gnss_position.write(gnss.position);
+        datastore::acquire().write_gnss(gnss.into());
     }
 }

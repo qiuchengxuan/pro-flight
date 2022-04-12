@@ -1,42 +1,47 @@
-use alloc::boxed::Box;
-
 use crate::{
-    config::peripherals::serial::{GNSSConfig, GNSSProtocol},
-    protocol::serial::Receiver,
-    service::{flight::data::FlightDataHUB, info::bulletin::Bulletin},
-    types::{
-        coordinate::Position,
-        measurement::{unit, Course, Heading, VelocityVector},
-    },
+    config::peripherals::serial::GNSSProtocol as Protocol, datastore, protocol::serial::Receiver,
 };
 
-pub struct DataSource<'a> {
-    pub fixed: &'a Bulletin<bool>,
-    pub position: &'a Bulletin<Position>,
-    pub velocity: &'a Bulletin<VelocityVector<i32, unit::MMpS>>,
-    pub heading: &'a Bulletin<Heading>,
-    pub course: &'a Bulletin<Course>,
-}
-
 pub mod nmea;
+pub mod out;
 pub mod ubx;
 
-use nmea::NMEA;
-use ubx::UBX;
+pub enum GNSSReceiver {
+    UBX(ubx::UBX),
+    NMEA(nmea::NMEA),
+}
 
-pub fn make_receiver<'a>(
-    config: &GNSSConfig,
-    hub: &'a FlightDataHUB,
-) -> Option<Box<dyn Receiver + 'a>> {
-    let data_source = DataSource {
-        fixed: &hub.gnss_fixed,
-        position: &hub.gnss_position,
-        velocity: &hub.gnss_velocity,
-        heading: &hub.gnss_heading,
-        course: &hub.gnss_course,
-    };
-    match config.protocol {
-        GNSSProtocol::NMEA => Some(Box::new(NMEA::new(data_source))),
-        GNSSProtocol::UBX => Some(Box::new(UBX::new(data_source))),
+impl Receiver for GNSSReceiver {
+    fn chunk_size(&self) -> usize {
+        match self {
+            Self::UBX(_) => ubx::CHUNK_SIZE,
+            Self::NMEA(_) => nmea::CHUNK_SIZE,
+        }
+    }
+
+    fn receive(&mut self, bytes: &[u8]) {
+        let gnss = match self {
+            Self::UBX(ref mut ubx) => ubx.receive(bytes),
+            Self::NMEA(ref mut nmea) => nmea.receive(bytes),
+        };
+        if let Some(gnss) = gnss {
+            datastore::acquire().write_gnss(gnss);
+        }
+    }
+
+    fn reset(&mut self) {
+        match self {
+            Self::UBX(ref mut ubx) => ubx.reset(),
+            Self::NMEA(ref mut nmea) => nmea.reset(),
+        }
+    }
+}
+
+impl From<Protocol> for GNSSReceiver {
+    fn from(protocol: Protocol) -> Self {
+        match protocol {
+            Protocol::NMEA => GNSSReceiver::NMEA(nmea::NMEA::new()),
+            Protocol::UBX => GNSSReceiver::UBX(ubx::UBX::new()),
+        }
     }
 }

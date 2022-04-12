@@ -85,14 +85,15 @@ macro_rules! __command {
             unsafe { $crate::cli::reboot() };
         })
     };
-    (osd,[$setter:ident]) => {
+    (osd,[$event:ident]) => {
         $crate::cli::Command::new("osd", "OSD related command", move |cmd| {
+            use $crate::sync::event::{Notifier as _, Subscriber as _};
             if cmd.trim() != "upload-font" {
                 println!("{}", $crate::cli::OSD_CMD_USAGE);
                 return;
             }
-            $setter.set();
-            while $setter.get() {
+            $event.notify();
+            while $event.wait() {
                 $crate::sys::time::TickTimer::default().delay_ms(1u32);
             }
         })
@@ -105,9 +106,10 @@ macro_rules! __command {
             }
         })
     };
-    (telemetry,[$reader:ident]) => {
+    (telemetry,[]) => {
         $crate::cli::Command::new("telemetry", "Show flight data", move |_| {
-            println!("{}", $reader.read())
+            let ds = $crate::datastore::acquire();
+            println!("{}", $crate::collection::Collector::new(ds).collect(None))
         })
     };
 }
