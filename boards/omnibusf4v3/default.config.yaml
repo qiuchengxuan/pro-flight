@@ -1,67 +1,11 @@
-battery:
-  cells: 3
-  min-cell-voltage: 3.3
-  max-cell-voltage: 4.2
-  warning-cell-voltage: 3.5
-fcs:
-  configuration: airplane
-  pids:
-    roll:
-      max-rate: 30
-      kp: 44
-      ki: 40
-      kd: 20
-    pitch:
-      max-rate: 10
-      kp: 58
-      ki: 50
-      kd: 22
-    yaw:
-      max-rate: 10
-      kp: 70
-      ki: 45
-      kd: 20
 imu:
   accelerometer:
-    gain:
-      x: 1.0
-      y: 1.0
-      z: 1.0
     sensitive: 4.0
-  mahony:
-    kp: 0.25
-    ki: 0.005
-ins:
-  speedometer:
-    kp: 0.1
-osd:
-  aspect-ratio: '16:9'
-  fov: 145
-  offset:
-    horizental: 8
-    vertical: 0
-  refresh-rate: 50
-  standard: PAL
 peripherals:
-  serial:
-    USART1:
-      type: GNSS
-      baudrate: 9600
-      protocol: NMEA
-    USART6:
-      type: SBUS
-      fast: false
-      rx-inverted: true
-      half-duplex: false
   pwm:
     PWM1:
       type: motor
       index: 0
-      protocol: PWM
-      rate: 400
-    PWM2:
-      type: motor
-      index: 1
       protocol: PWM
       rate: 400
     PWM3:
@@ -72,13 +16,3 @@ peripherals:
       type: aileron-left
     PWM6:
       type: rudder
-inputs:
-  axes:
-    roll:
-      channel: 1
-    pitch:
-      channel: 2
-    throttle:
-      channel: 3
-    yaw:
-      channel: 4

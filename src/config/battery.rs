@@ -22,7 +22,7 @@ pub struct Battery {
 impl Default for Battery {
     fn default() -> Self {
         Self {
-            cells: 0,
+            cells: 3,
             min_cell_voltage: DEFAULT_MIN_CELL_VOLTAGE,
             max_cell_voltage: DEFAULT_MAX_CELL_VOLTAGE,
             warning_cell_voltage: DEFAULT_WARNING_CELL_VOLTAGE,
@@ -33,7 +33,7 @@ impl Default for Battery {
 impl Setter for Battery {
     fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
         match path.next().ok_or(Error::MalformedPath)? {
-            "cells" => self.cells = value.parse()?.unwrap_or(0),
+            "cells" => self.cells = value.parse()?.unwrap_or(3),
             "min-cell-voltage" => {
                 self.min_cell_voltage = value.parse()?.unwrap_or(DEFAULT_MIN_CELL_VOLTAGE)
             }

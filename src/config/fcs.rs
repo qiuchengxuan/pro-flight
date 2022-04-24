@@ -58,11 +58,36 @@ impl Setter for PID {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
 pub struct PIDs {
     pub roll: PID,
     pub pitch: PID,
     pub yaw: PID,
+}
+
+impl Default for PIDs {
+    fn default() -> Self {
+        Self {
+            roll: PID {
+                max_rate: 30,
+                kp: fixed_point::fixed!(0.44),
+                ki: fixed_point::fixed!(0.4),
+                kd: fixed_point::fixed!(0.2),
+            },
+            pitch: PID {
+                max_rate: 30,
+                kp: fixed_point::fixed!(0.58),
+                ki: fixed_point::fixed!(0.5),
+                kd: fixed_point::fixed!(0.22),
+            },
+            yaw: PID {
+                max_rate: 30,
+                kp: fixed_point::fixed!(0.7),
+                ki: fixed_point::fixed!(0.45),
+                kd: fixed_point::fixed!(0.2),
+            },
+        }
+    }
 }
 
 impl Setter for PIDs {

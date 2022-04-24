@@ -26,7 +26,7 @@ impl FromStr for Ratio {
 
 impl Default for Ratio {
     fn default() -> Self {
-        Self(1, 1)
+        Self(16, 9)
     }
 }
 
