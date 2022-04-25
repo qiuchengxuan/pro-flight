@@ -4,11 +4,11 @@ pub mod imu;
 pub mod inputs;
 pub mod ins;
 pub mod osd;
+pub mod pathset;
 pub mod peripherals;
-pub mod setter;
 pub mod yaml;
 
-use core::{mem, slice, str::Split};
+use core::{mem, slice};
 
 use fixed_point::{fixed, FixedPoint};
 
@@ -22,50 +22,50 @@ pub use imu::IMU;
 pub use inputs::Inputs;
 pub use ins::INS;
 pub use osd::{Offset, Standard, OSD};
+use pathset::{Error, Path, PathSet, Value};
 pub use peripherals::{
     pwm::{PWMs, Protocol, PWM},
     Peripherals,
 };
-use setter::{Error, Setter, Value};
 use yaml::YamlParser;
 
-impl Setter for Axes {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or_default();
+impl PathSet for Axes {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let key = path.str()?;
+        let value = value.parse()?;
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
             "z" => self.z = value,
-            _ => return Err(Error::MalformedPath),
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
 }
 
-impl Setter for Bias {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or(fixed!(1.0, 5));
+impl PathSet for Bias {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let key = path.str()?;
+        let value = value.parse_or(fixed!(1.0, 5))?;
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
             "z" => self.z = value,
-            _ => return Err(Error::MalformedPath),
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
 }
 
-impl Setter for Gain {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let key = path.next().ok_or(Error::MalformedPath)?;
-        let value = value.parse()?.unwrap_or(fixed!(1.0, 4));
+impl PathSet for Gain {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let key = path.str()?;
+        let value = value.parse_or(fixed!(1.0, 4))?;
         match key {
             "x" => self.x = value,
             "y" => self.y = value,
             "z" => self.z = value,
-            _ => return Err(Error::MalformedPath),
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -86,9 +86,9 @@ pub struct Config {
     pub inputs: Inputs,
 }
 
-impl Setter for Config {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for Config {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "battery" => self.battery.set(path, value),
             "fcs" => self.fcs.set(path, value),
             "imu" => self.imu.set(path, value),
@@ -96,7 +96,7 @@ impl Setter for Config {
             "osd" => self.osd.set(path, value),
             "peripherals" => self.peripherals.set(path, value),
             "inputs" => self.inputs.set(path, value),
-            _ => Err(Error::MalformedPath),
+            _ => Err(Error::UnknownPath),
         }
     }
 }

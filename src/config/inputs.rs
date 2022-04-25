@@ -1,12 +1,10 @@
-use core::str::Split;
-
 use fixed_point::FixedPoint;
 use heapless::LinearMap;
 use serde::ser::SerializeMap;
 
 use crate::{types::control::AxisType, utils::LinearMapVisitor};
 
-use super::setter::{Error, Setter, Value};
+use super::pathset::{Error, Path, PathSet, Value};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Axis {
@@ -14,26 +12,36 @@ pub struct Axis {
     pub scale: FixedPoint<u8, 2>,
 }
 
-impl Setter for Axis {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
-            "channel" => {
-                self.channel = value.parse()?.ok_or(Error::ExpectValue)?;
-            }
-            "scale" => self.scale = value.parse()?.unwrap_or(fixed_point::fixed!(1.0)),
-            _ => return Err(Error::MalformedPath),
+impl PathSet for Axis {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "channel" => self.channel = value.parse()?,
+            "scale" => self.scale = value.parse_or(fixed_point::fixed!(1.0))?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Axes(pub LinearMap<AxisType, Axis, 4>);
 
-impl Setter for Axes {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let type_sring = path.next().ok_or(Error::MalformedPath)?;
-        let axis_type = type_sring.parse().map_err(|_| Error::MalformedPath)?;
+impl Default for Axes {
+    fn default() -> Self {
+        let mut axes = LinearMap::new();
+        let scale = fixed_point::fixed!(1.0);
+        axes.insert(AxisType::Throttle, Axis { channel: 3, scale }).ok();
+        axes.insert(AxisType::Roll, Axis { channel: 1, scale }).ok();
+        axes.insert(AxisType::Pitch, Axis { channel: 2, scale }).ok();
+        axes.insert(AxisType::Yaw, Axis { channel: 4, scale }).ok();
+        Self(axes)
+    }
+}
+
+impl PathSet for Axes {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let type_sring = path.str()?;
+        let axis_type = type_sring.parse().map_err(|_| Error::UnknownPath)?;
         if self.0.contains_key(&axis_type) {
             return self.0[&axis_type].set(path, value);
         }
@@ -60,29 +68,16 @@ impl<'de> serde::Deserialize<'de> for Axes {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Inputs {
     pub axes: Axes,
 }
 
-impl Setter for Inputs {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let key = path.next().ok_or(Error::MalformedPath)?;
-        if key != "axes" {
-            return Err(Error::MalformedPath);
+impl PathSet for Inputs {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "axes" => self.axes.set(path, value),
+            _ => Err(Error::UnknownPath),
         }
-        self.axes.set(path, value)
-    }
-}
-
-impl Default for Inputs {
-    fn default() -> Self {
-        let mut axes = Axes::default();
-        let scale = fixed_point::fixed!(1.0);
-        axes.0.insert(AxisType::Throttle, Axis { channel: 3, scale }).ok();
-        axes.0.insert(AxisType::Roll, Axis { channel: 1, scale }).ok();
-        axes.0.insert(AxisType::Pitch, Axis { channel: 2, scale }).ok();
-        axes.0.insert(AxisType::Yaw, Axis { channel: 4, scale }).ok();
-        Self { axes }
     }
 }

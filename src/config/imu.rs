@@ -1,27 +1,25 @@
-use core::str::Split;
-
 use fixed_point::FixedPoint;
 
 use crate::types::sensor::{Bias, Gain, Rotation};
 
-use super::setter::{Error, Setter, Value};
+use super::pathset::{Error, Path, PathSet, Value};
 
 pub type Sensitive = FixedPoint<i32, 2>; // LSB/unit
 
-#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Accelerometer {
     pub bias: Bias,
     pub gain: Gain,
     pub sensitive: Sensitive,
 }
 
-impl Setter for Accelerometer {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for Accelerometer {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "bias" => return self.bias.set(path, value),
             "gain" => return self.gain.set(path, value),
-            "sensitive" => self.sensitive = value.parse()?.unwrap_or_default(),
-            _ => return Err(Error::MalformedPath),
+            "sensitive" => self.sensitive = value.parse()?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -34,13 +32,13 @@ pub struct Magnetometer {
     pub declination: FixedPoint<i32, 1>,
 }
 
-impl Setter for Magnetometer {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for Magnetometer {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "bias" => return self.bias.set(path, value),
             "gain" => return self.gain.set(path, value),
-            "declination" => self.declination = value.parse()?.unwrap_or_default(),
-            _ => return Err(Error::MalformedPath),
+            "declination" => self.declination = value.parse()?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -61,12 +59,12 @@ impl Default for Mahony {
     }
 }
 
-impl Setter for Mahony {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
-            "kp" => self.kp = value.parse()?.unwrap_or(DEFAULT_KP),
-            "ki" => self.ki = value.parse()?.unwrap_or(DEFAULT_KI),
-            _ => return Err(Error::MalformedPath),
+impl PathSet for Mahony {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "kp" => self.kp = value.parse_or(DEFAULT_KP)?,
+            "ki" => self.ki = value.parse_or(DEFAULT_KI)?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -80,17 +78,17 @@ pub struct IMU {
     pub rotation: Rotation,
 }
 
-impl Setter for IMU {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for IMU {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "accelerometer" => self.accelerometer.set(path, value),
             "magnetometer" => self.magnetometer.set(path, value),
             "mahony" => self.mahony.set(path, value),
             "rotation" => {
-                self.rotation = value.parse()?.unwrap_or(Rotation::NoRotation);
+                self.rotation = value.parse()?;
                 Ok(())
             }
-            _ => return Err(Error::MalformedPath),
+            _ => Err(Error::UnknownPath),
         }
     }
 }

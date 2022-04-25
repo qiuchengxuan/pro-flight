@@ -1,8 +1,8 @@
-use core::str::{FromStr, Split};
+use core::str::FromStr;
 
 use fixed_point::FixedPoint;
 
-use super::setter::{Error, Setter, Value};
+use super::pathset::{Error, Path, PathSet, Value};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -35,14 +35,14 @@ pub struct PID {
     pub kd: FixedPoint<u16, 2>,
 }
 
-impl Setter for PID {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
-            "max-rate" => self.max_rate = value.parse()?.unwrap_or(30),
-            "kp" => self.kp = value.parse()?.unwrap_or(FixedPoint(1_0)),
-            "ki" => self.ki = value.parse()?.unwrap_or(FixedPoint(1_0)),
-            "kd" => self.kd = value.parse()?.unwrap_or(FixedPoint(1_0)),
-            _ => return Err(Error::MalformedPath),
+impl PathSet for PID {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "max-rate" => self.max_rate = value.parse_or(90)?,
+            "kp" => self.kp = value.parse_or(fixed_point::fixed!(1.0))?,
+            "ki" => self.ki = value.parse_or(fixed_point::fixed!(1.0))?,
+            "kd" => self.kd = value.parse_or(fixed_point::fixed!(1.0))?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -80,18 +80,18 @@ impl Default for PIDs {
     }
 }
 
-impl Setter for PIDs {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for PIDs {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "roll" => self.roll.set(path, value),
             "pitch" => self.pitch.set(path, value),
             "yaw" => self.yaw.set(path, value),
-            _ => Err(Error::MalformedPath),
+            _ => Err(Error::UnknownPath),
         }
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FCS {
     pub configuration: Configuration,
     pub pids: PIDs,
@@ -103,15 +103,15 @@ impl Default for FCS {
     }
 }
 
-impl Setter for FCS {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for FCS {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "configuration" => {
-                self.configuration = value.parse()?.unwrap_or(Configuration::Airplane)
+                self.configuration = value.parse_or(Configuration::Airplane)?;
+                Ok(())
             }
-            "pids" => self.pids.set(path, value)?,
-            _ => return Err(Error::MalformedPath),
+            "pids" => self.pids.set(path, value),
+            _ => Err(Error::UnknownPath),
         }
-        Ok(())
     }
 }

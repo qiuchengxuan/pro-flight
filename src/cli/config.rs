@@ -2,7 +2,7 @@ use core::fmt::Write;
 
 use crate::{
     config,
-    config::setter::{Setter, Value},
+    config::pathset::{Path, PathSet, Value},
     sys::fs::{File, OpenOptions},
 };
 
@@ -14,7 +14,7 @@ pub fn set(line: &str) {
     let mut split = line.split(' ');
     if let Some(path) = split.next() {
         let mut config = config::get().clone();
-        match config.set(&mut path.split('.'), Value(split.next())) {
+        match config.set(Path::new(path.split('.')), Value(split.next())) {
             Ok(()) => (),
             Err(e) => println!("{}", e),
         }

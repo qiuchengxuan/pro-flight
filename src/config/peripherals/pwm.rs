@@ -1,14 +1,10 @@
-use core::{
-    cmp,
-    fmt::Write,
-    str::{FromStr, Split},
-};
+use core::{cmp, fmt::Write, str::FromStr};
 
 use heapless::LinearMap;
 use serde::{de::Error as _, ser::SerializeMap};
 
 use crate::{
-    config::setter::{Error, Setter, Value},
+    config::pathset::{Error, Path, PathSet, Value},
     utils::LinearMapVisitor,
 };
 
@@ -142,11 +138,11 @@ impl PWM {
     }
 }
 
-impl Setter for PWM {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let key = path.next().ok_or(Error::MalformedPath)?;
+impl PathSet for PWM {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let key = path.str()?;
         if key == "type" {
-            let output_type = value.0.ok_or(Error::ExpectValue)?;
+            let output_type = value.str()?;
             *self = match output_type {
                 "motor" => Self::Motor(Motor::default()),
                 "aileron-left" => Self::Servo(Servo::of(ServoType::AileronLeft)),
@@ -157,32 +153,32 @@ impl Setter for PWM {
                 "elevon-right" => Self::Servo(Servo::of(ServoType::ElevonRight)),
                 "ruddervator-left" => Self::Servo(Servo::of(ServoType::RuddervatorLeft)),
                 "ruddervator-right" => Self::Servo(Servo::of(ServoType::RuddervatorRight)),
-                _ => return Err(Error::UnexpectedValue),
+                _ => return Err(Error::InvalidValue),
             };
             return Ok(());
         }
         match self {
             Self::Motor(ref mut motor) => match key {
-                "index" => motor.index = value.parse()?.unwrap_or(0),
+                "index" => motor.index = value.parse()?,
                 "protocol" => match value.0 {
                     Some("PWM") => motor.protocol = Protocol::PWM,
-                    Some(_) => return Err(Error::UnexpectedValue),
+                    Some(_) => return Err(Error::InvalidValue),
                     _ => motor.protocol = Protocol::PWM,
                 },
-                "rate" => motor.rate = value.parse()?.unwrap_or(400),
-                _ => return Err(Error::MalformedPath),
+                "rate" => motor.rate = value.parse_or(400)?,
+                _ => return Err(Error::UnknownPath),
             },
             Self::Servo(ref mut servo) => match key {
                 "min-angle" => {
-                    let min = value.parse()?.unwrap_or(-90);
+                    let min = value.parse_or(-90)?;
                     servo.min_angle = cmp::min(cmp::max(min, -90), 0)
                 }
                 "max-angle" => {
-                    let max = value.parse()?.unwrap_or(90);
+                    let max = value.parse_or(90)?;
                     servo.max_angle = cmp::max(cmp::min(max, 90), 0)
                 }
-                "reversed" => servo.reversed = value.parse()?.unwrap_or_default(),
-                _ => return Err(Error::MalformedPath),
+                "reversed" => servo.reversed = value.parse()?,
+                _ => return Err(Error::UnknownPath),
             },
         }
         Ok(())
@@ -214,13 +210,9 @@ impl<'de> serde::Deserialize<'de> for PWMs {
     }
 }
 
-impl Setter for PWMs {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let id_string = path.next().ok_or(Error::MalformedPath)?;
-        if !id_string.starts_with("PWM") {
-            return Err(Error::MalformedPath);
-        }
-        let id = id_string.parse().map_err(|_| Error::MalformedPath)?;
+impl PathSet for PWMs {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let id = path.parse()?;
         if self.0.contains_key(&id) {
             return self.0[&id].set(path, value);
         }

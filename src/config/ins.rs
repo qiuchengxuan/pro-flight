@@ -1,8 +1,6 @@
-use core::str::Split;
-
 use fixed_point::{fixed, FixedPoint};
 
-use super::setter::{Error, Setter, Value};
+use super::pathset::{Error, Path, PathSet, Value};
 
 const DEFAULT_KP: FixedPoint<u16, 3> = fixed!(0.25, 3);
 
@@ -17,11 +15,11 @@ impl Default for Speedometer {
     }
 }
 
-impl Setter for Speedometer {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
-            "kp" => self.kp = value.parse()?.unwrap_or(DEFAULT_KP),
-            _ => return Err(Error::MalformedPath),
+impl PathSet for Speedometer {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "kp" => self.kp = value.parse_or(DEFAULT_KP)?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -33,11 +31,11 @@ pub struct INS {
     pub speedometer: Speedometer,
 }
 
-impl Setter for INS {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for INS {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "speedometer" => self.speedometer.set(path, value),
-            _ => Err(Error::MalformedPath),
+            _ => Err(Error::UnknownPath),
         }
     }
 }

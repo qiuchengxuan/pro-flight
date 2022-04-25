@@ -1,12 +1,11 @@
 use core::{
     fmt::{Display, Formatter},
-    str::Split,
     time::Duration,
 };
 
 use crate::types::Ratio;
 
-use super::setter::{Error, Setter, Value};
+use super::pathset::{Error, Path, PathSet, Value};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -30,22 +29,24 @@ impl Default for Standard {
     }
 }
 
-impl From<&str> for Standard {
-    fn from(string: &str) -> Standard {
+impl core::str::FromStr for Standard {
+    type Err = ();
+
+    fn from_str(string: &str) -> Result<Standard, Self::Err> {
         match string {
-            "NTSC" => Standard::NTSC,
-            _ => Standard::PAL,
+            "NTSC" => Ok(Standard::NTSC),
+            "PAL" => Ok(Standard::PAL),
+            _ => Err(()),
         }
     }
 }
 
 impl Display for Standard {
     fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        let string = match self {
+        f.write_str(match self {
             Self::PAL => "PAL",
             Self::NTSC => "NTSC",
-        };
-        f.write_str(string)
+        })
     }
 }
 
@@ -64,13 +65,13 @@ pub struct Offset {
     pub vertical: i8,
 }
 
-impl Setter for Offset {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let value = value.parse()?.unwrap_or_default();
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for Offset {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let value = value.parse()?;
+        match path.str()? {
             "horizental" => self.horizental = value,
             "vertical" => self.vertical = value,
-            _ => return Err(Error::MalformedPath),
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }
@@ -98,15 +99,15 @@ impl Default for OSD {
     }
 }
 
-impl Setter for OSD {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
-            "aspect-ratio" => self.aspect_ratio = value.parse()?.unwrap_or_default(),
-            "fov" => self.fov = value.parse()?.unwrap_or_default(),
+impl PathSet for OSD {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "aspect-ratio" => self.aspect_ratio = value.parse()?,
+            "fov" => self.fov = value.parse()?,
             "offset" => return self.offset.set(path, value),
-            "refresh-rate" => self.refresh_rate = value.parse()?.unwrap_or_default(),
-            "standard" => self.standard = value.0.map(|v| Standard::from(v)).unwrap_or_default(),
-            _ => return Err(Error::MalformedPath),
+            "refresh-rate" => self.refresh_rate = value.parse()?,
+            "standard" => self.standard = value.parse()?,
+            _ => return Err(Error::UnknownPath),
         }
         Ok(())
     }

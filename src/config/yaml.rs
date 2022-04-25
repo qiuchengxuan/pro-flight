@@ -2,7 +2,7 @@ use core::fmt::Write;
 
 use heapless::String;
 
-use super::setter::{Setter, Value};
+use super::pathset::{Path, PathSet, Value};
 
 pub struct YamlParser<'a> {
     doc: core::str::Lines<'a>,
@@ -39,7 +39,7 @@ impl<'a> YamlParser<'a> {
         false
     }
 
-    fn parse_sequence(&mut self, depth: usize, setter: &mut dyn Setter) {
+    fn parse_sequence<T: PathSet>(&mut self, depth: usize, path_set: &mut T) {
         let len = self.buffer.len();
         let mut index = 0;
         while self.next_line(depth, false) {
@@ -54,9 +54,10 @@ impl<'a> YamlParser<'a> {
             write!(self.buffer, "[{}]", index).ok();
             stripped = (&stripped[2..]).trim_end();
             if stripped.contains(':') {
-                self.parse_map(depth + 1, true, setter)
+                self.parse_map(depth + 1, true, path_set)
             } else {
-                setter.set(&mut self.buffer.as_str().split('.'), Value::of(stripped)).ok();
+                let path = Path::new(self.buffer.as_str().split('.'));
+                path_set.set(path, Value::of(stripped)).ok();
                 self.doc.next();
             }
             index += 1;
@@ -64,7 +65,7 @@ impl<'a> YamlParser<'a> {
         }
     }
 
-    fn parse_map(&mut self, depth: usize, mut ignore_dash: bool, setter: &mut dyn Setter) {
+    fn parse_map<T: PathSet>(&mut self, depth: usize, mut ignore_dash: bool, path_set: &mut T) {
         let len = self.buffer.len();
         while self.next_line(depth, ignore_dash) {
             ignore_dash = false;
@@ -85,13 +86,14 @@ impl<'a> YamlParser<'a> {
 
             let trim = ['\'', '"', ' '];
             if let Some(value) = splitted.next().map(|v| v.trim_matches(&trim[..])) {
+                let path = Path::new(self.buffer.as_str().split('.'));
                 match value {
-                    "" => self.parse_next(depth + 1, setter),
+                    "" => self.parse_next(depth + 1, path_set),
                     "[]" | "~" | "null" => {
-                        setter.set(&mut self.buffer.as_str().split('.'), Value(None)).ok();
+                        path_set.set(path, Value(None)).ok();
                     }
                     _ => {
-                        setter.set(&mut self.buffer.as_str().split('.'), Value::of(value)).ok();
+                        path_set.set(path, Value::of(value)).ok();
                     }
                 }
             }
@@ -99,26 +101,26 @@ impl<'a> YamlParser<'a> {
         }
     }
 
-    fn parse_next(&mut self, depth: usize, setter: &mut dyn Setter) {
+    fn parse_next<T: PathSet>(&mut self, depth: usize, path_set: &mut T) {
         if !self.next_line(depth, false) {
             return;
         }
 
         let line = &self.doc.clone().next().unwrap()[depth * self.indent_width..];
         if line.starts_with("- ") {
-            return self.parse_sequence(depth, setter);
+            return self.parse_sequence(depth, path_set);
         }
 
         if line.contains(':') {
-            return self.parse_map(depth, false, setter);
+            return self.parse_map(depth, false, path_set);
         }
     }
 
-    pub fn parse_into(&mut self, setter: &mut dyn Setter) {
-        self.parse_next(0, setter);
+    pub fn parse_into<T: PathSet>(&mut self, path_set: &mut T) {
+        self.parse_next(0, path_set);
     }
 
-    pub fn parse<T: Default + Setter>(&mut self) -> T {
+    pub fn parse<T: Default + PathSet>(&mut self) -> T {
         let mut value = T::default();
         self.parse_into(&mut value);
         value
@@ -132,20 +134,20 @@ impl<'a> YamlParser<'a> {
 mod test {
     #[test]
     fn test_yaml_parser() {
-        use core::str::Split;
         use std::fmt::Write;
 
         use super::YamlParser;
-        use crate::config::setter::{Error, Value};
+        use crate::config::pathset::{Error, Path, Value};
 
         struct Handler(pub String);
 
-        impl super::Setter for Handler {
-            fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
+        impl super::PathSet for Handler {
+            fn set(&mut self, path: Path, value: Value) -> Result<(), Error> {
+                let split = path.unwrap();
                 if let Some(v) = value.0 {
-                    writeln!(self.0, "{} = {}", path.collect::<Vec<&str>>().join("."), v).ok();
+                    writeln!(self.0, "{} = {}", split.collect::<Vec<&str>>().join("."), v).ok();
                 } else {
-                    writeln!(self.0, "{} = null", path.collect::<Vec<&str>>().join(".")).ok();
+                    writeln!(self.0, "{} = null", split.collect::<Vec<&str>>().join(".")).ok();
                 }
                 Ok(())
             }

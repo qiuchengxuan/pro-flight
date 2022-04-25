@@ -7,12 +7,12 @@ fcs:
   configuration: airplane
   pids:
     roll:
-      max-rate: 30
+      max-rate: 90
       kp: 0.44
       ki: 0.4
       kd: 0.2
     pitch:
-      max-rate: 10
+      max-rate: 30
       kp: 0.58
       ki: 0.5
       kd: 0.22

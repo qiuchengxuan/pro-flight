@@ -1,13 +1,10 @@
-use core::{
-    fmt::Write,
-    str::{FromStr, Split},
-};
+use core::{fmt::Write, str::FromStr};
 
 use heapless::LinearMap;
 use serde::{de::Error as _, ser::SerializeMap};
 
 use crate::{
-    config::setter::{Error, Setter, Value},
+    config::pathset::{Error, Path, PathSet, Value},
     utils::LinearMapVisitor,
 };
 
@@ -147,29 +144,29 @@ pub enum Config {
     RC(RemoteControl),
 }
 
-impl Setter for Config {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let key = path.next().ok_or(Error::MalformedPath)?;
+impl PathSet for Config {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let key = path.str()?;
         if key == "type" {
             *self = match value.0 {
                 Some("GNSS") => Self::GNSS(GNSSConfig::default()),
                 Some("SBUS") => Self::RC(RemoteControl::SBUS(SbusConfig::default())),
-                Some(_) => return Err(Error::UnexpectedValue),
+                Some(_) => return Err(Error::InvalidValue),
                 _ => return Err(Error::ExpectValue),
             };
             return Ok(());
         }
         match self {
             Self::GNSS(ref mut gnss) => match key {
-                "baudrate" => gnss.baudrate = value.parse()?.unwrap_or(9600),
-                "protocol" => gnss.protocol = value.parse()?.unwrap_or(GNSSProtocol::NMEA),
-                _ => return Err(Error::MalformedPath),
+                "baudrate" => gnss.baudrate = value.parse_or(9600)?,
+                "protocol" => gnss.protocol = value.parse_or(GNSSProtocol::NMEA)?,
+                _ => return Err(Error::UnknownPath),
             },
             Self::RC(RemoteControl::SBUS(ref mut sbus)) => match key {
-                "fast" => sbus.fast = value.parse()?.unwrap_or(false),
-                "rx-inverted" => sbus.rx_inverted = value.parse()?.unwrap_or(true),
-                "half-duplex" => sbus.half_duplex = value.parse()?.unwrap_or(false),
-                _ => return Err(Error::MalformedPath),
+                "fast" => sbus.fast = value.parse()?,
+                "rx-inverted" => sbus.rx_inverted = value.parse_or(true)?,
+                "half-duplex" => sbus.half_duplex = value.parse()?,
+                _ => return Err(Error::UnknownPath),
             },
         }
         Ok(())
@@ -189,10 +186,9 @@ impl Serials {
     }
 }
 
-impl Setter for Serials {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        let id_sring = path.next().ok_or(Error::MalformedPath)?;
-        let id = Identifier::from_str(id_sring).map_err(|_| Error::MalformedPath)?;
+impl PathSet for Serials {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        let id = path.parse()?;
         if self.0.contains_key(&id) {
             return self.0[&id].set(path, value);
         }

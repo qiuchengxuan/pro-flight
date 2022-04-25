@@ -1,6 +1,4 @@
-use core::str::Split;
-
-use super::setter::{Error, Setter, Value};
+use super::pathset::{Error, Path, PathSet, Value};
 
 pub mod pwm;
 pub mod serial;
@@ -20,12 +18,12 @@ impl Peripherals {
     }
 }
 
-impl Setter for Peripherals {
-    fn set(&mut self, path: &mut Split<char>, value: Value) -> Result<(), Error> {
-        match path.next().ok_or(Error::MalformedPath)? {
+impl PathSet for Peripherals {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
             "serials" => self.serials.set(path, value),
             "pwms" => self.pwms.set(path, value),
-            _ => Err(Error::MalformedPath),
+            _ => Err(Error::UnknownPath),
         }
     }
 }
