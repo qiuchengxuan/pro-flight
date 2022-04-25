@@ -6,7 +6,7 @@ use super::setter::{Error, Setter, Value};
 
 const DEFAULT_KP: FixedPoint<u16, 3> = fixed!(0.25, 3);
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Speedometer {
     pub kp: FixedPoint<u16, 3>,
 }
@@ -28,7 +28,7 @@ impl Setter for Speedometer {
 }
 
 #[repr(C, align(4))]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct INS {
     pub speedometer: Speedometer,
 }

@@ -4,8 +4,9 @@ use fixed_point::FixedPoint;
 
 use super::setter::{Error, Setter, Value};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
+#[serde(rename_all = "kebab-case")]
 pub enum Configuration {
     Airplane,
     FlyingWing,
@@ -25,18 +26,7 @@ impl FromStr for Configuration {
     }
 }
 
-impl serde::Serialize for Configuration {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = match self {
-            Self::Airplane => "airplane",
-            Self::FlyingWing => "flying-wing",
-            Self::VTail => "v-tail",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PID {
     #[serde(rename = "max-rate")]
     pub max_rate: u16,
@@ -58,7 +48,7 @@ impl Setter for PID {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PIDs {
     pub roll: PID,
     pub pitch: PID,

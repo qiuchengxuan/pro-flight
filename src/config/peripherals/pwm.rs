@@ -5,9 +5,12 @@ use core::{
 };
 
 use heapless::LinearMap;
-use serde::ser::{SerializeMap, SerializeStruct};
+use serde::{de::Error as _, ser::SerializeMap};
 
-use crate::config::setter::{Error, Setter, Value};
+use crate::{
+    config::setter::{Error, Setter, Value},
+    utils::LinearMapVisitor,
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Identifier(pub u8);
@@ -37,27 +40,29 @@ impl serde::Serialize for Identifier {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+impl<'de> serde::Deserialize<'de> for Identifier {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <&str>::deserialize(deserializer)?;
+        if !s.starts_with("PWM") {
+            return Err(D::Error::custom("Malformed PWM id"));
+        }
+        let value: u8 = s[3..].parse().map_err(|_| D::Error::custom("Malformed PWM id"))?;
+        Ok(Self(value))
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Protocol {
     PWM,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+#[serde(rename = "motor")]
 pub struct Motor {
     pub index: u8,
     pub protocol: Protocol,
     pub rate: u16,
-}
-
-impl serde::Serialize for Motor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut struct_ = serializer.serialize_struct("Motor", 4)?;
-        struct_.serialize_field("type", "motor")?;
-        struct_.serialize_field("index", &self.index)?;
-        struct_.serialize_field("protocol", &self.protocol)?;
-        struct_.serialize_field("rate", &self.rate)?;
-        struct_.end()
-    }
 }
 
 impl Motor {
@@ -72,7 +77,8 @@ impl Default for Motor {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ServoType {
     AileronLeft,
     AileronRight,
@@ -99,13 +105,7 @@ impl Into<&str> for ServoType {
     }
 }
 
-impl serde::Serialize for ServoType {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str((*self).into())
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Servo {
     #[serde(rename = "type")]
@@ -125,7 +125,7 @@ impl Servo {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[serde(untagged)]
 pub enum PWM {
@@ -205,6 +205,12 @@ impl serde::Serialize for PWMs {
             map.serialize_entry(id, config)?;
         }
         map.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PWMs {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self(deserializer.deserialize_map(LinearMapVisitor::new())?))
     }
 }
 

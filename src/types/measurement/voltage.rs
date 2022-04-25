@@ -2,7 +2,7 @@ use core::{cmp, str::FromStr};
 
 use fixed_point::FixedPoint;
 
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Voltage(pub FixedPoint<u16, 3>);
 
 #[macro_export]
@@ -10,12 +10,6 @@ macro_rules! voltage {
     ($v:expr) => {
         Voltage(fixed_point::fixed!($v, 3))
     };
-}
-
-impl serde::Serialize for Voltage {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
-    }
 }
 
 impl core::ops::Div<u16> for Voltage {

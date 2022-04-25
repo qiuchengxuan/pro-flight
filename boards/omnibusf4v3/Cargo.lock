@@ -1015,6 +1015,7 @@ dependencies = [
  "hal",
  "log",
  "pro-flight",
+ "serde",
  "stm32f4xx-hal",
  "synopsys-usb-otg",
 ]

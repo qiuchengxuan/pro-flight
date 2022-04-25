@@ -4,13 +4,13 @@ mod rotation;
 pub use axes::Axes;
 pub use rotation::Rotation;
 
-use core::{fmt, ops};
+use core::ops;
 
 use fixed_point::{fixed, FixedPoint};
 use nalgebra::Vector3;
 use serde::ser::SerializeSeq;
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Bias {
     pub x: FixedPoint<i32, 5>,
     pub y: FixedPoint<i32, 5>,
@@ -29,7 +29,7 @@ impl Default for Bias {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Gain {
     pub x: FixedPoint<u16, 4>,
     pub y: FixedPoint<u16, 4>,
@@ -143,39 +143,6 @@ impl serde::Serialize for Readout {
             seq.serialize_element(&v)?;
         }
         seq.end()
-    }
-}
-
-impl<'d> serde::Deserialize<'d> for Readout {
-    fn deserialize<D: serde::Deserializer<'d>>(deserializer: D) -> Result<Self, D::Error> {
-        struct ReadoutVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ReadoutVisitor {
-            type Value = Readout;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("Readout")
-            }
-
-            fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
-            where
-                M: serde::de::MapAccess<'de>,
-            {
-                let mut readout = Readout { sensitive: u16::MAX, ..Default::default() };
-                while let Some((key, value)) = access.next_entry::<&str, f32>()? {
-                    let value = (value * u16::MAX as f32) as i32;
-                    match key {
-                        "x" => readout.axes.x = value,
-                        "y" => readout.axes.y = value,
-                        "z" => readout.axes.z = value,
-                        _ => continue,
-                    }
-                }
-                Ok(readout)
-            }
-        }
-
-        deserializer.deserialize_map(ReadoutVisitor {})
     }
 }
 

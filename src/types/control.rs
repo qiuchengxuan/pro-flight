@@ -1,6 +1,6 @@
 use core::str::FromStr;
 
-#[derive(Copy, Clone, Eq, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Eq, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[repr(u8)]
 pub enum AxisType {

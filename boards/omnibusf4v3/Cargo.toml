@@ -29,6 +29,7 @@ embedded-hal = "0.2"
 futures = { version = "0.3.0", default-features = false }
 hal = { path = "../../hal" }
 log = { version = "0.4", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 synopsys-usb-otg = { version = "0.2.4", features = ["cortex-m"], optional = true }
 
 [dependencies.drone-cortexm]

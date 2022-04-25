@@ -4,9 +4,12 @@ use core::{
 };
 
 use heapless::LinearMap;
-use serde::ser::SerializeMap;
+use serde::{de::Error as _, ser::SerializeMap};
 
-use crate::config::setter::{Error, Setter, Value};
+use crate::{
+    config::setter::{Error, Setter, Value},
+    utils::LinearMapVisitor,
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -39,6 +42,19 @@ impl serde::Serialize for Identifier {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for Identifier {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <&str>::deserialize(deserializer)?;
+        let index = s.find(char::is_numeric).ok_or(D::Error::custom("Malformed serial id"))?;
+        let value: u8 = s[index..].parse().map_err(|_| D::Error::custom("Malformed serial id"))?;
+        match &s[..index] {
+            "UART" => Ok(Self::UART(value)),
+            "USART" => Ok(Self::USART(value)),
+            _ => Err(D::Error::custom("Malformed serial id")),
+        }
+    }
+}
+
 impl Identifier {
     pub fn equals_str(&self, string: &str) -> bool {
         Self::from_str(string).map(|v| v == *self).ok().unwrap_or(false)
@@ -63,7 +79,7 @@ impl core::fmt::Display for Identifier {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum GNSSProtocol {
     UBX,
@@ -82,7 +98,7 @@ impl FromStr for GNSSProtocol {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[serde(rename = "GNSS")]
 pub struct GNSSConfig {
@@ -96,7 +112,7 @@ impl Default for GNSSConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct SbusConfig {
     pub fast: bool,
@@ -116,14 +132,14 @@ impl SbusConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[repr(u8)]
 pub enum RemoteControl {
     SBUS(SbusConfig),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 #[repr(u8)]
 pub enum Config {
@@ -196,5 +212,11 @@ impl serde::Serialize for Serials {
             }
         }
         map.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Serials {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self(deserializer.deserialize_map(LinearMapVisitor::new())?))
     }
 }

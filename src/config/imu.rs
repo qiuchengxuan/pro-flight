@@ -27,7 +27,7 @@ impl Setter for Accelerometer {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, Serialize)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Magnetometer {
     pub bias: Bias,
     pub gain: Gain,

@@ -37,3 +37,10 @@ impl serde::Serialize for Ratio {
         serializer.serialize_str(string.as_str())
     }
 }
+
+impl<'a> serde::Deserialize<'a> for Ratio {
+    fn deserialize<D: serde::Deserializer<'a>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <&str>::deserialize(deserializer)?;
+        Ratio::from_str(s).map_err(|_| <D::Error as serde::de::Error>::custom("Not ratio"))
+    }
+}

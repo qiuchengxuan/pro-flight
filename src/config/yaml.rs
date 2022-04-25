@@ -153,31 +153,31 @@ mod test {
 
         let mut handler = Handler(String::new());
 
-        let string = "\
-        \ndict:\
-        \n  entry-a: a\
-        \n  entry-b: b\
-        \nmulti-level-dict:\
-        \n  level1:\
-        \n    level2: lv2\
-        \nempty-list: []\
-        \nlist:\
-        \n  - list-a\
-        \n  - list-b\
-        \nlist-entry:\
-        \n  - entry-a: a\
-        \n  - entry-b: b\n";
-        YamlParser::new(&string).parse_into(&mut handler);
+        let string = r#"
+        dict:
+          entry-a: a
+          entry-b: b
+        multi-level-dict:
+          level1:
+            level2: lv2
+        empty-list: []
+        list:
+          - list-a
+          - list-b
+        list-entry:
+          - entry-a: a
+          - entry-b: b"#;
+        YamlParser::new(&string.replace("        ", "")).parse_into(&mut handler);
 
-        let expected = "\
-        \ndict.entry-a = a\
-        \ndict.entry-b = b\
-        \nmulti-level-dict.level1.level2 = lv2\
-        \nempty-list = null\
-        \nlist[0] = list-a\
-        \nlist[1] = list-b\
-        \nlist-entry[0].entry-a = a\
-        \nlist-entry[1].entry-b = b";
-        assert_eq!(expected.trim(), handler.0.trim());
+        let expected = r#"
+        dict.entry-a = a
+        dict.entry-b = b
+        multi-level-dict.level1.level2 = lv2
+        empty-list = null
+        list[0] = list-a
+        list[1] = list-b
+        list-entry[0].entry-a = a
+        list-entry[1].entry-b = b"#;
+        assert_eq!(expected.replace("        ", "").trim(), handler.0.trim());
     }
 }

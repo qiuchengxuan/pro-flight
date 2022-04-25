@@ -4,11 +4,11 @@ use fixed_point::FixedPoint;
 use heapless::LinearMap;
 use serde::ser::SerializeMap;
 
-use crate::types::control::AxisType;
+use crate::{types::control::AxisType, utils::LinearMapVisitor};
 
 use super::setter::{Error, Setter, Value};
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Axis {
     pub channel: u8,
     pub scale: FixedPoint<u8, 2>,
@@ -54,7 +54,13 @@ impl serde::Serialize for Axes {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+impl<'de> serde::Deserialize<'de> for Axes {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self(deserializer.deserialize_map(LinearMapVisitor::new())?))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Inputs {
     pub axes: Axes,
 }

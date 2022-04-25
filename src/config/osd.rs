@@ -8,7 +8,7 @@ use crate::types::Ratio;
 
 use super::setter::{Error, Setter, Value};
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Standard {
     PAL,
@@ -58,7 +58,7 @@ impl Into<Ratio> for Standard {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Default, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct Offset {
     pub horizental: i8,
     pub vertical: i8,
@@ -76,7 +76,7 @@ impl Setter for Offset {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct OSD {
     pub aspect_ratio: Ratio,

@@ -8,7 +8,7 @@ pub mod serial;
 use pwm::PWMs;
 use serial::Serials;
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Peripherals {
     pub serials: Serials,
     pub pwms: PWMs,

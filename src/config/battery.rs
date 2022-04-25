@@ -10,7 +10,7 @@ const DEFAULT_MIN_CELL_VOLTAGE: Voltage = voltage!(3.3);
 const DEFAULT_MAX_CELL_VOLTAGE: Voltage = voltage!(4.2);
 const DEFAULT_WARNING_CELL_VOLTAGE: Voltage = voltage!(3.5);
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Battery {
     pub cells: u8,

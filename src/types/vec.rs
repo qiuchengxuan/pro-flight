@@ -1,5 +1,7 @@
 use core::{cmp::Ordering, fmt, iter::FromIterator, mem::MaybeUninit, ops, ptr, slice};
 
+use serde::{de::Error, ser::SerializeSeq};
+
 #[derive(Copy, Clone)]
 pub struct Vec<T: Copy, const N: usize> {
     buffer: [MaybeUninit<T>; N],
@@ -752,6 +754,53 @@ impl<T: Copy, const N: usize> AsMut<[T]> for Vec<T, N> {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
         self
+    }
+}
+
+impl<T: Copy + serde::Serialize, const N: usize> serde::Serialize for Vec<T, N> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(self.len()))?;
+        for item in self.iter() {
+            seq.serialize_element(item)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'a, T: Copy + serde::Deserialize<'a>, const N: usize> serde::Deserialize<'a> for Vec<T, N> {
+    fn deserialize<D: serde::Deserializer<'a>>(deserializer: D) -> Result<Self, D::Error> {
+        struct VecVisitor<T, const N: usize> {
+            t: core::marker::PhantomData<T>,
+        }
+
+        impl<T, const N: usize> VecVisitor<T, N> {
+            pub fn new() -> Self {
+                Self { t: core::marker::PhantomData }
+            }
+        }
+
+        impl<'de, T, const N: usize> serde::de::Visitor<'de> for VecVisitor<T, N>
+        where
+            T: Copy + serde::Deserialize<'de>,
+        {
+            type Value = Vec<T, N>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("Vec")
+            }
+
+            fn visit_seq<A>(self, mut access: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                while let Some(value) = access.next_element()? {
+                    vec.push(value).map_err(|_| A::Error::custom("Out of capacity"))?;
+                }
+                Ok(vec)
+            }
+        }
+        deserializer.deserialize_seq(VecVisitor::<T, N>::new())
     }
 }
 
