@@ -1,6 +1,7 @@
 use core::ops;
 
 use fixed_point::FixedPoint;
+use nalgebra::UnitQuaternion;
 
 pub mod euler;
 pub mod unit;
@@ -88,6 +89,12 @@ impl<C: Copy + Default + Coordinate> Acceleration<C> {
 impl<C: Copy + Default> Acceleration<C> {
     pub fn g_force(&self) -> u8 {
         (self.0.scalar().raw / GRAVITY * 10.0) as u8
+    }
+}
+
+impl Acceleration<Frame> {
+    pub fn to_enu(self, quaternion: UnitQuaternion<f32>) -> Acceleration<ENU> {
+        Acceleration::new(quaternion.transform_vector(&self.0.raw), ENU)
     }
 }
 

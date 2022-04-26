@@ -63,8 +63,8 @@ impl Mahony {
 
     pub fn update(
         &mut self,
-        gyro: &Vector3<f32>,
-        acceleration: &Vector3<f32>,
+        gyro: Vector3<f32>,
+        acceleration: Vector3<f32>,
         magnetism: Option<MagnetismOrHeading>,
     ) -> bool {
         let acceleration = match acceleration.try_normalize(0.0) {
@@ -115,7 +115,7 @@ mod test {
         let course: f32 = 270.0;
         let magnetism = Some(MagnetismOrHeading::Heading(course));
         for _ in 0..10 {
-            mahony.update(&gyro, &accel, magnetism);
+            mahony.update(gyro, accel, magnetism);
         }
         let euler: Euler = mahony.quaternion().into();
         let mut yaw = -euler.yaw.to_degrees() as isize;

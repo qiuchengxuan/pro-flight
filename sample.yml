@@ -7,7 +7,7 @@ fcs:
   configuration: airplane
   pids:
     roll:
-      max-rate: 90
+      max-rate: 150
       kp: 0.44
       ki: 0.4
       kd: 0.2
@@ -103,3 +103,9 @@ inputs:
     yaw:
       channel: 4
       scale: 1.0
+  toggles:
+    - channel: 5
+      choices:
+        - nav-mode
+        - telemetry-mode
+        - telemetry-mode

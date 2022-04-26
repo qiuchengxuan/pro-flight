@@ -71,10 +71,10 @@ impl<W> Meta<W> {
     }
 
     pub fn take_ownership(&self, owner: Owner) -> Result<(), Owner> {
-        let ord = Ordering::Relaxed;
-        self.owner
-            .compare_exchange(Owner::Free as u8, owner as u8, ord, ord)
-            .map(|_| ())
-            .map_err(|v| Owner::from(v))
+        let relaxed = Ordering::Relaxed;
+        match self.owner.compare_exchange(Owner::Free as u8, owner as u8, relaxed, relaxed) {
+            Ok(_) => Ok(()),
+            Err(v) => Err(Owner::from(v)),
+        }
     }
 }

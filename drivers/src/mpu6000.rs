@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use core::future::Future;
 
 use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
+use fugit::NanosDurationU64 as Duration;
 use hal::dma::{Channel, Peripheral, TransferOption, BD, DMA};
 use mpu6000::{
     self,
@@ -142,9 +143,16 @@ where
         let convertor = Converter::from(config::get().imu);
         let rotation = config::get().imu.rotation;
         loop {
+            let future = match self.rx.rx(&mut self.rx_bd, Default::default()) {
+                Ok(future) => future,
+                Err(_) => {
+                    TickTimer::after(Duration::millis(1)).await;
+                    continue;
+                }
+            };
             self.cs.set_low().ok();
             self.tx.tx(&self.tx_bd, TransferOption::repeat().size(1 + NUM_MEASUREMENT_REGS)).ok();
-            self.rx.rx(&mut self.rx_bd, Default::default()).unwrap().await;
+            future.await;
             self.cs.set_high().ok();
             if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
                 let (acceleration, gyro) = convertor.convert(&buffer[1..], rotation);

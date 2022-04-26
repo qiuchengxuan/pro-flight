@@ -55,7 +55,7 @@ impl NAV {
 
     pub fn draw<'a, const W: usize, const H: usize>(
         &self,
-        screen: &'a mut Frame<W, H>,
+        frame: &'a mut Frame<W, H>,
     ) -> &'a Frame<W, H> {
         let collector = collection::Collector::new(datastore::acquire());
         let data = collector.collect();
@@ -107,8 +107,8 @@ impl NAV {
             vario: data.ins.velocity_vector.z().u(FTmin).raw as i16 / 100 * 100,
             steerpoint,
         };
-        self.hud.draw(&hud_telemetry, screen);
-        screen
+        self.hud.draw(&hud_telemetry, frame);
+        frame
     }
 }
 

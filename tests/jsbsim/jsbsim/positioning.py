@@ -19,8 +19,8 @@ class Degree:
             direction = self._direction[1]
         deg = int(degree)
         minute = int(degree * 60) % 60
-        second = (degree * 3600) % 60
-        return '%s%02d°%02d\'%.3f' % (direction, deg, minute, second)
+        second = int((degree * 3600) % 60 * 10)
+        return '%s%02d°%02d\'%03d' % (direction, deg, minute, second)
 
 
 @dataclass

@@ -62,6 +62,7 @@ use stm32f4xx_hal::{
     pac,
     prelude::*,
     serial::Serial,
+    watchdog::IndependentWatchdog,
 };
 
 use crate::{
@@ -84,7 +85,7 @@ macro_rules! into_interrupt {
     }};
 }
 
-fn never_complete(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
+fn fiber_yield(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
     move || {
         f();
         Yielded::<(), ()>(())
@@ -162,7 +163,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     }
 
     let mut ins = ins::INS::new(SAMPLE_RATE, Variometer::new(bmp280::SAMPLE_RATE));
-    threads.ins.add_fn(never_complete(move || ins.update()));
+    threads.ins.add_fn(fiber_yield(move || ins.update()));
     let mut ins_thread = into_thread(threads.ins);
 
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), threads.dma2_stream0);
@@ -170,14 +171,12 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut imu = IMU::new(SAMPLE_RATE);
     let mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
+    threads.mpu6000.add_fn(fiber_yield(move || int.clear_interrupt_pending_bit()));
     threads.mpu6000.add_exec(mpu6000.run(move |accel, gyro| {
-        int.clear_interrupt_pending_bit();
         imu.update(accel, gyro);
         ins_thread.wakeup()
     }));
     threads.mpu6000.enable_int();
-    let mut mpu6000 = into_thread(threads.mpu6000);
-    threads.dma2_stream0.add_fn(never_complete(move || mpu6000.wakeup()));
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), threads.dma2_stream2);
     let mut adc = Adc::adc2(peripherals.ADC2, true, voltage_adc::adc_config());
@@ -200,9 +199,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     bmp280.init().map_err(|e| error!("Init bmp280 err: {:?}", e)).ok();
     let compensator = Compensator(bmp280.read_calibration().unwrap_or_default());
     let (spi, cs_baro, _) = bmp280.free().free();
-    let bmp280 = DmaBMP280::new(rx.clone(), tx.clone(), cs_baro);
+    let bmp280 = DmaBMP280::new(rx.clone(), tx.clone(), cs_baro, compensator);
     let ds = datastore::acquire();
-    threads.bmp280.add_exec(bmp280.run(compensator, move |v| ds.write_altitude(v.into())));
+    threads.bmp280.add_exec(bmp280.run(move |v| ds.write_altitude(v.into())));
     let thread = into_thread(threads.bmp280);
     let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::millis(1));
 
@@ -250,7 +249,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pwms = crate::pwm::init(tims, pins, &clocks, &config::get().peripherals.pwms);
     let mut servos = PWMs::new(pwms);
     let mut fcs = FCS::new(SAMPLE_RATE);
-    threads.fcs.add_fn(never_complete(move || {
+    threads.fcs.add_fn(fiber_yield(move || {
         fcs.update();
         servos.update();
     }));
@@ -258,11 +257,14 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let thread = into_thread(threads.fcs);
     let mut servos = Schedule::new(thread, TickTimer::default(), Duration::millis(20));
 
-    threads.sys_tick.add_fn(never_complete(move || {
+    threads.sys_tick.add_fn(fiber_yield(move || {
         max7456.wakeup();
         bmp280.wakeup();
         servos.wakeup();
     }));
+
+    let mut watchdog = IndependentWatchdog::new(peripherals.IWDG);
+    watchdog.start(500.ms());
 
     let commands =
         commands!((bootloader, [persist]), (osd, [event]), (save, [nvram]), (telemetry, []));
@@ -271,5 +273,6 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         TickTimer::after(Duration::millis(1)).root_wait();
         led.wakeup();
         cli.run();
+        watchdog.feed();
     }
 }

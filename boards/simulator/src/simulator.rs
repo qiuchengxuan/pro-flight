@@ -43,7 +43,7 @@ impl Simulator {
 
     pub fn update_input(&mut self, axes: control::Axes) {
         let ds = datastore::acquire();
-        ds.write_control(control::Control { rssi: 100, axes });
+        ds.write_control(control::Control { rssi: 100, axes, commands: Default::default() });
         self.fcs.update();
     }
 

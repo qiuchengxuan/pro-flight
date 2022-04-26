@@ -11,14 +11,14 @@ use nmea0183::{
 
 use super::out::{Fixed, GNSS};
 use crate::types::{
-    coordinate::{latitude, longitude, Position},
+    coordinate::{latitude, longitude, Position, U_DEGREE},
     measurement::{unit, Altitude, Course, Distance, Heading, Velocity},
 };
 
 pub const CHUNK_SIZE: usize = MAX_MESSAGE_SIZE;
 
-impl Into<longitude::Longitude> for Longitude {
-    fn into(self) -> longitude::Longitude {
+impl Into<longitude::Longitude<U_DEGREE>> for Longitude {
+    fn into(self) -> longitude::Longitude<U_DEGREE> {
         let degrees = self.degrees() as i32 * 3600 * longitude::SUB_SECOND;
         let minutes = self.minutes() as i32 * 60 * longitude::SUB_SECOND;
         let seconds = self.seconds() as i32 * longitude::SUB_SECOND;
@@ -27,8 +27,8 @@ impl Into<longitude::Longitude> for Longitude {
     }
 }
 
-impl Into<latitude::Latitude> for Latitude {
-    fn into(self) -> latitude::Latitude {
+impl Into<latitude::Latitude<U_DEGREE>> for Latitude {
+    fn into(self) -> latitude::Latitude<U_DEGREE> {
         let degrees = self.degrees() as i32 * 3600 * latitude::SUB_SECOND;
         let minutes = self.minutes() as i32 * 60 * latitude::SUB_SECOND;
         let seconds = self.seconds() as i32 * latitude::SUB_SECOND;

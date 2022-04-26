@@ -44,6 +44,7 @@ Progress
   - [x] DMA buffer descriptor
 * OSD
   - [x] MAX7456 (With XMODEM font upload)
+  - [x] Telemetry page for troubleshooting
 * Sensor
   - [x] MPU6000
   - [x] Gyroscope/Accelerometer
@@ -58,11 +59,14 @@ Progress
 
 **WIP**
 
-* OSD
-  - [ ] FCS page for troubleshooting
+* FCS
+  - [ ] Flight control law protection
 
 **Future**
 
+* AP
+  - [ ] Auto-throttle
+  - [ ] Waypoint navigation, HDG/ALT hold, ALT hold
 * IO
   - [ ] SDCARD read & write
   - [ ] DMA based SDCARD read & write

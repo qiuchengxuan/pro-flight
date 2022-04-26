@@ -1,13 +1,13 @@
 use nalgebra::UnitQuaternion;
 use serde::ser::SerializeStruct;
 
-use crate::types::measurement::{unit::DEGs, Acceleration, Attitude, Gyro, ENU};
+use crate::types::measurement::{unit::DEGs, Acceleration, Attitude, Frame, Gyro};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct IMU {
-    pub acceleration: Acceleration<ENU>,
-    pub attitude: Attitude,
+    pub acceleration: Acceleration<Frame>,
     pub gyro: Gyro<DEGs>,
+    pub attitude: Attitude,
     pub quaternion: UnitQuaternion<f32>,
 }
 
@@ -16,9 +16,9 @@ impl serde::Serialize for IMU {
         let mut struct_ = serializer.serialize_struct("IMU", 4)?;
         let acceleration: [f32; 3] = self.acceleration.0.into();
         struct_.serialize_field("acceleration", &acceleration[..])?;
-        struct_.serialize_field("attitude", &self.attitude)?;
         let gyro: [f32; 3] = self.gyro.0.into();
         struct_.serialize_field("gyro", &gyro[..])?;
+        struct_.serialize_field("attitude", &self.attitude)?;
         let q = &self.quaternion;
         let value: [f32; 4] = [q.i, q.j, q.k, q.w];
         struct_.serialize_field("quaternion", &value[..])?;

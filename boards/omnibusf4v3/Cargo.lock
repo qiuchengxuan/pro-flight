@@ -80,6 +80,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b88d82667eca772c4aa12f0f1348b3ae643424c8876448f3f7bd5787032e234c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "atomic-polyfill"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -327,6 +336,7 @@ dependencies = [
 name = "drone-core"
 version = "0.14.2"
 dependencies = [
+ "atomic",
  "drone-core-macros",
  "drone-ctypes",
  "futures",
@@ -1095,6 +1105,7 @@ dependencies = [
  "fugit",
  "git-version",
  "hal",
+ "hash32 0.2.1",
  "heapless 0.7.10",
  "indoc",
  "integer-sqrt",

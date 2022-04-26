@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::ops;
 
 use super::meta::{Meta, Owner, TransferResult};
@@ -54,25 +55,39 @@ impl<'a, W> AsMut<[W]> for Buffer<'a, W> {
     }
 }
 
+impl<W: Copy + Default + 'static, const N: usize> Drop for BufferDescriptor<W, N> {
+    fn drop(&mut self) {
+        if let Some(callback) = self.meta.callback.take() {
+            core::mem::drop(unsafe { Box::from_raw(callback) });
+        }
+    }
+}
+
 impl<W: Copy + Default + 'static, const N: usize> BufferDescriptor<W, N> {
     pub fn new(array: [W; N]) -> Self {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub fn with_callback<C>(callback: &'static mut C) -> Self
+    pub unsafe fn get_buffer(&self) -> &[W; N] {
+        &self.buffer
+    }
+
+    pub fn with_callback<C>(callback: C) -> Self
     where
         C: FnMut(TransferResult<W>) + Send + 'static,
     {
+        let callback = Box::leak(Box::new(callback));
         Self {
             meta: Meta { size: N, callback: Some(callback), ..Default::default() },
             buffer: [W::default(); N],
         }
     }
 
-    pub fn new_with_callback<C>(array: [W; N], callback: &'static mut C) -> Self
+    pub fn new_with_callback<C>(array: [W; N], callback: C) -> Self
     where
         C: FnMut(TransferResult<W>) + Send + 'static,
     {
+        let callback = Box::leak(Box::new(callback));
         Self {
             meta: Meta { size: N, callback: Some(callback), ..Default::default() },
             buffer: array,

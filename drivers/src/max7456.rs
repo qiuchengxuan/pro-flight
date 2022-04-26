@@ -143,13 +143,26 @@ where
                 self.upload_font().await;
                 self.event.clear();
             }
-            let mut buffer = self.bd.try_get_buffer().unwrap();
-            let frame = osd.draw(&mut frame_buf);
-            let mut writer = LinesWriter::new(frame, Default::default());
-            let size = writer.write(buffer.as_mut()).0.len();
-            mem::drop(buffer);
+            let size = match self.bd.try_get_buffer() {
+                Ok(mut buffer) => {
+                    let frame = osd.draw(&mut frame_buf);
+                    let mut writer = LinesWriter::new(frame, Default::default());
+                    writer.write(buffer.as_mut()).0.len()
+                }
+                _ => 0,
+            };
+            if size == 0 {
+                continue;
+            }
+            if self.tx.preserve(&self.bd).is_err() {
+                TickTimer::after(Duration::millis(1)).await;
+                continue;
+            }
             self.cs.set_low().ok();
-            self.tx.tx(&self.bd, TransferOption::default().size(size)).unwrap().await;
+            if let Some(future) = self.tx.tx(&self.bd, TransferOption::default().size(size)).ok() {
+                future.await;
+            }
+            self.cs.set_high().ok();
         }
     }
 }

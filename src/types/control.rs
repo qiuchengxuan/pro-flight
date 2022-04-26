@@ -1,5 +1,7 @@
 use core::str::FromStr;
 
+use crate::{config::inputs::command, types::vec::Vec};
+
 #[derive(Copy, Clone, Eq, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[repr(u8)]
@@ -24,6 +26,8 @@ impl FromStr for AxisType {
     }
 }
 
+pub type RSSI = u16;
+
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Axes {
     pub throttle: u16,
@@ -32,10 +36,9 @@ pub struct Axes {
     pub yaw: i16,
 }
 
-pub type RSSI = u16;
-
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Control {
     pub rssi: RSSI,
     pub axes: Axes,
+    pub commands: Vec<command::Id, 8>,
 }

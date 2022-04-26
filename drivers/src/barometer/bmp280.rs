@@ -16,7 +16,7 @@ use embedded_hal::{
     digital::v2::OutputPin,
 };
 use fugit::NanosDurationU64 as Duration;
-use hal::dma::{BufferDescriptor, TransferOption, DMA};
+use hal::dma::{BufferDescriptor, Error, TransferOption, DMA};
 use pro_flight::{sys::time::TickTimer, types::measurement::Pressure};
 
 pub const SAMPLE_RATE: usize = 16;
@@ -83,9 +83,25 @@ where
 
     pub async fn run(mut self, mut handler: impl FnMut(Pressure)) {
         loop {
+            if self.tx.preserve(&self.tx_bd).is_err() {
+                TickTimer::after(Duration::millis(1)).await;
+                continue;
+            }
+            let future = match self.rx.rx(&mut self.rx_bd, Default::default()) {
+                Ok(future) => future,
+                Err(Error::Busy) => {
+                    continue;
+                }
+                Err(e) => panic!("DMA error: {:?}", e),
+            };
             self.cs.set_low().ok();
-            self.tx.tx(&self.tx_bd, TransferOption::repeat().size(8)).ok();
-            self.rx.rx(&mut self.rx_bd, Default::default()).unwrap().await;
+            match self.tx.tx(&self.tx_bd, TransferOption::repeat().size(8)) {
+                Err(Error::Busy) => {
+                    continue;
+                }
+                _ => (),
+            }
+            future.await;
             self.cs.set_high().ok();
             if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
                 handler(self.compensator.convert(&buffer));

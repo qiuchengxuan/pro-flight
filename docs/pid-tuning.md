@@ -4,22 +4,22 @@ PID tuning
 PID configuration looks like follows:
 
 ```yaml
-pids:
-  roll:
-    max-rate: 30
-    kp: 1.0
-    ki: 1.0
-    kd: 2.0
-  pitch:
-    max-rate: 10
-    kp: 5.8
-    ki: 5.0
-    kd: 2.2
-  yaw:
-    max-rate: 10
-    kp: 7.0
-    ki: 4.5
-    kd: 2.0
+  pids:
+    roll:
+      max-rate: 150
+      kp: 0.44
+      ki: 0.4
+      kd: 0.2
+    pitch:
+      max-rate: 30
+      kp: 0.58
+      ki: 0.5
+      kd: 0.22
+    yaw:
+      max-rate: 10
+      kp: 0.7
+      ki: 0.45
+      kd: 0.2
 ```
 
 * max-rate

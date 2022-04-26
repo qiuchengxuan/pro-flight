@@ -38,7 +38,7 @@ impl FCS {
         let imu = ds.read_imu();
         let mut axes = self.pids.next_control(control.axes, imu.gyro);
         if control.axes.yaw.is_positive() != axes.yaw.is_positive() || control.axes.yaw == 0 {
-            axes.yaw = 0;
+            axes.yaw = axes.yaw.clamp(-i16::MAX / 10, i16::MAX / 10);
         }
         let output = out::FCS::from(axes, self.configuration);
         ds.write_fcs(output);

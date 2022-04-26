@@ -2,7 +2,7 @@ use chrono::naive::{NaiveDate, NaiveTime};
 
 use crate::types::{
     coordinate,
-    coordinate::{latitude, longitude},
+    coordinate::{latitude, longitude, U_DEGREE},
 };
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
@@ -85,8 +85,8 @@ impl Flags3 {
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Longitude(i32);
 
-impl Into<coordinate::Longitude> for Longitude {
-    fn into(self) -> coordinate::Longitude {
+impl Into<coordinate::Longitude<U_DEGREE>> for Longitude {
+    fn into(self) -> coordinate::Longitude<U_DEGREE> {
         let sub_seconds = longitude::SUB_SECOND as i64;
         coordinate::Longitude((self.0 as i64 * 36 * sub_seconds / 100_000) as i32)
     }
@@ -95,8 +95,8 @@ impl Into<coordinate::Longitude> for Longitude {
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Latitude(i32);
 
-impl Into<coordinate::Latitude> for Latitude {
-    fn into(self) -> coordinate::Latitude {
+impl Into<coordinate::Latitude<U_DEGREE>> for Latitude {
+    fn into(self) -> coordinate::Latitude<U_DEGREE> {
         let sub_seconds = latitude::SUB_SECOND as i64;
         coordinate::Latitude((self.0 as i64 * 36 * sub_seconds / 100_000) as i32)
     }
@@ -171,7 +171,7 @@ mod test {
     fn test_ubx_nav_pos_pvt() {
         use hex_literal::hex;
 
-        use crate::types::coordinate::{Latitude, Longitude};
+        use crate::types::coordinate::{Latitude, Longitude, U_DEGREE};
 
         use super::NavPositionVelocityTime;
 
@@ -189,10 +189,10 @@ mod test {
             unsafe { core::mem::transmute(message.as_ptr()) };
         assert_eq!(nav_pos_pvt.year, 2016);
         assert_eq!("-13648250", format!("{}", nav_pos_pvt.longitude.0));
-        let longitude: Longitude = nav_pos_pvt.longitude.into();
+        let longitude: Longitude<U_DEGREE> = nav_pos_pvt.longitude.into();
         assert_eq!("W001°21'533", format!("{}", longitude));
         assert_eq!("69279661", format!("{}", nav_pos_pvt.latitude.0));
-        let latitude: Latitude = nav_pos_pvt.latitude.into();
+        let latitude: Latitude<U_DEGREE> = nav_pos_pvt.latitude.into();
         assert_eq!("N06°55'406", format!("{}", latitude));
     }
 }

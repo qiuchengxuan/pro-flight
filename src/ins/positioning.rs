@@ -45,7 +45,7 @@ impl Positioning {
                 }
                 self.initial.altitude = altitude;
             }
-            let height = self.initial.altitude - altitude;
+            let height = altitude - self.initial.altitude;
             self.displacement.raw[Z] = height.t(|v| v as f32).u(Meter).raw;
         }
         if let Some(position) = gnss {
@@ -70,6 +70,10 @@ impl Positioning {
 
     pub fn displacement(&self) -> Displacement<f32, Meter, ENU> {
         self.displacement
+    }
+
+    pub fn initial_position(&self) -> Position {
+        self.initial
     }
 
     pub fn position(&self) -> Position {

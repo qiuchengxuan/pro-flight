@@ -38,7 +38,7 @@ pub struct PID {
 impl PathSet for PID {
     fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
         match path.str()? {
-            "max-rate" => self.max_rate = value.parse_or(90)?,
+            "max-rate" => self.max_rate = value.parse()?,
             "kp" => self.kp = value.parse_or(fixed_point::fixed!(1.0))?,
             "ki" => self.ki = value.parse_or(fixed_point::fixed!(1.0))?,
             "kd" => self.kd = value.parse_or(fixed_point::fixed!(1.0))?,

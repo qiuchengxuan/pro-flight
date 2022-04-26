@@ -1,7 +1,39 @@
-use core::{cmp::Ordering, fmt, iter::FromIterator, mem::MaybeUninit, ops, ptr, slice};
+use core::{
+    cmp::Ordering, convert::TryFrom, fmt, hash, iter::FromIterator, mem::MaybeUninit, ops, ptr,
+    slice,
+};
 
+use hash32;
 use serde::{de::Error, ser::SerializeSeq};
 
+/// A fixed capacity [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html)
+///
+/// # Examples
+///
+/// ```
+/// use heapless::Vec;
+///
+/// // A vector with a fixed capacity of 8 elements allocated on the stack
+/// let mut vec = Vec::<_, 8>::new();
+/// vec.push(1);
+/// vec.push(2);
+///
+/// assert_eq!(vec.len(), 2);
+/// assert_eq!(vec[0], 1);
+///
+/// assert_eq!(vec.pop(), Some(2));
+/// assert_eq!(vec.len(), 1);
+///
+/// vec[0] = 7;
+/// assert_eq!(vec[0], 7);
+///
+/// vec.extend([1, 2, 3].iter().cloned());
+///
+/// for x in &vec {
+///     println!("{}", x);
+/// }
+/// assert_eq!(*vec, [7, 1, 2, 3]);
+/// ```
 #[derive(Copy, Clone)]
 pub struct Vec<T: Copy, const N: usize> {
     buffer: [MaybeUninit<T>; N],
@@ -25,7 +57,7 @@ impl<T: Copy, const N: usize> Vec<T, N> {
     /// static mut X: Vec<u8, 16> = Vec::new();
     /// ```
     /// `Vec` `const` constructor; wrap the returned value in [`Vec`](../struct.Vec.html)
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { buffer: [Self::INIT; N], len: 0 }
     }
 
@@ -112,7 +144,7 @@ impl<T: Copy, const N: usize> Vec<T, N> {
     }
 
     /// Returns the maximum number of elements the vector can hold.
-    pub fn capacity(&self) -> usize {
+    pub const fn capacity(&self) -> usize {
         N
     }
 
@@ -513,6 +545,14 @@ impl<const N: usize> fmt::Write for Vec<u8, N> {
     }
 }
 
+impl<'a, T: Copy, const N: usize> TryFrom<&'a [T]> for Vec<T, N> {
+    type Error = ();
+
+    fn try_from(slice: &'a [T]) -> Result<Self, Self::Error> {
+        Vec::from_slice(slice)
+    }
+}
+
 impl<T: Copy, const N: usize> Extend<T> for Vec<T, N> {
     fn extend<I>(&mut self, iter: I)
     where
@@ -531,6 +571,24 @@ where
         I: IntoIterator<Item = &'a T>,
     {
         self.extend(iter.into_iter().cloned())
+    }
+}
+
+impl<T, const N: usize> hash::Hash for Vec<T, N>
+where
+    T: Copy + core::hash::Hash,
+{
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        <[T] as hash::Hash>::hash(self, state)
+    }
+}
+
+impl<T, const N: usize> hash32::Hash for Vec<T, N>
+where
+    T: Copy + hash32::Hash,
+{
+    fn hash<H: hash32::Hasher>(&self, state: &mut H) {
+        <[T] as hash32::Hash>::hash(self, state)
     }
 }
 
@@ -808,6 +866,11 @@ impl<'a, T: Copy + serde::Deserialize<'a>, const N: usize> serde::Deserialize<'a
 mod tests {
     use super::Vec;
     use core::fmt::Write;
+
+    #[test]
+    fn static_new() {
+        static mut _V: Vec<i32, 4> = Vec::new();
+    }
 
     #[test]
     fn stack_new() {
@@ -1098,5 +1161,30 @@ mod tests {
         assert!(!v.ends_with(b"abc"));
         assert!(!v.ends_with(b"ba"));
         assert!(!v.ends_with(b"a"));
+    }
+
+    #[test]
+    fn zero_capacity() {
+        let mut v: Vec<u8, 0> = Vec::new();
+        // Validate capacity
+        assert_eq!(v.capacity(), 0);
+
+        // Make sure there is no capacity
+        assert!(v.push(1).is_err());
+
+        // Validate length
+        assert_eq!(v.len(), 0);
+
+        // Validate pop
+        assert_eq!(v.pop(), None);
+
+        // Validate slice
+        assert_eq!(v.as_slice(), &[0u8; 0]);
+
+        // Validate empty
+        assert!(v.is_empty());
+
+        // Validate full
+        assert!(v.is_full());
     }
 }

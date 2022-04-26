@@ -3,6 +3,8 @@ use core::num::FpCategory;
 #[allow(unused_imports)] // false warning
 use micromath::F32Ext;
 
+pub const U_DEGREE: char = '°';
+
 pub mod latitude;
 pub mod longitude;
 
@@ -46,8 +48,8 @@ impl<U: Copy + Default + Into<u32>> SphericalCoordinate<U> {
 
 #[derive(Default, Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Position {
-    pub latitude: Latitude,
-    pub longitude: Longitude,
+    pub latitude: Latitude<U_DEGREE>,
+    pub longitude: Longitude<U_DEGREE>,
     pub altitude: Altitude,
 }
 

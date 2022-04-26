@@ -139,6 +139,7 @@ impl<M: DmaChMap> Stream<M> {
         let address_reg = reg.memory0_address;
         let status = reg.interrupt_status.clone();
         let clear = reg.interrupt_clear.clone();
+        let configuration = reg.configuration.clone();
         int.add_fn(move || {
             let address = address_reg.load_bits() as usize;
             let half = status.half_transfer.read_bit();
@@ -153,12 +154,19 @@ impl<M: DmaChMap> Stream<M> {
             let buffer = unsafe { meta.get_buffer() };
             let result =
                 if half { TransferResult::Half(buffer) } else { TransferResult::Complete(buffer) };
+            if !configuration.en().read_bit() {
+                address_reg.store_bits(0);
+            }
             meta.callback.as_mut().map(|f| f(result));
             Yielded::<(), ()>(())
         });
         int.enable_int();
         reg.configuration.tcie().set_bit();
         Self { reg, persist: false }
+    }
+
+    fn is_busy(&self) -> bool {
+        self.reg.configuration.en().read_bit()
     }
 
     pub unsafe fn set_persist(&mut self) {
@@ -180,8 +188,18 @@ impl<M: DmaChMap> DMA for Stream<M> {
         });
     }
 
-    fn is_busy(&self) -> bool {
-        self.reg.configuration.en().read_bit()
+    fn preserve<'a, W, const N: usize>(&self, bd: &'a BD<W, N>) -> Result<(), Error>
+    where
+        W: Copy + Default,
+    {
+        let address = unsafe { bd.get_buffer() }.as_ptr() as *const _ as u32;
+        match self.reg.memory0_address.compare_exchange(0, address) {
+            Ok(_) => Ok(()),
+            Err(addr) => {
+                let result = if addr == address { Ok(()) } else { Err(Error::Busy) };
+                result
+            }
+        }
     }
 
     fn tx<'a, W, const N: usize>(
@@ -192,8 +210,8 @@ impl<M: DmaChMap> DMA for Stream<M> {
     where
         W: Copy + Default,
     {
+        self.preserve(bd)?;
         let bytes = bd.try_take().map_err(|_| Error::BufferDescripter)?;
-        self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();
         let mut num_of_data = option.size.unwrap_or(bytes.len());
@@ -222,8 +240,8 @@ impl<M: DmaChMap> DMA for Stream<M> {
     where
         W: Copy + Default,
     {
+        self.preserve(bd)?;
         let buffer = bd.try_take().map_err(|_| Error::BufferDescripter)?;
-        self.reg.memory0_address.store_bits(buffer.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();
         let num_of_data = cmp::min(buffer.len(), option.size.unwrap_or(buffer.len()));

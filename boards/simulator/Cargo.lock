@@ -1838,6 +1838,7 @@ dependencies = [
  "fugit",
  "git-version",
  "hal",
+ "hash32 0.2.1",
  "heapless 0.7.10",
  "indoc",
  "integer-sqrt",

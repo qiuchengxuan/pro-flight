@@ -31,10 +31,11 @@ impl INS {
         let ds = datastore::acquire();
         let gnss = ds.read_gnss_within(self.interval);
         let imu = ds.read_imu();
-
         let altitude = ds.read_altitude_within(self.interval);
         let vs = altitude.map(|alt| self.variometer.update(alt));
-        let vv = self.speedometer.update(imu.acceleration.0.raw, vs, gnss);
+        let acceleration = imu.acceleration.to_enu(imu.quaternion);
+
+        let vv = self.speedometer.update(acceleration.0.raw, vs, gnss);
         let gnss_position = gnss.map(|g| g.fixed.map(|f| f.position)).flatten();
         if self.initial.is_none() && gnss_position.is_some() {
             self.initial = gnss_position;

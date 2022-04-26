@@ -7,7 +7,7 @@ from typing import Dict
 
 import numpy
 from cli import CLI
-from telemetry import get_sensitive, read_sensor
+from telemetry import read_field
 
 
 class Attitude(Enum):
@@ -30,10 +30,10 @@ class Attitude(Enum):
 
 
 def get_average(cli: CLI) -> numpy.array:
-    avg = read_sensor('acceleration')
+    avg = read_field(cli, 'acceleration')
     for i in range(50):
         time.sleep(0.02)
-        avg = (avg + read_sensor('acceleration')) / 2
+        avg = (avg + read_field(cli, 'acceleration')) / 2
     return avg
 
 
@@ -78,7 +78,6 @@ def main():
         return
 
     cli = CLI(path)
-    sensitive = get_sensitive(cli, 'acceleration')
 
     try:
         data = collect(cli)
@@ -88,9 +87,9 @@ def main():
             (data[Attitude.FLAT] + data[Attitude.REVERSE]) / 2,
         ]
         gain = [
-            sensitive * sensitive / (data[Attitude.ROLL_RIGHT] - bias[0]),
-            sensitive * sensitive / (data[Attitude.PITCH_UP] - bias[1]),
-            sensitive * sensitive / (data[Attitude.REVERSE] - bias[2]),
+            data[Attitude.ROLL_RIGHT] - bias[0],
+            data[Attitude.PITCH_UP] - bias[1],
+            data[Attitude.REVERSE] - bias[2],
         ]
         print("bias:", bias)
         print("gain:", gain)

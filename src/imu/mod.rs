@@ -10,7 +10,7 @@ use crate::{
         measurement::{
             euler::{Euler, DEGREE_PER_DAG},
             unit::DEGs,
-            Acceleration, Gyro, ENU,
+            Acceleration, Frame, Gyro,
         },
         sensor::{Bias, Gain, Readout},
     },
@@ -73,7 +73,6 @@ pub struct IMU {
     interval: Duration,
     ahrs: Mahony,
     calibration: Calibration,
-    acceleration: Vector3<f32>,
 }
 
 impl IMU {
@@ -96,7 +95,6 @@ impl IMU {
             interval,
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             calibration,
-            acceleration: Default::default(),
         }
     }
 
@@ -115,8 +113,7 @@ impl IMU {
         let raw_gyro = gyro - self.calibration.gyroscope_bias;
 
         let acceleration: Vector3<f32> = raw_acceleration.into();
-        let mut gyro: Vector3<f32> = raw_gyro.into();
-        gyro = gyro / DEGREE_PER_DAG;
+        let gyro: Vector3<f32> = raw_gyro.into();
 
         let heading = if let Some(mag) = magnetism {
             let calib = &self.calibration.magnetometer;
@@ -126,12 +123,11 @@ impl IMU {
             heading.map(|h| MagnetismOrHeading::Heading(h.0.into()))
         };
 
-        if !self.ahrs.update(&gyro, &acceleration, heading) {
+        if !self.ahrs.update(gyro / DEGREE_PER_DAG, acceleration, heading) {
             return;
         }
-        self.acceleration = self.ahrs.quaternion().transform_vector(&acceleration);
         let quaternion = self.ahrs.quaternion();
-        let acceleration = Acceleration::new(self.acceleration, ENU);
+        let acceleration = Acceleration::new(acceleration, Frame);
         let gyro = Gyro::new(gyro, DEGs);
         let attitude = Euler::from(quaternion) * DEGREE_PER_DAG;
         ds.write_imu(out::IMU { acceleration, gyro, quaternion, attitude })
