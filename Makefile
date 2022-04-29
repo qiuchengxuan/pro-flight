@@ -1,7 +1,17 @@
 BOARD := simulator
 GDB := gdb-multiarch
 
+DFU_FLAGS = :leave
 mass-erase := false
+ifeq ($(mass-erase),true)
+	DFU_FLAGS = :mass-erase:force:leave
+endif
+
+CARGO_BUILD_FLAGS =
+debug := false
+ifeq ($(debug),true)
+	CARGO_BUILD_FLAGS = --features debug
+endif
 
 ifeq ($(shell uname),Linux)
 	SUDO := sudo
@@ -21,7 +31,7 @@ test: submodule
 
 .PHONY: $(BOARD)
 $(BOARD): submodule
-	@(cd boards/$(BOARD) && cargo build --release --target-dir ../../target)
+	@(cd boards/$(BOARD) && cargo build --release $(CARGO_BUILD_FLAGS) --target-dir ../../target)
 
 SIMULATOR := $(PWD)/target/release/simulator
 SIMULATOR_CONFIG := $(PWD)/boards/simulator/rascal.yaml
@@ -48,11 +58,7 @@ dfu: $(BOARD).dfu
 
 .PHONY: dfu-program
 dfu-program: $(BOARD).dfu
-ifeq ($(mass-erase),true)
-	$(SUDO) dfu-util -d 0483:df11 -a 0 -s :mass-erase:force:leave -D $(BOARD).dfu
-else
-	$(SUDO) dfu-util -d 0483:df11 -a 0 -s :leave -D $(BOARD).dfu
-endif
+	$(SUDO) dfu-util -d 0483:df11 -a 0 -s $(DFU_FLAGS) -D $(BOARD).dfu
 
 .PHONY: gdb
 gdb:

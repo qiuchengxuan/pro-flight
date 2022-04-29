@@ -1,6 +1,3 @@
-use alloc::boxed::Box;
-use core::time;
-
 use ascii_osd_hud::{
     hud::HUD,
     symbol::default_symbol_table,
@@ -8,6 +5,7 @@ use ascii_osd_hud::{
     AspectRatio, PixelRatio,
 };
 
+use super::Frame;
 use crate::{
     collection, config, datastore,
     types::{
@@ -20,16 +18,12 @@ use crate::{
     },
 };
 
-type Screen<const W: usize, const H: usize> = [[u8; W]; H];
+pub type FrameConsumer<const W: usize, const H: usize> = fn(&Frame<W, H>);
 
-pub type ScreenConsumer<const W: usize, const H: usize> = fn(&Screen<W, H>);
+const INS_ALIGN: &str = "ALN";
 
-const INS_DEGRADE: &str = "INS DEGD";
-
-pub struct OSD<const W: usize, const H: usize> {
-    interval: time::Duration,
+pub struct NAV {
     hud: HUD,
-    screen: Box<[[u8; W]; H]>,
 }
 
 impl From<Ratio> for AspectRatio {
@@ -52,16 +46,19 @@ fn hud_coordinate<U: Copy>(c: SphericalCoordinate<U>) -> hud::SphericalCoordinat
     hud::SphericalCoordinate { rho: c.rho.raw as u16, theta: c.theta, phi: c.phi }
 }
 
-impl<const W: usize, const H: usize> OSD<W, H> {
-    pub fn new(interval: time::Duration, pixel_ratio: PixelRatio) -> Self {
+impl NAV {
+    pub fn new(pixel_ratio: PixelRatio) -> Self {
         let cfg = &config::get().osd;
         let hud = HUD::new(&default_symbol_table(), cfg.fov, pixel_ratio, cfg.aspect_ratio.into());
-        Self { interval, hud, screen: Box::new([[0u8; W]; H]) }
+        Self { hud }
     }
 
-    pub fn draw(&mut self) -> &Screen<W, H> {
+    pub fn draw<'a, const W: usize, const H: usize>(
+        &self,
+        screen: &'a mut Frame<W, H>,
+    ) -> &'a Frame<W, H> {
         let collector = collection::Collector::new(datastore::acquire());
-        let data = collector.collect(Some(self.interval));
+        let data = collector.collect();
 
         let height = data.ins.displacement.z().u(Feet).raw as i16;
         let delta = data.ins.displacement;
@@ -89,12 +86,10 @@ impl<const W: usize, const H: usize> OSD<W, H> {
 
         let mut note_buffer = [0u8; W];
         let mut index = 0;
-        if let Some(gnss) = data.gnss {
-            if gnss.fixed.is_none() {
-                let slice = &mut note_buffer[index..index + INS_DEGRADE.len()];
-                slice.copy_from_slice(INS_DEGRADE.as_bytes());
-                index += INS_DEGRADE.len();
-            }
+        if data.gnss.fixed.is_none() {
+            let slice = &mut note_buffer[index..index + INS_ALIGN.len()];
+            slice.copy_from_slice(INS_ALIGN.as_bytes());
+            index += INS_ALIGN.len();
         }
         let note_left = unsafe { core::str::from_utf8_unchecked(&note_buffer[..index]) };
         let hud_telemetry = Telemetry {
@@ -112,8 +107,8 @@ impl<const W: usize, const H: usize> OSD<W, H> {
             vario: data.ins.velocity_vector.z().u(FTmin).raw as i16 / 100 * 100,
             steerpoint,
         };
-        self.hud.draw(&hud_telemetry, self.screen.as_mut());
-        &self.screen
+        self.hud.draw(&hud_telemetry, screen);
+        screen
     }
 }
 

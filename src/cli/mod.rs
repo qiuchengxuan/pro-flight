@@ -35,7 +35,7 @@ macro_rules! __builtin_commands {
     };
 }
 
-const BUILTIN_CMDS: [FnCommand; 14] = __builtin_commands!(
+const BUILTIN_CMDS: [FnCommand; 15] = __builtin_commands!(
     ("date", "Show date", |line| datetime::date(line)),
     ("dump", "Dump memory address", |line| memory::dump(line)),
     ("free", "Show memory allocation statistics", |_| unsafe { heap_statistics() }),
@@ -46,6 +46,7 @@ const BUILTIN_CMDS: [FnCommand; 14] = __builtin_commands!(
     ("import", "Import config", |line| config::import(line)),
     ("export", "Export config", |line| config::export(line)),
     ("set", "Set config entry", |line| config::set(line)),
+    ("clear", "Clear config entry", |line| config::clear(line)),
     ("reboot", "Reboot", |_| unsafe { reboot() }),
     ("reset", "Reset config", |_| config::reset()),
     ("show", "Show config", |_| config::show()),
@@ -109,7 +110,7 @@ macro_rules! __command {
     (telemetry,[]) => {
         $crate::cli::Command::new("telemetry", "Show flight data", move |_| {
             let ds = $crate::datastore::acquire();
-            println!("{}", $crate::collection::Collector::new(ds).collect(None))
+            println!("{}", $crate::collection::Collector::new(ds).collect())
         })
     };
 }

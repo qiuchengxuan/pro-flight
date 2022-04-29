@@ -54,8 +54,8 @@ mod test {
                 "ground-speed": 0,
                 "position": {
                     "altitude": 0,
-                    "latitude": "N00°00'00.000",
-                    "longitude": "E000°00'00.000",
+                    "latitude": "N00°00'000",
+                    "longitude": "E000°00'000",
                 }
             }
         });

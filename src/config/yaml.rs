@@ -51,7 +51,7 @@ impl<'a> YamlParser<'a> {
             if !stripped.starts_with("- ") {
                 continue;
             }
-            write!(self.buffer, "[{}]", index).ok();
+            write!(self.buffer, ".{}", index).ok();
             stripped = (&stripped[2..]).trim_end();
             if stripped.contains(':') {
                 self.parse_map(depth + 1, true, path_set)
@@ -176,10 +176,10 @@ mod test {
         dict.entry-b = b
         multi-level-dict.level1.level2 = lv2
         empty-list = null
-        list[0] = list-a
-        list[1] = list-b
-        list-entry[0].entry-a = a
-        list-entry[1].entry-b = b"#;
+        list.0 = list-a
+        list.1 = list-b
+        list-entry.0.entry-a = a
+        list-entry.1.entry-b = b"#;
         assert_eq!(expected.replace("        ", "").trim(), handler.0.trim());
     }
 }

@@ -91,7 +91,7 @@ impl fmt::Display for Longitude {
         let second = sub_second / SUB_SECOND;
         let (degree, minute, second) = (second / 3600, (second / 60) % 60, second % 60);
         let sub_second = sub_second % SUB_SECOND;
-        write!(f, "{}{:03}°{:02}'{:02}.{:03}", direction, degree, minute, second, sub_second)
+        write!(f, "{}{:03}°{:02}'{:03}", direction, degree, minute, second * 10 + sub_second / 100)
     }
 }
 
@@ -117,9 +117,9 @@ mod test {
         use crate::types::measurement::{unit::CentiMeter, Distance};
 
         let longitude = Longitude::from_str("E116°44'54").unwrap();
-        assert_eq!("E116°44'54.000", format!("{}", longitude));
+        assert_eq!("E116°44'540", format!("{}", longitude));
 
-        assert_eq!("E116°44'53.998", format!("{}", longitude + Distance::new(-7, CentiMeter)));
+        assert_eq!("E116°44'539", format!("{}", longitude + Distance::new(-7, CentiMeter)));
 
         let distance = longitude - Longitude::from_str("E116°43'54").unwrap();
         assert_eq!("1842m", format!("{}", distance));

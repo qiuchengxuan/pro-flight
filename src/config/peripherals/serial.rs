@@ -4,7 +4,7 @@ use heapless::LinearMap;
 use serde::{de::Error as _, ser::SerializeMap};
 
 use crate::{
-    config::pathset::{Error, Path, PathSet, Value},
+    config::pathset::{Error, Path, PathClear, PathSet, Value},
     utils::LinearMapVisitor,
 };
 
@@ -195,6 +195,14 @@ impl PathSet for Serials {
         let mut config = Config::GNSS(GNSSConfig::default());
         config.set(path, value)?;
         self.0.insert(id, config).ok();
+        Ok(())
+    }
+}
+
+impl PathClear for Serials {
+    fn clear(&mut self, mut path: Path) -> Result<(), Error> {
+        let id: Identifier = path.parse()?;
+        self.0.remove(&id);
         Ok(())
     }
 }

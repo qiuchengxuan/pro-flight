@@ -20,6 +20,9 @@ pub mod thread;
 
 use core::{alloc::Layout, panic::PanicInfo};
 
+#[cfg(feature = "cortex-m-semihosting")]
+use cortex_m_semihosting::hio;
+use drivers::stm32::usb_serial;
 use drone_core::{heap, heap::Allocator};
 use drone_stm32_map::stm32_reg_tokens;
 use pro_flight::{
@@ -81,6 +84,12 @@ fn reboot() -> ! {
     cortex_m::peripheral::SCB::sys_reset()
 }
 
+#[inline]
+fn halt() -> ! {
+    cortex_m::asm::bkpt();
+    loop {}
+}
+
 const DEFAULT_CONFIG: &'static [u8] = core::include_bytes!("../default.config.yaml");
 
 #[no_mangle]
@@ -89,16 +98,44 @@ fn default_config() -> Config {
     YamlParser::new(config_str).parse()
 }
 
+#[no_mangle]
+fn stdout_flush() {
+    usb_serial::flush()
+}
+
+#[no_mangle]
+fn stdout_write_bytes(bytes: &[u8]) -> usize {
+    #[cfg(feature = "cortex-m-semihosting")]
+    match hio::hstdout() {
+        Ok(mut stdout) => {
+            stdout.write_all(bytes).ok();
+        }
+        Err(_) => (),
+    }
+    usb_serial::write_bytes(bytes)
+}
+
+#[no_mangle]
+fn stdin_read_bytes(buffer: &mut [u8]) -> Result<usize, pro_flight::io::Error> {
+    usb_serial::read_bytes(buffer)
+}
+
 #[panic_handler]
 fn begin_panic(pi: &PanicInfo<'_>) -> ! {
     println!("{}", pi);
     stdout().flush().ok();
-    reboot()
+    match cfg!(feature = "debug") {
+        true => halt(),
+        false => reboot(),
+    }
 }
 
 #[lang = "oom"]
 fn oom(layout: Layout) -> ! {
     println!("Couldn't allocate memory of size {}. Aborting!", layout.size());
     stdout().flush().ok();
-    reboot()
+    match cfg!(feature = "debug") {
+        true => halt(),
+        false => reboot(),
+    }
 }

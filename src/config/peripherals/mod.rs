@@ -1,4 +1,4 @@
-use super::pathset::{Error, Path, PathSet, Value};
+use super::pathset::{Error, Path, PathClear, PathSet, Value};
 
 pub mod pwm;
 pub mod serial;
@@ -23,6 +23,16 @@ impl PathSet for Peripherals {
         match path.str()? {
             "serials" => self.serials.set(path, value),
             "pwms" => self.pwms.set(path, value),
+            _ => Err(Error::UnknownPath),
+        }
+    }
+}
+
+impl PathClear for Peripherals {
+    fn clear(&mut self, mut path: Path) -> Result<(), Error> {
+        match path.str()? {
+            "serials" => self.serials.clear(path),
+            "pwms" => self.pwms.clear(path),
             _ => Err(Error::UnknownPath),
         }
     }

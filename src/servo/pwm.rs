@@ -75,7 +75,7 @@ impl<'a> PWMs<'a> {
         if self.config_iteration != crate::config::iteration() {
             self.reconfigure();
         }
-        match datastore::acquire().read_fcs(None).unwrap_or_default() {
+        match datastore::acquire().read_fcs() {
             FCS::FixedWing(fixed_wing) => {
                 for (i, &value) in fixed_wing.engines.iter().enumerate() {
                     if let Some(&(motor, index)) = self.motors.get(i) {

@@ -3,8 +3,9 @@ pub enum Priority {
     Immediate = 0,
     System = 1,
     Sensor = 2,
-    Telemetry = 3,
-    Interactive = 4,
+    Normal = 3,
+    Telemetry = 4,
+    Interactive = 5,
 }
 
 impl Into<u8> for Priority {

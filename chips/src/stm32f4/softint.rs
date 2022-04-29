@@ -1,35 +1,16 @@
-use drone_core::fib::Yielded;
-use drone_cortexm::{
-    reg::{field::WRwRegFieldBitAtomic, prelude::*},
-    thr::{prelude::*, ThrNvic},
-};
-use drone_stm32_map::periph::exti::{
-    ExtiMap, ExtiPeriph, ExtiPrPif, ExtiSwierSwi, ExtiSwierSwiOpt,
-};
-use hal::event::Notifier;
+use drone_core::thr::ThrExec;
+use drone_cortexm::thr::ThrNvic;
+use hal::thread::Thread;
 
-pub struct SoftIntNotifier<T>(T);
+pub struct SoftThread<T>(T);
 
-impl<T: WRwRegFieldBitAtomic<Srt>> Notifier for SoftIntNotifier<T>
-where
-    T::Reg: RReg<Srt> + WReg<Srt>,
-{
-    fn notify(&mut self) {
-        self.0.set_bit()
+impl<T: ThrExec> Thread for SoftThread<T> {
+    fn wakeup(&mut self) {
+        self.0.wakeup()
     }
 }
 
-pub fn make_trigger<T, M>(thread: T, regs: ExtiPeriph<M>) -> impl Notifier
-where
-    T: ThrNvic,
-    M: ExtiMap + ExtiPrPif + ExtiSwierSwiOpt + ExtiSwierSwi,
-{
-    regs.exti_imr_im.set_bit();
-    let pending = regs.exti_pr_pif;
-    thread.add_fn(move || {
-        pending.set_bit();
-        Yielded::<(), ()>(())
-    });
+pub fn into_thread<T: ThrNvic + ThrExec>(thread: T) -> impl Thread {
     thread.enable_int();
-    SoftIntNotifier(regs.exti_swier_swi)
+    SoftThread(thread)
 }

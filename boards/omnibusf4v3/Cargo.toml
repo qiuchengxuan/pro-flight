@@ -18,6 +18,8 @@ std = [
     "drone-cortexm/std",
     "futures/std",
 ]
+debug = []
+semihosting = ["cortex-m-semihosting"]
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
@@ -31,6 +33,7 @@ hal = { path = "../../hal" }
 log = { version = "0.4", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 synopsys-usb-otg = { version = "0.2.4", features = ["cortex-m"], optional = true }
+cortex-m-semihosting = { version = "0.5", optional = true }
 
 [dependencies.drone-cortexm]
 path = "../../drone-os/drone-cortexm"
@@ -55,4 +58,3 @@ debug = true
 panic = "abort"
 codegen-units = 1
 opt-level = "z"
-strip = true

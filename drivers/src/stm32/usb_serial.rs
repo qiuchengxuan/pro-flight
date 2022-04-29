@@ -27,8 +27,7 @@ unsafe fn poll() {
     SUSPEND.store(device.state() == UsbDeviceState::Suspend, Ordering::Relaxed);
 }
 
-#[no_mangle]
-fn stdout_flush() {
+pub fn flush() {
     if SUSPEND.load(Ordering::Relaxed) {
         return;
     }
@@ -46,8 +45,7 @@ fn stdout_flush() {
     }
 }
 
-#[no_mangle]
-fn stdout_write_bytes(bytes: &[u8]) -> usize {
+pub fn write_bytes(bytes: &[u8]) -> usize {
     let serial_port = match unsafe { SERIAL_PORT.as_mut() } {
         Some(port) => port,
         None => return 0,
@@ -57,15 +55,14 @@ fn stdout_write_bytes(bytes: &[u8]) -> usize {
     while !SUSPEND.load(Ordering::Relaxed) && written < bytes.len() {
         match cortex_m::interrupt::free(|_| serial_port.write(&bytes[written..])) {
             Ok(size) => written += size,
-            Err(UsbError::WouldBlock) => stdout_flush(),
+            Err(UsbError::WouldBlock) => flush(),
             Err(_) => return written,
         }
     }
     written
 }
 
-#[no_mangle]
-pub fn stdin_read_bytes(buffer: &mut [u8]) -> Result<usize, Error> {
+pub fn read_bytes(buffer: &mut [u8]) -> Result<usize, Error> {
     let result = match unsafe { SERIAL_PORT.as_mut() } {
         Some(port) => cortex_m::interrupt::free(|_| Ok(port.read(buffer).ok().unwrap_or(0))),
         None => Ok(0),

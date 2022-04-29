@@ -1,5 +1,3 @@
-use core::time;
-
 use crate::{
     datastore::DataStore,
     fcs::out::FCS,
@@ -9,11 +7,11 @@ use crate::{
     types::{control::Control, measurement::voltage::Voltage},
 };
 
-#[derive(Copy, Clone, Default, Serialize)]
+#[derive(Copy, Clone, Debug, Default, Serialize)]
 pub struct Collection {
     pub control: Control,
     pub fcs: FCS,
-    pub gnss: Option<GNSS>,
+    pub gnss: GNSS,
     pub imu: IMU,
     pub ins: INS,
     pub voltage: Voltage,
@@ -32,14 +30,14 @@ impl<'a> Collector<'a> {
         Self(datastore)
     }
 
-    pub fn collect(&self, timeout: Option<time::Duration>) -> Collection {
+    pub fn collect(&self) -> Collection {
         Collection {
-            control: self.0.read_control(timeout).unwrap_or_default(),
-            fcs: self.0.read_fcs(timeout).unwrap_or_default(),
-            gnss: self.0.read_gnss(timeout),
-            imu: self.0.read_imu(timeout).unwrap_or_default(),
-            ins: self.0.read_ins(timeout).unwrap_or_default(),
-            voltage: self.0.read_voltage(timeout).unwrap_or_default(),
+            control: self.0.read_control(),
+            fcs: self.0.read_fcs(),
+            gnss: self.0.read_gnss(),
+            imu: self.0.read_imu(),
+            ins: self.0.read_ins(),
+            voltage: self.0.read_voltage(),
         }
     }
 }

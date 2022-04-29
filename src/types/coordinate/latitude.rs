@@ -97,7 +97,7 @@ impl fmt::Display for Latitude {
         let second = sub_second / SUB_SECOND;
         let (degree, minute, second) = (second / 3600, (second / 60) % 60, second % 60);
         let sub_second = sub_second % SUB_SECOND;
-        write!(f, "{}{:02}°{:02}'{:02}.{:03}", direction, degree, minute, second, sub_second)
+        write!(f, "{}{:02}°{:02}'{:03}", direction, degree, minute, second * 10 + sub_second / 100)
     }
 }
 
@@ -123,8 +123,8 @@ mod test {
         use crate::types::measurement::{unit::CentiMeter, Distance};
 
         let latitude = Latitude::from_str("N40°19'48").unwrap();
-        assert_eq!("N40°19'48.000", format!("{}", latitude));
-        assert_eq!("N40°19'47.998", format!("{}", latitude + Distance::new(-7, CentiMeter)));
+        assert_eq!("N40°19'480", format!("{}", latitude));
+        assert_eq!("N40°19'479", format!("{}", latitude + Distance::new(-7, CentiMeter)));
 
         let distance = latitude - Latitude::from_str("N40°18'48.000").unwrap();
         assert_eq!("1855m", format!("{}", distance));

@@ -22,7 +22,7 @@ pub enum Error {
 
 extern "Rust" {
     fn stdout_write_bytes(bytes: &[u8]);
-    fn stdout_flush();
+    fn stdout_flush() -> usize;
     fn stdin_read_bytes(buffer: &mut [u8]) -> Result<usize, Error>;
 }
 
@@ -122,7 +122,7 @@ pub fn __write_stdout(args: fmt::Arguments) {
     write!(stdout(), "{}", args).ok();
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(test, feature = "std")))]
 #[macro_export]
 macro_rules! print {
     ($fmt:expr) => {
@@ -133,7 +133,7 @@ macro_rules! print {
     };
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(test, feature = "std")))]
 #[macro_export]
 macro_rules! println {
     ($fmt:expr) => {

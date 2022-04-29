@@ -4,7 +4,7 @@ use heapless::LinearMap;
 use serde::{de::Error as _, ser::SerializeMap};
 
 use crate::{
-    config::pathset::{Error, Path, PathSet, Value},
+    config::pathset::{Error, Path, PathClear, PathSet, Value},
     utils::LinearMapVisitor,
 };
 
@@ -219,6 +219,14 @@ impl PathSet for PWMs {
         let mut config = PWM::Motor(Motor::default());
         config.set(path, value)?;
         self.0.insert(id, config).ok();
+        Ok(())
+    }
+}
+
+impl PathClear for PWMs {
+    fn clear(&mut self, mut path: Path) -> Result<(), Error> {
+        let id: Identifier = path.parse()?;
+        self.0.remove(&id);
         Ok(())
     }
 }

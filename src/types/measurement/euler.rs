@@ -48,7 +48,10 @@ impl From<UnitQuaternion<f32>> for Euler {
         let r20 = 2.0 * (q.i * q.k - q.w * q.j);
         let r21 = 2.0 * (q.w * q.i + q.j * q.k);
         let r22 = q.w * q.w - q.i * q.i - q.j * q.j + q.k * q.k;
-        let yaw = -r01.atan2(r11);
+        let mut yaw = -r01.atan2(r11);
+        if yaw < 0.0 {
+            yaw += 2.0 * PI;
+        }
         let pitch = if r21.abs() >= 1.0 { (PI / 2.0).copysign(r21) } else { (r21).asin() };
         let roll = -r20.atan2(r22);
         Self { roll, pitch, yaw }
@@ -70,8 +73,20 @@ mod test {
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.7071068, 0.0, 0.0));
         assert_eq!(Euler::new(-0.0, 90.0, -0.0), Euler::from(unit) * DEGREE_PER_DAG);
 
+        // yaw 0
+        let unit = UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0));
+        assert_eq!(Euler::new(0.0, 0.0, 0.0), Euler::from(unit) * DEGREE_PER_DAG);
+
         // yaw 90
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.0, 0.0, 0.7071068));
         assert_eq!(Euler::new(-0.0, 0.0, 90.0), Euler::from(unit) * DEGREE_PER_DAG);
+
+        // yaw 180
+        let unit = UnitQuaternion::new_normalize(Quaternion::new(0.0, 0.0, 0.0, 1.0));
+        assert_eq!(Euler::new(0.0, 0.0, 180.0), Euler::from(unit) * DEGREE_PER_DAG);
+
+        // yaw 270
+        let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.0, 0.0, -0.7071068));
+        assert_eq!(Euler::new(0.0, 0.0, 270.0), Euler::from(unit) * DEGREE_PER_DAG);
     }
 }

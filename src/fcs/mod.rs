@@ -34,8 +34,8 @@ impl FCS {
         }
 
         let ds = datastore::acquire();
-        let control = ds.read_control(Some(self.interval)).unwrap_or_default();
-        let imu = ds.read_imu(Some(self.interval)).unwrap_or_default();
+        let control = ds.read_control_within(self.interval).unwrap_or_default();
+        let imu = ds.read_imu();
         let axes = self.pids.next_control(control.axes, imu.gyro);
         let output = out::FCS::from(axes, self.configuration);
         ds.write_fcs(output);

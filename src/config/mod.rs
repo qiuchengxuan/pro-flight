@@ -22,7 +22,7 @@ pub use imu::IMU;
 pub use inputs::Inputs;
 pub use ins::INS;
 pub use osd::{Offset, Standard, OSD};
-use pathset::{Error, Path, PathSet, Value};
+use pathset::{Error, Path, PathClear, PathSet, Value};
 pub use peripherals::{
     pwm::{PWMs, Protocol, PWM},
     Peripherals,
@@ -96,6 +96,16 @@ impl PathSet for Config {
             "osd" => self.osd.set(path, value),
             "peripherals" => self.peripherals.set(path, value),
             "inputs" => self.inputs.set(path, value),
+            _ => Err(Error::UnknownPath),
+        }
+    }
+}
+
+impl PathClear for Config {
+    fn clear(&mut self, mut path: Path) -> Result<(), Error> {
+        match path.str()? {
+            "peripherals" => self.peripherals.clear(path),
+            "inputs" => self.inputs.clear(path),
             _ => Err(Error::UnknownPath),
         }
     }

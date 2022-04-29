@@ -2,9 +2,11 @@ use fixed_point::FixedPoint;
 use heapless::LinearMap;
 use serde::ser::SerializeMap;
 
-use crate::{types::control::AxisType, utils::LinearMapVisitor};
-
-use super::pathset::{Error, Path, PathSet, Value};
+use crate::{
+    config::pathset::{Error, Path, PathClear, PathSet, Value},
+    types::control::AxisType,
+    utils::LinearMapVisitor,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Axis {
@@ -40,14 +42,21 @@ impl Default for Axes {
 
 impl PathSet for Axes {
     fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
-        let type_sring = path.str()?;
-        let axis_type = type_sring.parse().map_err(|_| Error::UnknownPath)?;
+        let axis_type = path.parse()?;
         if self.0.contains_key(&axis_type) {
             return self.0[&axis_type].set(path, value);
         }
         let mut config = Axis { channel: u8::MAX, scale: fixed_point::fixed!(1.0) };
         config.set(path, value)?;
         self.0.insert(axis_type, config).ok();
+        Ok(())
+    }
+}
+
+impl PathClear for Axes {
+    fn clear(&mut self, mut path: Path) -> Result<(), Error> {
+        let axis_type = path.parse()?;
+        self.0.remove(&axis_type);
         Ok(())
     }
 }
@@ -65,19 +74,5 @@ impl serde::Serialize for Axes {
 impl<'de> serde::Deserialize<'de> for Axes {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(Self(deserializer.deserialize_map(LinearMapVisitor::new())?))
-    }
-}
-
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Inputs {
-    pub axes: Axes,
-}
-
-impl PathSet for Inputs {
-    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
-        match path.str()? {
-            "axes" => self.axes.set(path, value),
-            _ => Err(Error::UnknownPath),
-        }
     }
 }

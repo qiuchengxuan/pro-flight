@@ -32,9 +32,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.56"
+version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4361135be9122e0870de935d7c439aef945b9f9ddd4199a553b5270b49c82a27"
+checksum = "08f9b8508dccb7687a1d6c4ce66b2b0ecef467c94667de27d8d7fe1f8d2a9cdc"
 
 [[package]]
 name = "approx"
@@ -72,7 +72,7 @@ checksum = "bbf56136a5198c7b01a49e3afcbef6cf84597273d298f54432926024107b0109"
 [[package]]
 name = "ascii-osd-hud"
 version = "0.1.5"
-source = "git+https://github.com/qiuchengxuan/ascii-osd-hud#8db26b0eeecc0e0ba7998955a12aa2b8a6e07582"
+source = "git+https://github.com/qiuchengxuan/ascii-osd-hud#b9796d8b4d1f3d5f89ee929ea2dcfc1a9297d623"
 dependencies = [
  "enum-map",
  "heapless 0.6.1",
@@ -245,6 +245,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "cortex-m-semihosting"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c23234600452033cc77e4b761e740e02d2c4168e11dbf36ab14a0f58973592b0"
+dependencies = [
+ "cortex-m 0.7.4",
 ]
 
 [[package]]
@@ -907,9 +916,9 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
+checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "micromath"
@@ -961,18 +970,18 @@ source = "git+https://github.com/qiuchengxuan/nmea0183#439be04112ab3681e137fdda2
 
 [[package]]
 name = "num-complex"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26873667bbbb7c5182d4a37c1add32cdf09f841af72da53318fdb81543c15085"
+checksum = "97fbc387afefefd5e9e39493299f3069e14a140dd34dc19b4c1c1a8fddb6a790"
 dependencies = [
  "num-traits",
 ]
 
 [[package]]
 name = "num-integer"
-version = "0.1.44"
+version = "0.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
+checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
 dependencies = [
  "autocfg",
  "num-traits",
@@ -1006,6 +1015,7 @@ dependencies = [
  "chips",
  "chrono",
  "cortex-m 0.6.7",
+ "cortex-m-semihosting",
  "drivers",
  "drone-core",
  "drone-cortexm",
@@ -1043,9 +1053,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e280fbe77cc62c91527259e9442153f4688736748d24660126286329742b4c6c"
+checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
 
 [[package]]
 name = "pin-utils"
@@ -1228,9 +1238,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.136"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
+checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
 dependencies = [
  "serde_derive",
 ]
@@ -1268,9 +1278,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.136"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
+checksum = "1f26faba0c3959972377d3b2d306ee9f71faee9714294e41bb777f83f88578be"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1344,9 +1354,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.91"
+version = "1.0.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b683b2b825c8eef438b77c36a06dc262294da3d5a5813fac20da149241dcd44d"
+checksum = "7ff7c592601f11445996a06f8ad0c27f094a58857c2f89e97974ab9235b92c52"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1366,18 +1376,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.30"
+version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "854babe52e4df1653706b98fcfc05843010039b406875930a70e4d9644e5c417"
+checksum = "bd829fe32373d27f76265620b5309d0340cb8550f523c1dda251d6298069069a"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.30"
+version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa32fd3f627f367fe16f893e2597ae3c05020f8bba2666a4e6ea73d377e5714b"
+checksum = "0396bc89e626244658bef819e22d0cc459e795a5ebe878e6ec336d1674a8d79a"
 dependencies = [
  "proc-macro2",
  "quote",

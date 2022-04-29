@@ -78,7 +78,7 @@ impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
         Self { rx_bd, tx_bd, cs }
     }
 
-    pub fn trigger<RXF, TXF, RX, TX>(&mut self, rx: &RX, tx: &TX)
+    pub fn trx<RXF, TXF, RX, TX>(&mut self, rx: &RX, tx: &TX)
     where
         RX: DMA<Future = RXF>,
         TX: DMA<Future = TXF>,

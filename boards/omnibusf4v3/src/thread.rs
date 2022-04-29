@@ -28,12 +28,13 @@ thr::nvic! {
         };
         interrupts => {
             5: pub rcc;
-            7: pub servo; // exti1
+            7: pub fcs; // exti1
             8: pub bmp280; // exti2
             9: pub max7456; // exti3
             10: pub mpu6000; // exti4
             11: pub dma1_stream0;
             16: pub dma1_stream5;
+            23: pub ins; // exti5-9
             56: pub dma2_stream0;
             57: pub dma2_stream1;
             58: pub dma2_stream2;
@@ -59,8 +60,9 @@ pub fn setup_priority(thread: &mut Thrs) {
     thread.dma2_stream1.set_priority(priority!(Priority::Sensor));
     thread.dma2_stream3.set_priority(priority!(Priority::System));
     thread.dma2_stream5.set_priority(priority!(Priority::Sensor));
-    thread.servo.set_priority(priority!(Priority::Immediate));
+    thread.fcs.set_priority(priority!(Priority::Immediate));
     thread.bmp280.set_priority(priority!(Priority::Sensor));
     thread.mpu6000.set_priority(priority!(Priority::Sensor));
+    thread.ins.set_priority(priority!(Priority::Normal));
     thread.max7456.set_priority(priority!(Priority::Telemetry));
 }

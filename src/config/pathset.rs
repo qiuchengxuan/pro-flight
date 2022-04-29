@@ -1,12 +1,13 @@
 use core::str::{FromStr, Split};
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Error {
     UnknownPath,
     ExpectValue,
     InvalidValue,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Value<'a>(pub Option<&'a str>);
 
 impl<'a> Value<'a> {
@@ -18,10 +19,10 @@ impl<'a> Value<'a> {
         self.0.ok_or(Error::InvalidValue)
     }
 
-    pub fn parse<T: FromStr + Default>(&self) -> Result<T, Error> {
+    pub fn parse<T: FromStr>(&self) -> Result<T, Error> {
         match self.0 {
             Some(s) => FromStr::from_str(s).map_err(|_| Error::InvalidValue),
-            None => Ok(T::default()),
+            None => Err(Error::InvalidValue),
         }
     }
 
@@ -29,6 +30,13 @@ impl<'a> Value<'a> {
         match self.0 {
             Some(s) => FromStr::from_str(s).map_err(|_| Error::InvalidValue),
             None => Ok(or),
+        }
+    }
+
+    pub fn parse_or_default<T: FromStr + Default>(&self) -> Result<T, Error> {
+        match self.0 {
+            Some(s) => FromStr::from_str(s).map_err(|_| Error::InvalidValue),
+            None => Ok(T::default()),
         }
     }
 }
@@ -44,6 +52,7 @@ impl core::fmt::Display for Error {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Path<'a>(Split<'a, char>);
 
 impl<'a> Path<'a> {
@@ -69,4 +78,8 @@ impl<'a> Path<'a> {
 
 pub trait PathSet {
     fn set(&mut self, path: Path, value: Value) -> Result<(), Error>;
+}
+
+pub trait PathClear {
+    fn clear(&mut self, path: Path) -> Result<(), Error>;
 }

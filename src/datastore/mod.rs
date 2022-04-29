@@ -12,21 +12,26 @@ use crate::{
     types::{
         control::Control,
         measurement::{voltage::Voltage, Altitude},
+        sensor::Magnetism,
     },
 };
 
 #[derive(Copy, Clone, Default)]
 struct Entry<T: Default> {
     timestamp: time::Duration,
-    data: T,
+    data: Option<T>,
 }
 
 impl<T: Copy + Default> Entry<T> {
-    fn read(&self, max_timestamp: time::Duration) -> Option<T> {
+    fn read(&self) -> T {
+        self.data.unwrap_or_default()
+    }
+
+    fn read_within(&self, max_timestamp: time::Duration) -> Option<T> {
         if !max_timestamp.is_zero() && self.timestamp > max_timestamp {
             return None;
         }
-        Some(self.data)
+        self.data
     }
 }
 
@@ -39,16 +44,24 @@ macro_rules! datastore {
 
         impl DataStore {
             $(
+                concat_idents!(getter = read_, $names, _within {
+                    pub fn getter(&self, timeout: time::Duration) -> Option<$types> {
+                        self.$names.read().read_within(jiffies::get() + timeout)
+                    }
+                });
+
                 concat_idents!(getter = read_, $names {
-                    pub fn getter(&self, timeout: Option<time::Duration>) -> Option<$types> {
-                        let max_timestamp = timeout.map(|t| jiffies::get() + t).unwrap_or_default();
-                        self.$names.read().read(max_timestamp)
+                    pub fn getter(&self) -> $types {
+                        self.$names.read().read()
                     }
                 });
 
                 concat_idents!(setter = write_, $names {
                     pub fn setter(&self, data: $types) {
-                        self.$names.write(Entry{timestamp: jiffies::get(), data})
+                        let entry = Entry{timestamp: jiffies::get(), data: Some(data)};
+                        if self.$names.write(entry).is_err() {
+                            error!("Write {} conflict", core::any::type_name::<$types>())
+                        }
                     }
                 });
             )+
@@ -63,6 +76,7 @@ datastore! {
     gnss: GNSS,
     imu: IMU,
     ins: INS,
+    magnetism: Magnetism,
     voltage: Voltage
 }
 

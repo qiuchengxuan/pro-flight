@@ -2,7 +2,7 @@ use core::fmt::Write;
 
 use crate::{
     config,
-    config::pathset::{Path, PathSet, Value},
+    config::pathset::{Path, PathClear, PathSet, Value},
     sys::fs::{File, OpenOptions},
 };
 
@@ -20,6 +20,15 @@ pub fn set(line: &str) {
         }
         config::replace(&config);
     }
+}
+
+pub fn clear(path: &str) {
+    let mut config = config::get().clone();
+    match config.clear(Path::new(path.split('.'))) {
+        Ok(()) => (),
+        Err(e) => println!("{}", e),
+    }
+    config::replace(&config);
 }
 
 pub fn reset() {

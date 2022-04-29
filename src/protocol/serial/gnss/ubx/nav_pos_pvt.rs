@@ -190,9 +190,9 @@ mod test {
         assert_eq!(nav_pos_pvt.year, 2016);
         assert_eq!("-13648250", format!("{}", nav_pos_pvt.longitude.0));
         let longitude: Longitude = nav_pos_pvt.longitude.into();
-        assert_eq!("W001°21'53.370", format!("{}", longitude));
+        assert_eq!("W001°21'533", format!("{}", longitude));
         assert_eq!("69279661", format!("{}", nav_pos_pvt.latitude.0));
         let latitude: Latitude = nav_pos_pvt.latitude.into();
-        assert_eq!("N06°55'40.677", format!("{}", latitude));
+        assert_eq!("N06°55'406", format!("{}", latitude));
     }
 }

@@ -147,7 +147,7 @@ where
     TX: DMA<Future = TXF>,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
 {
-    pub fn trigger(&mut self) {
+    pub fn trx(&mut self) {
         self.cs.set_low().ok();
         if self.rx.is_busy() || self.tx.is_busy() {
             return;

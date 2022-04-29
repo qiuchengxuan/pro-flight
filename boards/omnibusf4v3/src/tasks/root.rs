@@ -10,7 +10,7 @@ use chips::stm32f4::{
     dfu, dma,
     flash::{Flash, Sector},
     rtc,
-    softint::make_trigger,
+    softint::into_thread,
     spi::BaudrateControl,
     systick,
     usart::IntoDMA as _,
@@ -27,7 +27,6 @@ use drone_core::fib::{FiberState, ThrFiberClosure, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::{
     dma::*,
-    exti::{periph_exti1, periph_exti2, periph_exti3},
     flash::periph_flash,
     rtc::periph_rtc,
     spi::{periph_spi1, periph_spi3},
@@ -35,8 +34,8 @@ use drone_stm32_map::periph::{
 };
 use hal::{
     dma::DMA,
-    event::{Notifier, TimedNotifier},
     persist::PersistDatastore,
+    thread::{Schedule, Thread},
 };
 use pro_flight::{
     cli::CLI,
@@ -46,6 +45,7 @@ use pro_flight::{
     },
     datastore,
     fcs::FCS,
+    imu::IMU,
     ins,
     ins::variometer::Variometer,
     logger,
@@ -94,13 +94,13 @@ fn never_complete(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
 /// The root task handler.
 #[inline(never)]
 pub fn handler(reg: Regs, thr_init: ThrsInit) {
-    let mut thread = thread::init(thr_init);
-    thread.hard_fault.add_once(|| panic!("Hard Fault"));
+    let mut threads = thread::init(thr_init);
+    threads.hard_fault.add_once(|| panic!("Hard Fault"));
     let mut peripherals = stm32::Peripherals::take().unwrap();
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).require_pll48clk().freeze();
-    systick::init(periph_sys_tick!(reg), thread.sys_tick);
-    thread::setup_priority(&mut thread);
+    systick::init(periph_sys_tick!(reg), threads.sys_tick);
+    thread::setup_priority(&mut threads);
 
     let (usb_global, usb_device, usb_pwrclk) =
         (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
@@ -110,11 +110,11 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
     let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
     let poll = usb_serial::init(bus, board_name());
-    thread.otg_fs.add_fn(move || {
+    threads.otg_fs.add_fn(move || {
         poll();
         Yielded::<(), ()>(())
     });
-    thread.otg_fs.enable_int();
+    threads.otg_fs.enable_int();
 
     logger::init(Box::leak(Box::new([0u8; 1024])));
 
@@ -161,19 +161,25 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Err(_) => error!("MPU6000 init failed"),
     }
 
-    let rx = dma::Stream::new(periph_dma2_ch0!(reg), thread.dma2_stream0);
-    let tx = dma::Stream::new(periph_dma2_ch3!(reg), thread.dma2_stream3);
-    let variometer = Variometer::new(bmp280::SAMPLE_RATE);
-    let mut ins = ins::INS::new(SAMPLE_RATE, variometer);
-    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |acceleration, gyro| {
-        ins.update(acceleration, gyro);
+    let mut ins = ins::INS::new(SAMPLE_RATE, Variometer::new(bmp280::SAMPLE_RATE));
+    threads.ins.add_fn(never_complete(move || ins.update()));
+    let mut ins_thread = into_thread(threads.ins);
+
+    let rx = dma::Stream::new(periph_dma2_ch0!(reg), threads.dma2_stream0);
+    let tx = dma::Stream::new(periph_dma2_ch3!(reg), threads.dma2_stream3);
+    let mut imu = IMU::new(SAMPLE_RATE);
+    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |accel, gyro| {
+        imu.update(accel, gyro);
+        ins_thread.wakeup()
     });
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    thread.mpu6000.add_fn(never_complete(move || int.clear_interrupt_pending_bit()));
-    thread.mpu6000.add_fn(never_complete(move || mpu6000.trigger()));
-    thread.mpu6000.enable_int();
+    threads.mpu6000.add_fn(never_complete(move || {
+        int.clear_interrupt_pending_bit();
+        mpu6000.trx();
+    }));
+    threads.mpu6000.enable_int();
 
-    let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), thread.dma2_stream2);
+    let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), threads.dma2_stream2);
     let mut adc = Adc::adc2(peripherals.ADC2, true, voltage_adc::adc_config());
     let vbat = gpio_c.pc2.into_analog();
     adc.configure_channel(&vbat, voltage_adc::SEQUENCE, voltage_adc::SAMPLE_TIME);
@@ -185,9 +191,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pins = (gpio_c.pc10, gpio_c.pc11, gpio_c.pc12);
     let baudrate = BaudrateControl::new(clock::PCLK1, 10 * 1000u32.pow(2));
     let mut spi3 = Spi3::new(periph_spi3!(reg), pins, baudrate, bmp280::SPI_MODE);
-    let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), thread.dma1_stream0);
+    let mut rx = dma::Stream::new(periph_dma1_ch0!(reg), threads.dma1_stream0);
     rx.setup_peripheral(0, &mut spi3);
-    let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), thread.dma1_stream5);
+    let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), threads.dma1_stream5);
     tx.setup_peripheral(0, &mut spi3);
 
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
@@ -205,19 +211,19 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let event = event::Event::default();
     let max7456 = max7456::init(spi, cs_osd).unwrap();
     let max7456 = max7456.into_dma(event.clone(), tx.clone()).unwrap();
-    thread.max7456.add_exec(max7456.run());
-    let int = make_trigger(thread.max7456, periph_exti3!(reg));
+    threads.max7456.add_exec(max7456.run());
+    let thread = into_thread(threads.max7456);
     let standard = config::get().osd.standard;
-    let mut max7456 = TimedNotifier::new(int, TickTimer::default(), standard.refresh_interval());
-    thread.bmp280.add_fn(never_complete(move || bmp280.trigger(&rx, &tx)));
-    let int = make_trigger(thread.bmp280, periph_exti2!(reg));
-    let mut bmp280 = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(100));
+    let mut max7456 = Schedule::new(thread, TickTimer::default(), standard.refresh_interval());
+    threads.bmp280.add_fn(never_complete(move || bmp280.trx(&rx, &tx)));
+    let thread = into_thread(threads.bmp280);
+    let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::from_millis(100));
 
     if let Some(config) = config::get().peripherals.serials.get("USART1") {
         let pins = (gpio_a.pa9.into_alternate_af7(), gpio_a.pa10.into_alternate_af7());
         let serial_config = usart::to_serial_config(&config);
         let usart1 = Serial::usart1(peripherals.USART1, pins, serial_config, clocks).unwrap();
-        let dma_rx = dma::Stream::new(periph_dma2_ch5!(reg), thread.dma2_stream5);
+        let dma_rx = dma::Stream::new(periph_dma2_ch5!(reg), threads.dma2_stream5);
         if let Some(receiver) = serial::make_receiver(config) {
             usart::init(usart1.into_dma(), dma_rx, 4, receiver);
         }
@@ -235,7 +241,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         let pins = (gpio_c.pc6.into_alternate_af8(), gpio_c.pc7.into_alternate_af8());
         let serial_config = usart::to_serial_config(&config);
         let usart6 = Serial::usart6(peripherals.USART6, pins, serial_config, clocks).unwrap();
-        let dma_rx = dma::Stream::new(periph_dma2_ch1!(reg), thread.dma2_stream1);
+        let dma_rx = dma::Stream::new(periph_dma2_ch1!(reg), threads.dma2_stream1);
         if let Some(receiver) = serial::make_receiver(config) {
             usart::init(usart6.into_dma(), dma_rx, 5, receiver);
         }
@@ -247,18 +253,18 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
     let mut servos = PWMs::new(pwms);
     let mut fcs = FCS::new(SAMPLE_RATE);
-    thread.servo.add_fn(never_complete(move || {
+    threads.fcs.add_fn(never_complete(move || {
         fcs.update();
         servos.update();
     }));
 
-    let int = make_trigger(thread.servo, periph_exti1!(reg));
-    let mut servos = TimedNotifier::new(int, TickTimer::default(), Duration::from_millis(20));
+    let thread = into_thread(threads.fcs);
+    let mut servos = Schedule::new(thread, TickTimer::default(), Duration::from_millis(20));
 
-    thread.sys_tick.add_fn(never_complete(move || {
-        max7456.notify();
-        bmp280.notify();
-        servos.notify();
+    threads.sys_tick.add_fn(never_complete(move || {
+        max7456.wakeup();
+        bmp280.wakeup();
+        servos.wakeup();
     }));
 
     let commands =
@@ -266,7 +272,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut cli = CLI::new(commands);
     loop {
         TickTimer::after(Duration::from_millis(1)).root_wait();
-        led.notify();
+        led.wakeup();
         cli.run();
     }
 }

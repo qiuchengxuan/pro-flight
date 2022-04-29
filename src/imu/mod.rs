@@ -1,10 +1,16 @@
+use core::time;
+
 use nalgebra::Vector3;
 
 use crate::{
     algorithm::mahony::{MagnetismOrHeading, Mahony},
-    config::imu::IMU as Config,
+    config, datastore,
     types::{
-        measurement::{euler::DEGREE_PER_DAG, unit::DEGs, Acceleration, Gyro, Heading, ENU},
+        measurement::{
+            euler::{Euler, DEGREE_PER_DAG},
+            unit::DEGs,
+            Acceleration, Gyro, ENU,
+        },
         sensor::{Bias, Gain, Readout},
     },
 };
@@ -64,21 +70,17 @@ impl Calibration {
     }
 }
 
-pub struct Input {
-    pub acceleration: Readout,
-    pub gyro: Readout,
-    pub magnetism: Option<Readout>,
-    pub heading: Option<Heading>,
-}
-
 pub struct IMU {
+    interval: time::Duration,
     ahrs: Mahony,
     calibration: Calibration,
     acceleration: Vector3<f32>,
 }
 
 impl IMU {
-    pub fn new(sample_rate: usize, config: &Config) -> Self {
+    pub fn new(sample_rate: usize) -> Self {
+        let config = config::get().imu;
+        let interval = time::Duration::from_micros((1000_000 / sample_rate) as u64);
         let (kp, ki) = (config.mahony.kp.into(), config.mahony.ki.into());
         let calibration = Calibration {
             accelerometer: Sensor {
@@ -92,42 +94,48 @@ impl IMU {
             status: CalibrationStatus::Calibrating,
         };
         Self {
+            interval,
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             calibration,
             acceleration: Default::default(),
         }
     }
 
-    pub fn update_imu(&mut self, input: Input) -> Option<out::IMU> {
+    pub fn update(&mut self, acceleration: Readout, gyro: Readout) {
         if self.calibration.status != CalibrationStatus::Calibrated {
-            self.calibration.calibrate(input.gyro);
-            return None;
+            self.calibration.calibrate(gyro);
+            return;
         }
+        let ds = datastore::acquire();
+        let gnss = ds.read_gnss_within(self.interval);
+        let heading = gnss.map(|g| g.fixed.map(|f| f.heading)).flatten().flatten();
+        let magnetism = ds.read_magnetism_within(self.interval);
 
         let calib = &self.calibration.accelerometer;
-        let raw_acceleration = input.acceleration.zero(&calib.bias).gain(&calib.gain);
-        let raw_gyro = input.gyro - self.calibration.gyroscope_bias;
+        let raw_acceleration = acceleration.zero(&calib.bias).gain(&calib.gain);
+        let raw_gyro = gyro - self.calibration.gyroscope_bias;
 
         let acceleration: Vector3<f32> = raw_acceleration.into();
         let mut gyro: Vector3<f32> = raw_gyro.into();
         gyro = gyro / DEGREE_PER_DAG;
 
-        let heading = if let Some(mag) = input.magnetism {
+        let heading = if let Some(mag) = magnetism {
             let calib = &self.calibration.magnetometer;
             let m = mag.zero(&calib.bias).gain(&calib.gain).into();
             Some(MagnetismOrHeading::Magnetism(m))
         } else {
-            input.heading.map(|h| MagnetismOrHeading::Heading(h.0.into()))
+            heading.map(|h| MagnetismOrHeading::Heading(h.0.into()))
         };
 
         if !self.ahrs.update(&gyro, &acceleration, heading) {
-            return None;
+            return;
         }
         self.acceleration = self.ahrs.quaternion().transform_vector(&acceleration);
         let quaternion = self.ahrs.quaternion();
         let acceleration = Acceleration::new(self.acceleration, ENU);
         let gyro = Gyro::new(gyro, DEGs);
-        Some(out::IMU { acceleration, gyro, quaternion, attitude: quaternion.into() })
+        let attitude = Euler::from(quaternion) * DEGREE_PER_DAG;
+        ds.write_imu(out::IMU { acceleration, gyro, quaternion, attitude })
     }
 
     /// Testing only

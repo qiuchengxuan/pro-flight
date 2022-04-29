@@ -47,7 +47,6 @@ where
 }
 
 pub struct DmaMAX7456<CS, TX> {
-    refresh_rate: u8,
     cs: CS,
     event: Event,
     tx: TX,
@@ -74,7 +73,6 @@ where
     type Error = E;
 
     fn into_dma(mut self, event: Event, tx: TX) -> Result<DmaMAX7456<CS, TX>, E> {
-        let refresh_rate = config::get().osd.refresh_rate;
         let video_mode_0 = self.load(Registers::VideoMode0)?;
         let (_, cs) = self.free();
         let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
@@ -82,7 +80,7 @@ where
             cs_.set_high().ok();
         }));
         let bd = Box::new(BufferDescriptor::<u8, 800>::with_callback(callback));
-        Ok(DmaMAX7456 { refresh_rate, cs, event, tx, video_mode_0, bd })
+        Ok(DmaMAX7456 { cs, event, tx, video_mode_0, bd })
     }
 }
 
@@ -137,16 +135,16 @@ where
     TX: DMA<Future = TXF>,
 {
     pub async fn run(mut self) {
-        let interval = Duration::from_millis((1000 / self.refresh_rate as usize) as u64);
-        let mut osd = OSD::<29, 15>::new(interval, Ratio(12, 18).into());
+        let mut frame_buf = [[0u8; 29]; 15];
+        let osd = OSD::new(Ratio(12, 18).into());
         loop {
             if self.event.wait() {
                 self.upload_font().await;
                 self.event.clear();
             }
             let mut buffer = self.bd.try_get_buffer().unwrap();
-            let screen = osd.draw();
-            let mut writer = LinesWriter::new(screen, Default::default());
+            let frame = osd.draw(&mut frame_buf);
+            let mut writer = LinesWriter::new(frame, Default::default());
             let size = writer.write(buffer.as_mut()).0.len();
             mem::drop(buffer);
             self.cs.set_low().ok();

@@ -124,6 +124,6 @@ graph LR
     subgraph FCS
         PIDs --> Servos
     end
-    Controller -->|Input| PIDs
+    RC -->|Input| PIDs
     IMU -->|"Gyro(CAL)"| PIDs
 ```

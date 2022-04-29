@@ -2,6 +2,7 @@ use pro_flight::{
     collection::{Collection, Collector},
     datastore,
     fcs::FCS,
+    imu::IMU,
     ins::{variometer::Variometer, INS},
     protocol::serial::gnss::out::GNSS,
     types::{
@@ -18,6 +19,7 @@ pub struct Config {
 }
 
 pub struct Simulator {
+    imu: IMU,
     ins: INS,
     fcs: FCS,
     acceleration: Option<Readout>,
@@ -26,16 +28,17 @@ pub struct Simulator {
 
 impl Simulator {
     pub fn new(config: Config) -> Self {
+        let mut imu = IMU::new(config.sample_rate);
+        imu.skip_calibration();
         let variometer = Variometer::new(1000 / config.altimeter_rate);
-        let mut ins = INS::new(config.sample_rate, variometer);
-        ins.skip_calibration();
+        let ins = INS::new(config.sample_rate, variometer);
         let mut fcs = FCS::new(1000);
         fcs.update();
-        Self { ins, fcs, acceleration: None, gyro: None }
+        Self { imu, ins, fcs, acceleration: None, gyro: None }
     }
 
     pub fn collect(&self) -> Collection {
-        Collector::new(datastore::acquire()).collect(None)
+        Collector::new(datastore::acquire()).collect()
     }
 
     pub fn update_input(&mut self, axes: control::Axes) {
@@ -56,7 +59,8 @@ impl Simulator {
         match self.gyro.take() {
             Some(gyro) => {
                 trace!("Invoke INS update");
-                self.ins.update(acceleration, gyro)
+                self.imu.update(acceleration, gyro);
+                self.ins.update()
             }
             None => self.acceleration = Some(acceleration),
         }
@@ -74,7 +78,8 @@ impl Simulator {
         match self.acceleration.take() {
             Some(acceleration) => {
                 trace!("Invoke INS update");
-                self.ins.update(acceleration, gyro)
+                self.imu.update(acceleration, gyro);
+                self.ins.update()
             }
             None => self.gyro = Some(gyro),
         }
