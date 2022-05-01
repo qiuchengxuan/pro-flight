@@ -67,26 +67,26 @@ mod test {
 
         // roll 90
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.0, 0.7071068, 0.0));
-        assert_eq!(Euler::new(90.0, 0.0, 0.0), Euler::from(unit) * DEGREE_PER_DAG);
+        assert_eq!((90, 0, 0), (Euler::from(unit) * DEGREE_PER_DAG).into());
 
         // pitch 90
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.7071068, 0.0, 0.0));
-        assert_eq!(Euler::new(-0.0, 90.0, -0.0), Euler::from(unit) * DEGREE_PER_DAG);
+        assert_eq!((0, 90, 0), (Euler::from(unit) * DEGREE_PER_DAG).into());
 
         // yaw 0
         let unit = UnitQuaternion::new_normalize(Quaternion::new(1.0, 0.0, 0.0, 0.0));
-        assert_eq!(Euler::new(0.0, 0.0, 0.0), Euler::from(unit) * DEGREE_PER_DAG);
+        assert_eq!((0, 0, 0), (Euler::from(unit) * DEGREE_PER_DAG).into());
 
         // yaw 90
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.0, 0.0, 0.7071068));
-        assert_eq!(Euler::new(-0.0, 0.0, 90.0), Euler::from(unit) * DEGREE_PER_DAG);
+        assert_eq!((-0, 0, 90), (Euler::from(unit) * DEGREE_PER_DAG).into());
 
         // yaw 180
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.0, 0.0, 0.0, 1.0));
-        assert_eq!(Euler::new(0.0, 0.0, 180.0), Euler::from(unit) * DEGREE_PER_DAG);
+        assert_eq!((0, 0, 180), (Euler::from(unit) * DEGREE_PER_DAG).into());
 
         // yaw 270
         let unit = UnitQuaternion::new_normalize(Quaternion::new(0.7071068, 0.0, 0.0, -0.7071068));
-        assert_eq!(Euler::new(0.0, 0.0, 270.0), Euler::from(unit) * DEGREE_PER_DAG);
+        assert_eq!((0, 0, 270), (Euler::from(unit) * DEGREE_PER_DAG).into());
     }
 }

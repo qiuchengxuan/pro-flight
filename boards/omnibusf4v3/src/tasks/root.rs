@@ -168,16 +168,16 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), threads.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), threads.dma2_stream3);
     let mut imu = IMU::new(SAMPLE_RATE);
-    let mut mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3), move |accel, gyro| {
+    let mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
+    let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
+    threads.mpu6000.add_exec(mpu6000.run(move |accel, gyro| {
+        int.clear_interrupt_pending_bit();
         imu.update(accel, gyro);
         ins_thread.wakeup()
-    });
-    let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
-    threads.mpu6000.add_fn(never_complete(move || {
-        int.clear_interrupt_pending_bit();
-        mpu6000.trx();
     }));
     threads.mpu6000.enable_int();
+    let mut mpu6000 = into_thread(threads.mpu6000);
+    threads.dma2_stream0.add_fn(never_complete(move || mpu6000.wakeup()));
 
     let dma_rx = dma::Stream::new(periph_dma2_ch2!(reg), threads.dma2_stream2);
     let mut adc = Adc::adc2(peripherals.ADC2, true, voltage_adc::adc_config());
@@ -195,29 +195,26 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     rx.setup_peripheral(0, &mut spi3);
     let mut tx = dma::Stream::new(periph_dma1_ch5!(reg), threads.dma1_stream5);
     tx.setup_peripheral(0, &mut spi3);
-
-    let mut cs_osd = gpio_a.pa15.into_push_pull_output();
-    cs_osd.set_high().ok();
     let cs_baro = gpio_b.pb3.into_push_pull_output();
     let mut bmp280 = bmp280_spi(spi3, cs_baro, TickDelay {});
     bmp280.init().map_err(|e| error!("Init bmp280 err: {:?}", e)).ok();
     let compensator = Compensator(bmp280.read_calibration().unwrap_or_default());
     let (spi, cs_baro, _) = bmp280.free().free();
+    let bmp280 = DmaBMP280::new(rx.clone(), tx.clone(), cs_baro);
+    let ds = datastore::acquire();
+    threads.bmp280.add_exec(bmp280.run(compensator, move |v| ds.write_altitude(v.into())));
+    let thread = into_thread(threads.bmp280);
+    let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::from_millis(1));
 
-    let mut bmp280 = DmaBMP280::new(cs_baro, compensator, move |v| {
-        datastore::acquire().write_altitude(v.into())
-    });
-
+    let mut cs_osd = gpio_a.pa15.into_push_pull_output();
+    cs_osd.set_high().ok();
     let event = event::Event::default();
     let max7456 = max7456::init(spi, cs_osd).unwrap();
-    let max7456 = max7456.into_dma(event.clone(), tx.clone()).unwrap();
+    let max7456 = max7456.into_dma(event.clone(), tx).unwrap();
     threads.max7456.add_exec(max7456.run());
     let thread = into_thread(threads.max7456);
     let standard = config::get().osd.standard;
     let mut max7456 = Schedule::new(thread, TickTimer::default(), standard.refresh_interval());
-    threads.bmp280.add_fn(never_complete(move || bmp280.trx(&rx, &tx)));
-    let thread = into_thread(threads.bmp280);
-    let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::from_millis(100));
 
     if let Some(config) = config::get().peripherals.serials.get("USART1") {
         let pins = (gpio_a.pa9.into_alternate_af7(), gpio_a.pa10.into_alternate_af7());

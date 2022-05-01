@@ -4,11 +4,15 @@ use crate::{
     imu::out::IMU,
     ins::out::INS,
     protocol::serial::gnss::out::GNSS,
-    types::{control::Control, measurement::voltage::Voltage},
+    types::{
+        control::Control,
+        measurement::{voltage::Voltage, Altitude},
+    },
 };
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
 pub struct Collection {
+    pub altitude: Altitude,
     pub control: Control,
     pub fcs: FCS,
     pub gnss: GNSS,
@@ -32,6 +36,7 @@ impl<'a> Collector<'a> {
 
     pub fn collect(&self) -> Collection {
         Collection {
+            altitude: self.0.read_altitude(),
             control: self.0.read_control(),
             fcs: self.0.read_fcs(),
             gnss: self.0.read_gnss(),

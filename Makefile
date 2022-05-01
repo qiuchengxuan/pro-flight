@@ -7,10 +7,12 @@ ifeq ($(mass-erase),true)
 	DFU_FLAGS = :mass-erase:force:leave
 endif
 
-CARGO_BUILD_FLAGS =
-debug := false
+CARGO_FEATURES =
 ifeq ($(debug),true)
-	CARGO_BUILD_FLAGS = --features debug
+	CARGO_FEATURES = debug
+endif
+ifeq ($(semihosting),true)
+	CARGO_FEATURES += cortex-m-semihosting
 endif
 
 ifeq ($(shell uname),Linux)
@@ -31,7 +33,7 @@ test: submodule
 
 .PHONY: $(BOARD)
 $(BOARD): submodule
-	@(cd boards/$(BOARD) && cargo build --release $(CARGO_BUILD_FLAGS) --target-dir ../../target)
+	(cd boards/$(BOARD) && cargo build --release --features "$(CARGO_FEATURES)" --target-dir ../../target)
 
 SIMULATOR := $(PWD)/target/release/simulator
 SIMULATOR_CONFIG := $(PWD)/boards/simulator/rascal.yaml

@@ -32,14 +32,14 @@ thr::nvic! {
             8: pub bmp280; // exti2
             9: pub max7456; // exti3
             10: pub mpu6000; // exti4
-            11: pub dma1_stream0;
-            16: pub dma1_stream5;
+            11: pub dma1_stream0; // BMP280/MAX7456 rx
+            16: pub dma1_stream5; // BMP280 tx
             23: pub ins; // exti5-9
-            56: pub dma2_stream0;
-            57: pub dma2_stream1;
-            58: pub dma2_stream2;
-            59: pub dma2_stream3;
-            61: pub dma2_stream5;
+            56: pub dma2_stream0; // mpu6000 rx
+            57: pub dma2_stream1; // USART3/I2C-2
+            58: pub dma2_stream2; // ADC2
+            59: pub dma2_stream3; // mpu6000 tx
+            61: pub dma2_stream5; // USART1 rx
             67: pub otg_fs;
         }
     };
@@ -54,13 +54,13 @@ macro_rules! priority {
 
 pub fn setup_priority(thread: &mut Thrs) {
     thread.otg_fs.set_priority(priority!(Priority::Immediate));
+    thread.fcs.set_priority(priority!(Priority::Immediate));
     thread.dma1_stream0.set_priority(priority!(Priority::System));
     thread.dma1_stream5.set_priority(priority!(Priority::System));
     thread.dma2_stream0.set_priority(priority!(Priority::System));
-    thread.dma2_stream1.set_priority(priority!(Priority::Sensor));
+    thread.dma2_stream1.set_priority(priority!(Priority::System));
     thread.dma2_stream3.set_priority(priority!(Priority::System));
-    thread.dma2_stream5.set_priority(priority!(Priority::Sensor));
-    thread.fcs.set_priority(priority!(Priority::Immediate));
+    thread.dma2_stream5.set_priority(priority!(Priority::System));
     thread.bmp280.set_priority(priority!(Priority::Sensor));
     thread.mpu6000.set_priority(priority!(Priority::Sensor));
     thread.ins.set_priority(priority!(Priority::Normal));

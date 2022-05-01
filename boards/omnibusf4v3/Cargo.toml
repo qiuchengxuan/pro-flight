@@ -19,7 +19,6 @@ std = [
     "futures/std",
 ]
 debug = []
-semihosting = ["cortex-m-semihosting"]
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["serde"] }

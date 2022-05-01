@@ -46,5 +46,5 @@ where
     let address = rx_bd.try_get_buffer().unwrap().as_ptr();
     trace!("Init voltage ADC DMA address at 0x{:x}", address as usize);
     dma.setup_peripheral(1, &mut adc);
-    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle());
+    dma.setup_rx(Box::leak(rx_bd), TransferOption::circle()).ok();
 }

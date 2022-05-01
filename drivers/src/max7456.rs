@@ -98,7 +98,7 @@ where
         buffer[1] = video_mode_0.value;
         mem::drop(buffer);
         self.cs.set_low().ok();
-        self.tx.tx(&self.bd, TransferOption::default().size(2)).await;
+        self.tx.tx(&self.bd, TransferOption::default().size(2)).unwrap().await;
     }
 
     async fn upload_char(&mut self, bytes: &[u8], index: u8) {
@@ -109,7 +109,7 @@ where
         mem::drop(buffer);
         let timer = TickTimer::after(Duration::from_millis(13));
         self.cs.set_low().ok();
-        self.tx.tx(&self.bd, TransferOption::default().size(STORE_CHAR_BUFFER_SIZE)).await;
+        self.tx.tx(&self.bd, TransferOption::default().size(STORE_CHAR_BUFFER_SIZE)).unwrap().await;
         timer.await;
     }
 
@@ -148,7 +148,7 @@ where
             let size = writer.write(buffer.as_mut()).0.len();
             mem::drop(buffer);
             self.cs.set_low().ok();
-            self.tx.tx(&self.bd, TransferOption::default().size(size)).await;
+            self.tx.tx(&self.bd, TransferOption::default().size(size)).unwrap().await;
         }
     }
 }

@@ -36,10 +36,7 @@ pub fn stdin() -> Stdin {
 
 impl Stdin {
     pub fn lock(&self) -> bool {
-        if STDIN_LOCK
-            .compare_exchange_weak(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .is_ok()
-        {
+        if STDIN_LOCK.compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
             self.0.set(true);
             return true;
         }

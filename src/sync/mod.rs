@@ -20,7 +20,7 @@ impl<T: Default> Default for ReadSpinLock<T> {
 impl<T: Copy> ReadSpinLock<T> {
     pub fn write(&self, data: T) -> Result<(), bool> {
         let relaxed = Ordering::Relaxed;
-        self.write_lock.compare_exchange_weak(false, true, relaxed, relaxed)?;
+        self.write_lock.compare_exchange(false, true, relaxed, relaxed)?;
         unsafe { ptr::write(ptr::addr_of!(self.data) as *mut T, data) };
         self.version.fetch_add(1, Ordering::Release);
         self.write_lock.store(false, Ordering::Relaxed);

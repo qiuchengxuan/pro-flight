@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
-use core::ptr;
+use core::future::Future;
 
 use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
-use hal::dma::{Channel, Peripheral, TransferOption, TransferResult, BD, DMA};
+use hal::dma::{Channel, Peripheral, TransferOption, BD, DMA};
 use mpu6000::{
     self,
     bus::RegAccess,
@@ -103,36 +103,25 @@ pub struct DmaMPU6000<RX, TX, CS> {
     tx_bd: Box<BD<u8, 1>>,
 }
 
-pub trait IntoDMA<RX: DMA, TX: DMA, H, CS>
-where
-    H: FnMut(Readout, Readout) + Send + 'static,
-{
-    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel), h: H) -> DmaMPU6000<RX, TX, CS>;
+pub trait IntoDMA<RX: DMA, TX: DMA, CS> {
+    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel)) -> DmaMPU6000<RX, TX, CS>;
 }
 
-impl<E, SPI, CS, DELAY, RX: DMA, TX: DMA, H> IntoDMA<RX, TX, H, CS>
+impl<E, RXF, TXF, SPI, CS, DELAY, RX: DMA, TX: DMA> IntoDMA<RX, TX, CS>
     for MPU6000<SpiBus<SPI, CS, DELAY>>
 where
     SPI: Peripheral,
+    RX: DMA<Future = RXF>,
+    TX: DMA<Future = TXF>,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
-    H: FnMut(Readout, Readout) + Send + 'static,
 {
-    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel), mut h: H) -> DmaMPU6000<RX, TX, CS> {
+    fn into_dma(self, rx: (RX, Channel), tx: (TX, Channel)) -> DmaMPU6000<RX, TX, CS> {
         let (mut spi, cs, _) = self.free().free();
         let (mut rx, ch) = rx;
         rx.setup_peripheral(ch, &mut spi);
         let (mut tx, ch) = tx;
         tx.setup_peripheral(ch, &mut spi);
-        let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
-        let convertor = Converter::from(config::get().imu);
-        let rotation = config::get().imu.rotation;
-        let callback = Box::leak(Box::new(move |result: TransferResult<u8>| {
-            cs_.set_high().ok();
-            let bytes: &[u8] = result.into();
-            let (acceleration, gyro) = convertor.convert(&bytes[1..], rotation);
-            h(acceleration, gyro);
-        }));
-        let mut rx_bd = Box::new(BD::<u8, { 1 + NUM_MEASUREMENT_REGS }>::with_callback(callback));
+        let mut rx_bd = Box::new(BD::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
         trace!("Init MPU6000 DMA address at 0x{:x}", address as usize);
         let byte = Register::AccelerometerXHigh as u8 | 0x80;
@@ -141,18 +130,26 @@ where
     }
 }
 
-impl<E, RXF, TXF, RX, TX, CS> DmaMPU6000<RX, TX, CS>
+impl<E, O, RXF, TXF, RX, TX, CS> DmaMPU6000<RX, TX, CS>
 where
+    RXF: Future<Output = O>,
+    TXF: Future<Output = O>,
     RX: DMA<Future = RXF>,
     TX: DMA<Future = TXF>,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
 {
-    pub fn trx(&mut self) {
-        self.cs.set_low().ok();
-        if self.rx.is_busy() || self.tx.is_busy() {
-            return;
+    pub async fn run(mut self, mut handler: impl FnMut(Readout, Readout)) {
+        let convertor = Converter::from(config::get().imu);
+        let rotation = config::get().imu.rotation;
+        loop {
+            self.cs.set_low().ok();
+            self.tx.tx(&self.tx_bd, TransferOption::repeat().size(1 + NUM_MEASUREMENT_REGS)).ok();
+            self.rx.rx(&mut self.rx_bd, Default::default()).unwrap().await;
+            self.cs.set_high().ok();
+            if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
+                let (acceleration, gyro) = convertor.convert(&buffer[1..], rotation);
+                handler(acceleration, gyro);
+            }
         }
-        self.rx.rx(&mut self.rx_bd, Default::default());
-        self.tx.tx(&self.tx_bd, TransferOption::repeat().size(1 + NUM_MEASUREMENT_REGS));
     }
 }

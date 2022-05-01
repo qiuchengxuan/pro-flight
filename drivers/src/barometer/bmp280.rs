@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use core::ptr;
+use core::{future::Future, time::Duration};
 
 pub use bmp280::DEFAULT_SPI_MODE as SPI_MODE;
 use bmp280::{
@@ -15,10 +15,10 @@ use embedded_hal::{
     },
     digital::v2::OutputPin,
 };
-use hal::dma::{BufferDescriptor, TransferOption, TransferResult, DMA};
+use hal::dma::{BufferDescriptor, TransferOption, DMA};
 use pro_flight::{sys::time::TickTimer, types::measurement::Pressure};
 
-pub const SAMPLE_RATE: usize = 10; // actually 16
+pub const SAMPLE_RATE: usize = 16;
 
 pub struct Compensator(pub Calibration);
 
@@ -55,39 +55,41 @@ impl<E, BUS: Bus<Error = E>> BMP280Init<E> for BMP280<BUS> {
     }
 }
 
-pub struct DmaBMP280<CS> {
+pub struct DmaBMP280<RX, TX, CS> {
+    rx: RX,
+    tx: TX,
+    cs: CS,
     rx_bd: Box<BufferDescriptor<u8, 8>>,
     tx_bd: Box<BufferDescriptor<u8, 1>>,
-    cs: CS,
+    compensator: Compensator,
 }
 
-impl<E, CS: OutputPin<Error = E> + Send + Unpin + 'static> DmaBMP280<CS> {
-    pub fn new<H>(cs: CS, compensator: Compensator, mut handler: H) -> Self
-    where
-        H: FnMut(Pressure) + Send + 'static,
-    {
-        let mut cs_ = unsafe { ptr::read(ptr::addr_of!(cs)) };
-        let callback = Box::leak(Box::new(move |result: TransferResult<u8>| {
-            cs_.set_high().ok();
-            handler(compensator.convert(result.into()))
-        }));
-        let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::with_callback(callback));
+impl<E, O, RXF, TXF, RX, TX, CS> DmaBMP280<RX, TX, CS>
+where
+    RXF: Future<Output = O>,
+    TXF: Future<Output = O>,
+    RX: DMA<Future = RXF>,
+    TX: DMA<Future = TXF>,
+    CS: OutputPin<Error = E> + Send + 'static,
+{
+    pub fn new(rx: RX, tx: TX, cs: CS, compensator: Compensator) -> Self {
+        let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::default());
         let address = rx_bd.try_get_buffer().unwrap().as_ptr();
         trace!("Init BMP280 DMA address at 0x{:x}", address as usize);
         let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new([Register::PressureMsb as u8 | 0x80]));
-        Self { rx_bd, tx_bd, cs }
+        Self { rx, tx, cs, rx_bd, tx_bd, compensator }
     }
 
-    pub fn trx<RXF, TXF, RX, TX>(&mut self, rx: &RX, tx: &TX)
-    where
-        RX: DMA<Future = RXF>,
-        TX: DMA<Future = TXF>,
-    {
-        self.cs.set_low().ok();
-        if rx.is_busy() || tx.is_busy() {
-            return;
+    pub async fn run(mut self, mut handler: impl FnMut(Pressure)) {
+        loop {
+            self.cs.set_low().ok();
+            self.tx.tx(&self.tx_bd, TransferOption::repeat().size(8)).ok();
+            self.rx.rx(&mut self.rx_bd, Default::default()).unwrap().await;
+            self.cs.set_high().ok();
+            if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
+                handler(self.compensator.convert(&buffer));
+            }
+            TickTimer::after(Duration::from_micros(62_500)).await;
         }
-        rx.rx(&mut self.rx_bd, Default::default());
-        tx.tx(&self.tx_bd, TransferOption::repeat().size(8));
     }
 }

@@ -46,6 +46,11 @@ impl TransferOption {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Error {
+    BufferDescripter,
+}
+
 pub type Channel = u8;
 
 pub type BD<W, const N: usize> = BufferDescriptor<W, N>;
@@ -59,14 +64,20 @@ pub trait DMA: Send + Sync + 'static {
 
     fn setup_peripheral(&mut self, channel: Channel, periph: &mut dyn Peripheral);
     fn is_busy(&self) -> bool;
-    fn tx<'a, W, const N: usize>(&'a self, bd: &'a BD<W, N>, o: TransferOption) -> Self::Future
-    where
-        W: Copy + Default + 'static;
-    fn rx<'a, W, const N: usize>(&'a self, bd: &'a mut BD<W, N>, o: TransferOption) -> Self::Future
-    where
-        W: Copy + Default + 'static;
-    fn setup_rx<W, const N: usize>(self, bd: &'static mut BD<W, N>, option: TransferOption)
-    where
-        W: Copy + Default + 'static;
+    fn tx<'a, W: Copy + Default + 'static, const N: usize>(
+        &'a self,
+        bd: &'a BD<W, N>,
+        option: TransferOption,
+    ) -> Result<Self::Future, Error>;
+    fn rx<'a, W: Copy + Default + 'static, const N: usize>(
+        &'a self,
+        bd: &'a mut BD<W, N>,
+        option: TransferOption,
+    ) -> Result<Self::Future, Error>;
+    fn setup_rx<W: Copy + Default + 'static, const N: usize>(
+        self,
+        bd: &'static mut BD<W, N>,
+        option: TransferOption,
+    ) -> Result<(), Error>;
     fn stop(&self);
 }

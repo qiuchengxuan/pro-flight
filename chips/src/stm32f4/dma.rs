@@ -14,7 +14,7 @@ use drone_cortexm::{
 use drone_stm32_map::periph::dma::ch::*;
 
 use hal::dma::{
-    BufferDescriptor, DMAFuture, Meta, Peripheral, TransferOption, TransferResult, DMA,
+    BufferDescriptor, DMAFuture, Error, Meta, Peripheral, TransferOption, TransferResult, DMA,
 };
 
 pub enum Direction {
@@ -184,11 +184,15 @@ impl<M: DmaChMap> DMA for Stream<M> {
         self.reg.configuration.en().read_bit()
     }
 
-    fn tx<'a, W, const N: usize>(&'a self, bd: &'a BD<W, N>, option: TransferOption) -> DMABusy<M>
+    fn tx<'a, W, const N: usize>(
+        &'a self,
+        bd: &'a BD<W, N>,
+        option: TransferOption,
+    ) -> Result<DMABusy<M>, Error>
     where
         W: Copy + Default,
     {
-        let bytes = bd.try_take().unwrap();
+        let bytes = bd.try_take().map_err(|_| Error::BufferDescripter)?;
         self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();
@@ -207,18 +211,18 @@ impl<M: DmaChMap> DMA for Stream<M> {
             r.dir().write(v, Direction::MemoryToPeripheral as u32);
             r.en().set(v);
         });
-        DMABusy(self.reg.configuration)
+        Ok(DMABusy(self.reg.configuration))
     }
 
     fn rx<'a, W, const N: usize>(
         &'a self,
         bd: &'a mut BD<W, N>,
         option: TransferOption,
-    ) -> DMABusy<M>
+    ) -> Result<DMABusy<M>, Error>
     where
         W: Copy + Default,
     {
-        let buffer = bd.try_take().unwrap();
+        let buffer = bd.try_take().map_err(|_| Error::BufferDescripter)?;
         self.reg.memory0_address.store_bits(buffer.as_ptr() as *const _ as u32);
         let msize = mem::size_of::<W>() as u32 - 1;
         self.reg.interrupt_clear.clear_all();
@@ -241,15 +245,16 @@ impl<M: DmaChMap> DMA for Stream<M> {
                 r.htie().clear(v);
             }
         });
-        DMABusy(self.reg.configuration)
+        Ok(DMABusy(self.reg.configuration))
     }
 
-    fn setup_rx<W, const N: usize>(mut self, bd: &'static mut BD<W, N>, option: TransferOption)
-    where
-        W: Copy + Default,
-    {
+    fn setup_rx<W: Copy + Default, const N: usize>(
+        mut self,
+        bd: &'static mut BD<W, N>,
+        option: TransferOption,
+    ) -> Result<(), Error> {
         self.persist = true;
-        self.rx(bd, option);
+        self.rx(bd, option).map(|_| ())
     }
 
     fn stop(&self) {
