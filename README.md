@@ -36,6 +36,7 @@ Progress
 * FCS
   - [x] PWM & ESC
   - [x] PID
+  - [x] Law protection
 * INS
   - [x] Displacement integral
   - [x] Complementary filter
@@ -59,26 +60,25 @@ Progress
 
 **WIP**
 
-* FCS
-  - [ ] Flight control law protection
+* AP
+  - [ ] Auto-throttle
+  - [ ] Waypoint navigation with failsafe
 
 **Future**
 
 * AP
-  - [ ] Auto-throttle
-  - [ ] Waypoint navigation, HDG/ALT hold, ALT hold
+  - [ ] HDG/ALT hold, ALT hold
 * IO
   - [ ] SDCARD read & write
   - [ ] DMA based SDCARD read & write
 * logging
   - [ ] Blackbox
-* navigation
+* driver
   - [ ] Magnetometer
   - [ ] DMA based I2C
   - [ ] QMC5883L
-  - [ ] Waypoint navigation
-* IMU
-  - [ ] INS and setup calibration for more accurate displacement integral
+* INS
+  - [ ] More reliable calibration
   - [ ] Extended kalman filter
 * protocol
   - [ ] Mavlink

@@ -153,7 +153,7 @@ mod test {
     #[test]
     fn test_gain() {
         use super::{Axes, Gain, Readout};
-        use fixed_point::{fixed, FixedPoint};
+        use fixed_point::fixed;
 
         let readout = Readout { axes: Axes { x: 100, y: 200, z: 300 }, sensitive: 0 };
         let readout = readout.gain(&gain!(1.01, 1.02, 1.03));

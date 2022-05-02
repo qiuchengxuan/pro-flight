@@ -1,7 +1,5 @@
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
 use fixed_point::FixedPoint;
-#[allow(unused_imports)] // false warning
-use micromath::F32Ext;
 use nmea0183::{
     message::Message,
     messages::{gga::GGA, rmc::RMC},

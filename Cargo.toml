@@ -1,12 +1,11 @@
 [workspace]
-members = ["fixed-point"]
 exclude = ["drone-os", "boards"]
 
 [package]
 name = "pro-flight"
 version = "0.1.0"
 authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
 
 [dependencies]
@@ -18,10 +17,9 @@ crc16 = { version = "0.4", default-features = false }
 derive_more = "0.99"
 embedded-hal = "0.2"
 fugit = "0.3"
-fixed-point = { path = "fixed-point" }
+fixed-point = { version = "1.0", default-features = false, features = ["serde"] }
 git-version = "0.3"
 hal = { path = "hal" }
-hash32 = "0.2"
 heapless = { version = "0.7", features = ["serde"] }
 libm = "0.2"
 indoc = "1.0"
@@ -29,25 +27,29 @@ integer-sqrt = "0.1"
 log = { version = "0.4", default-features = false }
 max7456 = "0.1"
 micromath = "2.0"
-nalgebra = { version = "0.31", default-features = false, features = ["libm-force"] }
 nb = "1"
 nmea0183-core = { git = "https://github.com/qiuchengxuan/nmea0183" }
 num-traits = { version = "0.2", default-features = false }
 pid = "3.0.0"
-sbus-parser = { git = "https://github.com/qiuchengxuan/sbus" }
+sbus-parser = "0.1"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-core-fmt = "0.1"
 serde-yaml-core = { git = "https://github.com/qiuchengxuan/serde-yaml-core" }
 spin = { version = "0.9", default-features = false }
 void = { version = "1", default-features = false }
 
+[dependencies.nalgebra]
+version = "0.31"
+default-features = false
+features = ["libm-force", "serde-serialize-no-std"]
+
 [lib]
 name = "pro_flight"
 
 [features]
-std = ["serde/std", "nalgebra/std"]
+std = ["serde/std", "nalgebra/std", "fixed-point/std"]
 default-config = []
-default = []
+default = ["std"]
 
 [dev-dependencies]
 hex-literal = "0.3"

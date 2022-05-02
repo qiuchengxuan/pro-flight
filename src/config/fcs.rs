@@ -92,14 +92,45 @@ impl PathSet for PIDs {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Envelop {
+    pub max_roll: u8,
+    pub min_pitch: i8,
+    pub max_pitch: i8,
+}
+
+impl Default for Envelop {
+    fn default() -> Self {
+        Self { max_roll: 67, min_pitch: -15, max_pitch: 30 }
+    }
+}
+
+impl PathSet for Envelop {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "max-roll" => self.max_roll = value.parse()?,
+            "min-pitch" => self.min_pitch = value.parse()?,
+            "max-pitch" => self.max_pitch = value.parse()?,
+            _ => return Err(Error::UnknownPath),
+        }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FCS {
     pub configuration: Configuration,
+    pub envelop: Envelop,
     pub pids: PIDs,
 }
 
 impl Default for FCS {
     fn default() -> Self {
-        Self { configuration: Configuration::Airplane, pids: Default::default() }
+        Self {
+            configuration: Configuration::Airplane,
+            envelop: Default::default(),
+            pids: Default::default(),
+        }
     }
 }
 
@@ -110,6 +141,7 @@ impl PathSet for FCS {
                 self.configuration = value.parse_or(Configuration::Airplane)?;
                 Ok(())
             }
+            "envelop" => self.envelop.set(path, value),
             "pids" => self.pids.set(path, value),
             _ => Err(Error::UnknownPath),
         }

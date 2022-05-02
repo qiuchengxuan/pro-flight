@@ -140,19 +140,15 @@ impl<CMDS: AsMut<[Command]>> CLI<CMDS> {
         let mut buffer = [0u8; 80];
         let size = io::stdin().read(&mut buffer[..]).ok().unwrap_or(0);
         let line = match self.terminal.receive(&buffer[..size]) {
-            Some(line) => line,
+            Some(line) => line.trim(),
             None => return,
         };
-        if line.starts_with('#') {
+        if line.starts_with('#') || line.trim() == "" {
             return prompt();
         }
-        let mut split = line.splitn(2, ' ');
-        let cmd_name = match split.next() {
-            Some(word) => word,
-            None => return prompt(),
-        };
-        let remain = split.next().unwrap_or("");
-        match cmd_name {
+        let (cmd, operand) =
+            line.split_once(' ').map(|(a, b)| (a, b.trim_start())).unwrap_or((line, ""));
+        match cmd {
             "" => return prompt(),
             "help" => {
                 for command in BUILTIN_CMDS.iter() {
@@ -165,12 +161,12 @@ impl<CMDS: AsMut<[Command]>> CLI<CMDS> {
             }
             _ => {}
         };
-        if let Some(cmd) = BUILTIN_CMDS.iter().find(|cmd| cmd.name == cmd_name) {
-            (cmd.action)(remain);
-        } else if let Some(cmd) = self.commands.as_mut().iter_mut().find(|c| c.name == cmd_name) {
-            (cmd.action)(remain);
+        if let Some(cmd) = BUILTIN_CMDS.iter().find(|c| c.name == cmd) {
+            (cmd.action)(operand);
+        } else if let Some(cmd) = self.commands.as_mut().iter_mut().find(|c| c.name == cmd) {
+            (cmd.action)(operand);
         } else {
-            println!("Unknown command: {}", cmd_name);
+            println!("Unknown command: {}", cmd);
         }
         prompt()
     }

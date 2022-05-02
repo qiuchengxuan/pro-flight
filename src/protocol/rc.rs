@@ -39,16 +39,17 @@ impl ControlMatrix {
         self.toggles = inputs.toggles.clone();
     }
 
-    pub fn read(&mut self, channels: &[i16; MAX_CHANNEL]) {
+    pub fn read(&mut self, raw: &RawControl) {
         if self.config_iteration != config::iteration() {
             self.reset();
         }
         let mut control = Control::default();
+        control.rssi = raw.rssi;
         for (axis_type, axis) in self.axes.0.iter() {
-            if axis.channel as usize > channels.len() {
+            if axis.channel as usize > raw.channels.len() {
                 continue;
             }
-            let ch = scale(channels[axis.channel as usize], axis.scale.0);
+            let ch = scale(raw.channels[axis.channel as usize], axis.scale.0);
             match axis_type {
                 AxisType::Throttle => control.axes.throttle = unsigned(ch),
                 AxisType::Roll => control.axes.roll = ch,
@@ -57,10 +58,13 @@ impl ControlMatrix {
             }
         }
         for toggle in self.toggles.0.iter() {
-            if toggle.channel as usize > channels.len() {
+            if toggle.channel as usize > raw.channels.len() {
                 continue;
             }
-            let ch = unsigned(channels[toggle.channel as usize]);
+            if toggle.choices.len() <= 0 {
+                continue;
+            }
+            let ch = unsigned(raw.channels[toggle.channel as usize]);
             let index = ch / (u16::MAX / toggle.choices.len() as u16);
             let command = toggle.choices[index as usize];
             control.commands.push(command).ok();

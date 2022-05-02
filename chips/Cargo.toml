@@ -3,7 +3,7 @@ authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
 edition = "2018"
 readme = "README.md"
 name = "chips"
-version = "0.0.1"
+version = "0.1.0"
 
 [dependencies]
 chrono = { version = "0.4", default-features = false }

@@ -4,6 +4,7 @@ use ascii_osd_hud::{
     telemetry::{self as hud, Notes, Steerpoint, Telemetry, Unit},
     AspectRatio, PixelRatio,
 };
+use fixed_point::FixedPoint;
 
 use super::Frame;
 use crate::{
@@ -94,10 +95,10 @@ impl NAV {
         let note_left = unsafe { core::str::from_utf8_unchecked(&note_buffer[..index]) };
         let hud_telemetry = Telemetry {
             altitude: data.ins.position.altitude.0.u(Feet).raw as i16,
-            aoa: aoa as i8,
+            aoa: FixedPoint(aoa as i8),
             attitude: hud_attitude(data.imu.attitude),
             heading: data.imu.attitude.yaw as u16,
-            g_force: data.imu.acceleration.g_force(),
+            g_force: FixedPoint((data.imu.acceleration.g_force() * 10.0) as i8),
             height: if height > 200 { i16::MIN } else { height },
             notes: Notes { left: note_left, center: "", right: "" },
             battery: data.voltage.soc(),

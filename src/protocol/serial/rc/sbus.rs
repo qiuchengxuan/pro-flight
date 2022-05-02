@@ -44,11 +44,8 @@ impl SBUS {
         self.receiver.reset();
         self.timer.start(self.inter_frame_gap.convert());
 
-        if packet.frame_lost {
-            self.loss_bitmap |= 1u128 << self.loss_bitmap_index;
-        } else {
-            self.loss_bitmap &= !(1u128 << self.loss_bitmap_index);
-        }
+        self.loss_bitmap &= !(1u128 << self.loss_bitmap_index);
+        self.loss_bitmap |= (packet.frame_lost as u128) << self.loss_bitmap_index;
         self.loss_bitmap_index = (self.loss_bitmap_index + 1) % 100;
 
         let mut channels = [0i16; 18];
@@ -62,5 +59,29 @@ impl SBUS {
 
     pub fn reset(&mut self) {
         self.receiver.reset();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use hex_literal::hex;
+
+    use crate::sys::time::TickTimer;
+
+    #[test]
+    fn test_rssi() {
+        let mut sbus = super::SBUS::new(false);
+        let mut bytes =
+            hex!("0F E0 03 1F 58 C0 07 16 B0 80 05 2C 60 01 0B F8 C0 07 00 00 00 00 00 23 00");
+        assert_eq!(sbus.receive(&bytes).unwrap().rssi, 99);
+        sbus.timer = TickTimer::default();
+        assert_eq!(sbus.receive(&bytes).unwrap().rssi, 98);
+        bytes[bytes.len() - 2] = 3;
+        for _ in 0..100 {
+            sbus.timer = TickTimer::default();
+            sbus.receive(&bytes);
+        }
+        sbus.timer = TickTimer::default();
+        assert_eq!(sbus.receive(&bytes).unwrap().rssi, 100);
     }
 }

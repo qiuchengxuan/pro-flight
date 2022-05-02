@@ -64,7 +64,7 @@ dfu-program: $(BOARD).dfu
 
 .PHONY: gdb
 gdb:
-	$(GDB) $(TARGET)
+	@(cd boards/$(BOARD); $(GDB) $(TARGET))
 
 .PHONY: bloat
 bloat:

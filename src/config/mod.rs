@@ -10,7 +10,7 @@ pub mod yaml;
 
 use core::{mem, slice};
 
-use fixed_point::{fixed, FixedPoint};
+use fixed_point::fixed;
 
 use crate::{
     io::Read,

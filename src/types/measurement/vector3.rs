@@ -1,7 +1,7 @@
 use core::ops::{Add, AddAssign, Div, Mul, Sub};
 
 use integer_sqrt::IntegerSquareRoot;
-#[allow(unused_imports)] // false warning
+#[cfg(not(any(test, feature = "std")))]
 use micromath::F32Ext;
 use nalgebra::{base::Scalar, ClosedAdd, ClosedDiv, ClosedMul, ClosedSub};
 use serde::ser::SerializeSeq;

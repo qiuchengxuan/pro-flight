@@ -153,7 +153,7 @@ def main():
             jsbsim_to_simulator(jsbsim_api, simulator_api, time_ms)
             telemetry = simulator_api.get_telemetry()
             atti = jsbsim_api.attitude
-            fcs = telemetry.fcs.normalize()
+            fcs = telemetry.fcs.control.normalize()
             jsbsim_api.control(Control(fcs.engines[0], fcs.aileron_right, fcs.elevator, fcs.rudder))
             status = '%dkt, %dft,' % (jsbsim_api.speed.cas, jsbsim_api.height)
             atti = jsbsim_api.attitude

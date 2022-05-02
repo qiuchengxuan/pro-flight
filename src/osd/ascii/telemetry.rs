@@ -3,7 +3,7 @@ use core::fmt::Write;
 use heapless::String;
 
 use super::Frame;
-use crate::{collection, datastore, fcs::out::FCS};
+use crate::{collection, datastore, fcs::out::Configuration};
 
 pub struct Telemetry;
 
@@ -16,6 +16,10 @@ macro_rules! next_row {
             return $frame;
         }
     };
+}
+
+fn percentage<T: Into<i32>>(value: T, max: T) -> i8 {
+    (value.into() * 100 / max.into()) as i8
 }
 
 impl Telemetry {
@@ -36,35 +40,39 @@ impl Telemetry {
             }
         });
 
-        let att = collection.imu.attitude;
-        write!(buf, "ATT {:4} {:4} {:4}", att.roll as i16, att.pitch as i16, att.yaw as i16).ok();
-        next_row!(frame, buf, row, H);
-
         let pos = collection.ins.position;
         let (lat, lon) = (pos.latitude.into::<'o'>(), pos.longitude.into::<'o'>());
         write!(buf, "POS {} {}", lat, lon).ok();
         next_row!(frame, buf, row, H);
 
+        let att = collection.imu.attitude;
+        write!(buf, "ATT {:4} {:4} {:4}", att.roll as i16, att.pitch as i16, att.yaw as i16).ok();
+        next_row!(frame, buf, row, H);
+
         let axes = collection.control.axes;
-        write!(buf, "RC  {:4}T {:5} {:5} {:5}", axes.throttle, axes.roll, axes.pitch, axes.yaw)
-            .ok();
+        let throttle = percentage(axes.throttle, u16::MAX);
+        let roll = percentage(axes.roll, i16::MAX);
+        let pitch = percentage(axes.pitch, i16::MAX);
+        let yaw = percentage(axes.yaw, i16::MAX);
+        write!(buf, "RC  {:3}T {:4} {:4} {:4}", throttle, roll, pitch, yaw).ok();
+        next_row!(frame, buf, row, H);
+
+        match collection.fcs.control {
+            Configuration::FixedWing(fixed_wing) => {
+                write!(buf, "ENG {:3}", percentage(fixed_wing.engines[0], u16::MAX)).ok();
+                next_row!(frame, buf, row, H);
+
+                write!(buf, "CTL").ok();
+                for &(_, v) in fixed_wing.control_surface.iter() {
+                    write!(buf, " {:4}", percentage(v, i16::MAX)).ok();
+                }
+            }
+        }
         next_row!(frame, buf, row, H);
 
         write!(buf, "BAT {}v", collection.voltage.0).ok();
         next_row!(frame, buf, row, H);
 
-        match collection.fcs {
-            FCS::FixedWing(fixed_wing) => {
-                write!(buf, "ENG {:4}", fixed_wing.engines[0] / 16).ok();
-                next_row!(frame, buf, row, H);
-
-                write!(buf, "CTL").ok();
-                for (_, v) in fixed_wing.control_surface.iter() {
-                    write!(buf, " {:5}", v / 16).ok();
-                }
-            }
-        }
-        next_row!(frame, buf, row, H);
         let _ = row;
 
         frame
@@ -86,12 +94,12 @@ mod test {
             .map(|bytes| from_utf8(bytes).unwrap().trim_end_matches('\0'))
             .collect::<Vec<_>>();
         let expected = vec![
-            "ATT    0    0    0",
             "POS N00o00'000 E000o00'000",
-            "RC     0T     0     0     0",
-            "BAT 0.0v",
-            "ENG    0",
+            "ATT    0    0    0",
+            "RC    0T    0    0    0",
+            "ENG   0",
             "CTL",
+            "BAT 0.0v",
         ];
         assert_eq!(expected, actual);
     }

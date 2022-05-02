@@ -87,8 +87,8 @@ impl<C: Copy + Default + Coordinate> Acceleration<C> {
 }
 
 impl<C: Copy + Default> Acceleration<C> {
-    pub fn g_force(&self) -> u8 {
-        (self.0.scalar().raw / GRAVITY * 10.0) as u8
+    pub fn g_force(&self) -> f32 {
+        self.0.scalar().raw / GRAVITY
     }
 }
 

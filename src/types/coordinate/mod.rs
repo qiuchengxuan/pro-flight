@@ -1,6 +1,6 @@
 use core::num::FpCategory;
 
-#[allow(unused_imports)] // false warning
+#[cfg(not(any(test, feature = "std")))]
 use micromath::F32Ext;
 
 pub const U_DEGREE: char = '°';

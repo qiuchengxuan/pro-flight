@@ -3,7 +3,7 @@ use alloc::{boxed::Box, vec::Vec};
 use embedded_hal::PwmPin;
 use heapless::LinearMap;
 
-use crate::{config::peripherals::pwm as config, datastore, fcs::out::FCS};
+use crate::{config::peripherals::pwm as config, datastore, fcs::out::Configuration};
 
 type PWM = Box<dyn PwmPin<Duty = u16> + Send>;
 
@@ -75,8 +75,8 @@ impl<'a> PWMs<'a> {
         if self.config_iteration != crate::config::iteration() {
             self.reconfigure();
         }
-        match datastore::acquire().read_fcs() {
-            FCS::FixedWing(fixed_wing) => {
+        match datastore::acquire().read_fcs().control {
+            Configuration::FixedWing(fixed_wing) => {
                 for (i, &value) in fixed_wing.engines.iter().enumerate() {
                     if let Some(&(motor, index)) = self.motors.get(i) {
                         let (_, ref mut pwm) = &mut self.pwms[index];

@@ -5,6 +5,10 @@ battery:
   warning-cell-voltage: 3.5
 fcs:
   configuration: airplane
+  envelop:
+    max-roll: 67
+    min-pitch: -15
+    max-pitch: 30
   pids:
     roll:
       max-rate: 150
@@ -92,16 +96,16 @@ peripherals:
 inputs:
   axes:
     throttle:
-      channel: 3
+      channel: 2
       scale: 1.1
     roll:
-      channel: 1
+      channel: 0
       scale: 1.0
     pitch:
-      channel: 2
+      channel: 1
       scale: 1.0
     yaw:
-      channel: 4
+      channel: 3
       scale: 1.0
   toggles:
     - channel: 5

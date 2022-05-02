@@ -1,5 +1,3 @@
-use fixed_point::FixedPoint;
-
 use crate::types::measurement::voltage::Voltage;
 
 use super::pathset::{Error, Path, PathSet, Value};

@@ -26,7 +26,7 @@ impl Receiver for RemoteControl {
             Protocol::SBUS(ref mut sbus) => sbus.receive(bytes),
         };
         if let Some(raw) = raw {
-            self.matrix.read(&raw.channels);
+            self.matrix.read(&raw);
         }
     }
 

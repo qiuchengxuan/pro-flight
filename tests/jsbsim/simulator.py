@@ -71,7 +71,7 @@ class IMU:
 
 
 @dataclass
-class FCS:
+class FixedWing:
     engines: List[Union[int, float]]
     aileron_left: Union[int, float]
     aileron_right: Union[int, float]
@@ -81,7 +81,13 @@ class FCS:
     def normalize(self):
         engines = [e / 65536 for e in self.engines]
         array = [self.aileron_left, self.aileron_right, self.elevator, self.rudder]
-        return FCS(engines, *[v / 32768 for v in array])
+        return FixedWing(engines, *[v / 32768 for v in array])
+
+
+@dataclass
+class FCS:
+    output: List[float]
+    control: FixedWing
 
 
 @dataclass

@@ -9,7 +9,7 @@ version = "0.0.1"
 bmp280-core = "0.2"
 cortex-m = { version = "0.7", optional = true }
 embedded-hal = "0.2"
-fixed-point = { path = "../fixed-point" }
+fixed-point = { version = "1.0", default-features = false, features = ["serde"] }
 fugit = "0.3"
 hal = { path = "../hal" }
 log = { version = "0.4", default-features = false }

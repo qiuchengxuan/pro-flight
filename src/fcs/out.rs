@@ -1,8 +1,9 @@
 use heapless::Vec;
+use nalgebra::Vector3;
 use serde::ser::SerializeMap;
 
 use crate::{
-    config::{fcs::Configuration, peripherals::pwm::ServoType},
+    config::{fcs::Configuration as Config, peripherals::pwm::ServoType},
     types::control,
 };
 
@@ -24,20 +25,20 @@ impl serde::Serialize for FixedWing {
 }
 
 impl FixedWing {
-    fn from(axes: control::Axes, configuration: Configuration) -> Self {
+    fn from(axes: control::Axes, config: Config) -> Self {
         let mut control_surface: Vec<(ServoType, i16), 4> = Vec::new();
-        match configuration {
-            Configuration::Airplane => {
+        match config {
+            Config::Airplane => {
                 control_surface.push((ServoType::AileronLeft, -axes.roll)).ok();
                 control_surface.push((ServoType::AileronRight, axes.roll)).ok();
                 control_surface.push((ServoType::Elevator, axes.pitch)).ok();
                 control_surface.push((ServoType::Rudder, axes.yaw)).ok();
             }
-            Configuration::FlyingWing => {
+            Config::FlyingWing => {
                 control_surface.push((ServoType::ElevonLeft, -axes.roll + axes.pitch)).ok();
                 control_surface.push((ServoType::ElevonRight, axes.roll + axes.pitch)).ok();
             }
-            Configuration::VTail => {
+            Config::VTail => {
                 control_surface.push((ServoType::AileronLeft, -axes.roll)).ok();
                 control_surface.push((ServoType::AileronRight, axes.roll)).ok();
                 let value = axes.yaw + axes.pitch;
@@ -52,18 +53,24 @@ impl FixedWing {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
-pub enum FCS {
+pub enum Configuration {
     FixedWing(FixedWing),
 }
 
-impl FCS {
-    pub fn from(axes: control::Axes, configuration: Configuration) -> FCS {
-        Self::FixedWing(FixedWing::from(axes, configuration))
+impl Configuration {
+    pub fn from(axes: control::Axes, config: Config) -> Self {
+        Self::FixedWing(FixedWing::from(axes, config))
     }
 }
 
-impl Default for FCS {
+impl Default for Configuration {
     fn default() -> Self {
         Self::FixedWing(FixedWing::default())
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct FCS {
+    pub output: Vector3<f32>,
+    pub control: Configuration,
 }

@@ -1,3 +1,5 @@
+use fugit::NanosDurationU64 as Duration;
+
 use crate::{
     datastore::DataStore,
     fcs::out::FCS,
@@ -37,7 +39,7 @@ impl<'a> Collector<'a> {
     pub fn collect(&self) -> Collection {
         Collection {
             altitude: self.0.read_altitude(),
-            control: self.0.read_control(),
+            control: self.0.read_control_within(Duration::millis(100)).unwrap_or_default(),
             fcs: self.0.read_fcs(),
             gnss: self.0.read_gnss(),
             imu: self.0.read_imu(),

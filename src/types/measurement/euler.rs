@@ -1,6 +1,6 @@
 use core::f32::consts::PI;
 
-#[allow(unused_imports)] // false warning
+#[cfg(not(any(test, feature = "std")))]
 use micromath::F32Ext;
 use nalgebra::UnitQuaternion;
 
