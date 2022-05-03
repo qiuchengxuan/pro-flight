@@ -17,6 +17,7 @@ concat-idents = "1.1"
 crc16 = { version = "0.4", default-features = false }
 derive_more = "0.99"
 embedded-hal = "0.2"
+fugit = "0.3"
 fixed-point = { path = "fixed-point" }
 git-version = "0.3"
 hal = { path = "hal" }
@@ -27,7 +28,7 @@ integer-sqrt = "0.1"
 log = { version = "0.4", default-features = false }
 max7456 = "0.1"
 micromath = "2.0"
-nalgebra = { version = "0.30", default-features = false, features = ["libm"] }
+nalgebra = { version = "0.31", default-features = false, features = ["libm-force"] }
 nb = "1"
 nmea0183-core = { git = "https://github.com/qiuchengxuan/nmea0183" }
 num-traits = { version = "0.2", default-features = false }
@@ -45,12 +46,13 @@ name = "pro_flight"
 [features]
 sleep-ms = []
 sleep-us = []
-std = ["serde/std"]
+std = ["serde/std", "nalgebra/std"]
 default-config = []
 default = []
 
 [dev-dependencies]
 hex-literal = "0.3"
+nalgebra = "0.31"
 pretty_assertions = "0.4"
 serial_test = "*"
 serde_json = "1.0"

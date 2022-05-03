@@ -1,11 +1,9 @@
-use core::{
-    fmt::{Display, Formatter},
-    time::Duration,
-};
+use core::fmt::{Display, Formatter};
 
-use crate::types::Ratio;
+use fugit::NanosDurationU64 as Duration;
 
 use super::pathset::{Error, Path, PathSet, Value};
+use crate::types::Ratio;
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -17,8 +15,8 @@ pub enum Standard {
 impl Standard {
     pub fn refresh_interval(self) -> Duration {
         match self {
-            Self::PAL => Duration::from_millis(20),
-            Self::NTSC => Duration::from_millis(16),
+            Self::PAL => Duration::millis(20),
+            Self::NTSC => Duration::millis(16),
         }
     }
 }

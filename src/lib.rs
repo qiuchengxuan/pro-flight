@@ -1,23 +1,11 @@
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 extern crate alloc;
-extern crate ascii;
-extern crate ascii_osd_hud;
-extern crate crc16;
-extern crate derive_more;
-extern crate heapless;
-extern crate integer_sqrt;
-extern crate libm;
 #[macro_use]
 extern crate log;
-extern crate micromath;
-extern crate nalgebra;
-extern crate nb;
 extern crate nmea0183_core as nmea0183;
-extern crate sbus_parser;
 #[macro_use]
 extern crate serde;
-extern crate spin;
 
 #[cfg(test)]
 #[macro_use]

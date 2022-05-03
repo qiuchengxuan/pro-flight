@@ -1,12 +1,12 @@
 use core::{
     mem::MaybeUninit,
     sync::atomic::{AtomicU32, Ordering},
-    time::Duration,
 };
 
 use drone_core::{fib::Yielded, thr::ThrToken};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
 use drone_stm32_map::periph::sys_tick::SysTickPeriph;
+use fugit::NanosDurationU64 as Duration;
 
 use super::clock::SYSCLK;
 
@@ -21,9 +21,9 @@ fn get_jiffies() -> Duration {
     let val = SYSCLK / RATE - 1 - systick.stk_val.current.read_bits();
     let counter2 = COUNTER.load(Ordering::Relaxed);
     if counter < counter2 {
-        return Duration::from_millis(counter2 as u64);
+        return Duration::millis(counter2 as u64);
     }
-    Duration::from_nanos(counter as u64 * 1000_000 + (val * 1000 / (SYSCLK / RATE / 1000)) as u64)
+    Duration::nanos(counter as u64 * 1000_000 + (val * 1000 / (SYSCLK / RATE / 1000)) as u64)
 }
 
 pub fn init(systick: SysTickPeriph, thread: impl ThrToken) {

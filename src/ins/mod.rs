@@ -1,9 +1,9 @@
-use core::time;
-
 pub mod out;
 pub mod positioning;
 pub mod speedometer;
 pub mod variometer;
+
+use fugit::NanosDurationU64 as Duration;
 
 use positioning::Positioning;
 use speedometer::Speedometer;
@@ -12,7 +12,7 @@ use variometer::Variometer;
 use crate::{datastore, types::coordinate::Position};
 
 pub struct INS {
-    interval: time::Duration,
+    interval: Duration,
     variometer: Variometer,
     speedometer: Speedometer,
     positioning: Positioning,
@@ -21,7 +21,7 @@ pub struct INS {
 
 impl INS {
     pub fn new(sample_rate: usize, variometer: Variometer) -> Self {
-        let interval = time::Duration::from_micros((1000_000 / sample_rate) as u64);
+        let interval = Duration::micros(1000_000 / sample_rate as u64);
         let speedometer = Speedometer::new(sample_rate);
         let positioning = Positioning::new(sample_rate);
         Self { interval, variometer, speedometer, positioning, initial: None }

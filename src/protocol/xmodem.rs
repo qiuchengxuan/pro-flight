@@ -1,6 +1,5 @@
-use core::time::Duration;
-
 use ascii::{AsciiChar, ToAsciiChar};
+use fugit::NanosDurationU64 as Duration;
 
 use crate::{
     io::{self, Read, Write},
@@ -64,7 +63,7 @@ impl<'a> XMODEM<'a> {
                     _ => continue,
                 }
             }
-            let read_timeout = TickTimer::after(Duration::from_secs(1));
+            let read_timeout = TickTimer::after(Duration::secs(1));
             if self.first {
                 self.stdout.write(b"C").ok();
                 self.stdout.flush().ok();

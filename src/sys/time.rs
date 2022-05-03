@@ -3,7 +3,6 @@ use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use chrono::naive::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -11,11 +10,12 @@ use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     timer::CountDown,
 };
+use fugit::NanosDurationU64 as Duration;
 use hal::rtc::{RTCReader, RTCWriter};
 use nb;
 use void::Void;
 
-pub const STEP_THRESHOLD: Duration = Duration::from_secs(5);
+pub const STEP_THRESHOLD: Duration = Duration::secs(5);
 
 use super::jiffies;
 
@@ -35,8 +35,9 @@ pub fn date() -> NaiveDate {
 pub fn time() -> NaiveTime {
     unsafe { RTC_READER.as_ref() }.map(|rtc| rtc.time()).unwrap_or_else(|| {
         let jiffies = jiffies::get();
-        let (seconds, nanos) = (jiffies.as_secs() as u32, jiffies.subsec_nanos());
-        NaiveTime::from_num_seconds_from_midnight(seconds, nanos)
+        let nanos = jiffies.to_nanos();
+        let (seconds, nanos) = (nanos / 1_000_000_000, nanos % 1_000_000_000);
+        NaiveTime::from_num_seconds_from_midnight(seconds as u32, nanos as u32)
     })
 }
 
@@ -46,8 +47,8 @@ pub fn now() -> NaiveDateTime {
 
 pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
     let now = now();
-    let delta = (datetime.time() - now.time()).abs().to_std().unwrap_or_default();
-    if datetime.date() != now.date() || delta > STEP_THRESHOLD {
+    let delta = (datetime.time() - now.time()).abs().num_nanoseconds().unwrap_or_default() as u64;
+    if datetime.date() != now.date() || Duration::nanos(delta) > STEP_THRESHOLD {
         match unsafe { RTC_WRITER.as_ref() } {
             Some(w) => w.set_datetime(datetime),
             None => return Err(Error::NotInitialized),
@@ -56,8 +57,13 @@ pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(Default)]
 pub struct TickTimer(Duration);
+
+impl Default for TickTimer {
+    fn default() -> Self {
+        Self(Duration::secs(0))
+    }
+}
 
 impl TickTimer {
     pub fn after<T: Into<Duration>>(duration: T) -> Self {
@@ -89,14 +95,14 @@ impl CountDown for TickTimer {
 
 impl<T: Into<u32>> DelayMs<T> for TickTimer {
     fn delay_ms(&mut self, ms: T) {
-        self.start(Duration::from_millis(ms.into().into()));
+        self.start(Duration::millis(ms.into() as u64));
         nb::block!(self.wait()).unwrap();
     }
 }
 
 impl<T: Into<u32>> DelayUs<T> for TickTimer {
     fn delay_us(&mut self, us: T) {
-        self.start(Duration::from_micros(us.into().into()));
+        self.start(Duration::micros(us.into() as u64));
         nb::block!(self.wait()).unwrap();
     }
 }

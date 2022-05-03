@@ -1,19 +1,17 @@
-use core::time::Duration;
-
 use embedded_hal::timer::CountDown;
 
 pub trait Thread {
     fn wakeup(&mut self);
 }
 
-pub struct Schedule<C, T> {
+pub struct Schedule<D, C, T> {
     count_down: C,
     thread: T,
-    interval: Duration,
+    interval: D,
 }
 
-impl<D: From<Duration>, C: CountDown<Time = D>, T: Thread> Schedule<C, T> {
-    pub fn new(thread: T, count_down: C, interval: Duration) -> Self {
+impl<D, C: CountDown<Time = D>, T: Thread> Schedule<D, C, T> {
+    pub fn new(thread: T, count_down: C, interval: D) -> Self {
         Self { count_down, thread, interval }
     }
 
@@ -22,7 +20,7 @@ impl<D: From<Duration>, C: CountDown<Time = D>, T: Thread> Schedule<C, T> {
     }
 }
 
-impl<D: From<Duration>, C: CountDown<Time = D>, T: Thread> Thread for Schedule<C, T> {
+impl<D: Copy, C: CountDown<Time = D>, T: Thread> Thread for Schedule<D, C, T> {
     fn wakeup(&mut self) {
         if !self.count_down.wait().is_ok() {
             return;

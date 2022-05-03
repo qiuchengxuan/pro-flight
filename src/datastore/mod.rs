@@ -1,6 +1,7 @@
-use core::{mem::MaybeUninit, time};
+use core::mem::MaybeUninit;
 
 use concat_idents::concat_idents;
+use fugit::NanosDurationU64 as Duration;
 
 use crate::{
     fcs::out::FCS,
@@ -16,10 +17,16 @@ use crate::{
     },
 };
 
-#[derive(Copy, Clone, Default)]
-struct Entry<T: Default> {
-    timestamp: time::Duration,
+#[derive(Copy, Clone)]
+struct Entry<T> {
+    timestamp: Duration,
     data: Option<T>,
+}
+
+impl<T: Default> Default for Entry<T> {
+    fn default() -> Self {
+        Self { timestamp: Duration::nanos(0), data: None }
+    }
 }
 
 impl<T: Copy + Default> Entry<T> {
@@ -27,8 +34,8 @@ impl<T: Copy + Default> Entry<T> {
         self.data.unwrap_or_default()
     }
 
-    fn read_within(&self, max_timestamp: time::Duration) -> Option<T> {
-        if !max_timestamp.is_zero() && self.timestamp > max_timestamp {
+    fn read_within(&self, max_timestamp: Duration) -> Option<T> {
+        if self.timestamp > max_timestamp {
             return None;
         }
         self.data
@@ -45,8 +52,8 @@ macro_rules! datastore {
         impl DataStore {
             $(
                 concat_idents!(getter = read_, $names, _within {
-                    pub fn getter(&self, timeout: time::Duration) -> Option<$types> {
-                        self.$names.read().read_within(jiffies::get() + timeout)
+                    pub fn getter(&self, timeout: Duration) -> Option<$types> {
+                        self.$names.read().read_within(jiffies::get() + timeout.convert())
                     }
                 });
 

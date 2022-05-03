@@ -8,6 +8,7 @@ version = "0.0.1"
 [dependencies]
 chrono = { version = "0.4", default-features = false }
 embedded-hal = "0.2"
+fugit = "0.3"
 
 [lib]
 name = "hal"

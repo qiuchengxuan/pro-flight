@@ -10,6 +10,7 @@ bmp280-core = "0.2"
 cortex-m = { version = "0.6", optional = true }
 embedded-hal = "0.2"
 fixed-point = { path = "../fixed-point" }
+fugit = "0.3"
 hal = { path = "../hal" }
 log = { version = "0.4", default-features = false }
 max7456 = { git = "https://github.com/qiuchengxuan/max7456.git" }

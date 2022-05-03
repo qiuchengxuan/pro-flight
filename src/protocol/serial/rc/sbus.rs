@@ -1,6 +1,5 @@
-use core::time::Duration;
-
 use embedded_hal::timer::CountDown;
+use fugit::MillisDurationU32 as Duration;
 use sbus_parser::receiver::Receiver;
 
 use crate::{protocol::rc::RawControl, sys::time::TickTimer};
@@ -15,10 +14,9 @@ pub struct SBUS {
 
 impl SBUS {
     pub fn new(fast: bool) -> Self {
-        let gap = Duration::from_millis(if fast { 10 } else { 20 } - 1);
         Self {
             receiver: Receiver::new(),
-            inter_frame_gap: gap,
+            inter_frame_gap: Duration::millis(if fast { 10 } else { 20 } - 1),
             timer: TickTimer::default(),
             loss_bitmap: 0u128,
             loss_bitmap_index: 0,
@@ -44,7 +42,7 @@ impl SBUS {
             None => return None,
         };
         self.receiver.reset();
-        self.timer.start(self.inter_frame_gap);
+        self.timer.start(self.inter_frame_gap.convert());
 
         if packet.frame_lost {
             self.loss_bitmap |= 1u128 << self.loss_bitmap_index;

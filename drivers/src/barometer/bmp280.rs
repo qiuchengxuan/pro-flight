@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use core::{future::Future, time::Duration};
+use core::future::Future;
 
 pub use bmp280::DEFAULT_SPI_MODE as SPI_MODE;
 use bmp280::{
@@ -15,6 +15,7 @@ use embedded_hal::{
     },
     digital::v2::OutputPin,
 };
+use fugit::NanosDurationU64 as Duration;
 use hal::dma::{BufferDescriptor, TransferOption, DMA};
 use pro_flight::{sys::time::TickTimer, types::measurement::Pressure};
 
@@ -89,7 +90,7 @@ where
             if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
                 handler(self.compensator.convert(&buffer));
             }
-            TickTimer::after(Duration::from_micros(62_500)).await;
+            TickTimer::after(Duration::micros(62_500)).await;
         }
     }
 }

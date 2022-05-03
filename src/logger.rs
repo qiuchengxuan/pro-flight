@@ -82,11 +82,10 @@ impl Log for Logger {
 
     fn log(&self, record: &Record) {
         let jiffies = jiffies::get();
-        let seconds = jiffies.as_secs() as u32;
-        println!("[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), record.args());
+        let millis = jiffies.to_millis() as u32;
+        println!("[{:5}.{:03}] {}", millis / 1000, millis % 1000, record.args());
         let log_buffer = unsafe { &mut LOG_BUFFER };
-        writeln!(log_buffer, "[{:5}.{:03}] {}", seconds, jiffies.subsec_millis(), record.args())
-            .ok();
+        writeln!(log_buffer, "[{:5}.{:03}] {}", millis / 1000, millis % 1000, record.args()).ok();
     }
 
     fn flush(&self) {}

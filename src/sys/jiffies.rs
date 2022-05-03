@@ -1,15 +1,15 @@
-use core::time;
+use fugit::NanosDurationU64 as Duration;
 
 #[cfg(not(test))]
 extern "Rust" {
-    fn get_jiffies() -> time::Duration;
+    fn get_jiffies() -> Duration;
 }
 
 #[cfg(test)]
-unsafe fn get_jiffies() -> time::Duration {
-    time::Duration::from_secs(1)
+unsafe fn get_jiffies() -> Duration {
+    Duration::secs(1)
 }
 
-pub fn get() -> time::Duration {
+pub fn get() -> Duration {
     unsafe { get_jiffies() }
 }

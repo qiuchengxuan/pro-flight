@@ -1,10 +1,11 @@
 use alloc::boxed::Box;
-use core::{future::Future, mem, ptr, time::Duration};
+use core::{future::Future, mem, ptr};
 
 use embedded_hal::{
     blocking::spi::{Transfer, Write},
     digital::v2::OutputPin,
 };
+use fugit::NanosDurationU64 as Duration;
 use hal::dma::{BufferDescriptor, TransferOption, TransferResult, DMA};
 use max7456::{
     character_memory::{build_store_char_operation, CHAR_DATA_SIZE, STORE_CHAR_BUFFER_SIZE},
@@ -107,7 +108,7 @@ where
         char_data.copy_from_slice(bytes);
         build_store_char_operation(&char_data, index, buffer.as_mut());
         mem::drop(buffer);
-        let timer = TickTimer::after(Duration::from_millis(13));
+        let timer = TickTimer::after(Duration::millis(13));
         self.cs.set_low().ok();
         self.tx.tx(&self.bd, TransferOption::default().size(STORE_CHAR_BUFFER_SIZE)).unwrap().await;
         timer.await;

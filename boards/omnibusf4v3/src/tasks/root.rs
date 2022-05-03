@@ -1,7 +1,6 @@
 //! The root task.
 
 use alloc::boxed::Box;
-use core::time::Duration;
 
 use chips::stm32f4::{
     adc::IntoDMA as _,
@@ -32,6 +31,7 @@ use drone_stm32_map::periph::{
     spi::{periph_spi1, periph_spi3},
     sys_tick::periph_sys_tick,
 };
+use fugit::NanosDurationU64 as Duration;
 use hal::{
     dma::DMA,
     persist::PersistDatastore,
@@ -204,7 +204,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let ds = datastore::acquire();
     threads.bmp280.add_exec(bmp280.run(compensator, move |v| ds.write_altitude(v.into())));
     let thread = into_thread(threads.bmp280);
-    let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::from_millis(1));
+    let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::millis(1));
 
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
     cs_osd.set_high().ok();
@@ -256,7 +256,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     }));
 
     let thread = into_thread(threads.fcs);
-    let mut servos = Schedule::new(thread, TickTimer::default(), Duration::from_millis(20));
+    let mut servos = Schedule::new(thread, TickTimer::default(), Duration::millis(20));
 
     threads.sys_tick.add_fn(never_complete(move || {
         max7456.wakeup();
@@ -268,7 +268,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         commands!((bootloader, [persist]), (osd, [event]), (save, [nvram]), (telemetry, []));
     let mut cli = CLI::new(commands);
     loop {
-        TickTimer::after(Duration::from_millis(1)).root_wait();
+        TickTimer::after(Duration::millis(1)).root_wait();
         led.wakeup();
         cli.run();
     }

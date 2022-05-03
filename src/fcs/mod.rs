@@ -1,12 +1,12 @@
 pub mod out;
 pub mod pid;
 
-use core::time;
+use fugit::NanosDurationU64 as Duration;
 
 use crate::{config::fcs::Configuration, datastore};
 
 pub struct FCS {
-    interval: time::Duration,
+    interval: Duration,
 
     config_iteration: usize,
     configuration: Configuration,
@@ -21,7 +21,7 @@ impl FCS {
 
     pub fn new(sample_rate: usize) -> Self {
         Self {
-            interval: time::Duration::from_micros((1000_000 / sample_rate) as u64),
+            interval: Duration::micros(1000_000 / sample_rate as u64),
             config_iteration: crate::config::iteration(),
             configuration: crate::config::get().fcs.configuration,
             pids: pid::PIDs::new(&crate::config::get().fcs.pids),
@@ -36,7 +36,10 @@ impl FCS {
         let ds = datastore::acquire();
         let control = ds.read_control_within(self.interval).unwrap_or_default();
         let imu = ds.read_imu();
-        let axes = self.pids.next_control(control.axes, imu.gyro);
+        let mut axes = self.pids.next_control(control.axes, imu.gyro);
+        if control.axes.yaw.is_positive() != axes.yaw.is_positive() || control.axes.yaw == 0 {
+            axes.yaw = 0;
+        }
         let output = out::FCS::from(axes, self.configuration);
         ds.write_fcs(output);
     }

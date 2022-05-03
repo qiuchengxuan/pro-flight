@@ -1,5 +1,6 @@
-use core::time;
+pub mod out;
 
+use fugit::NanosDurationU64 as Duration;
 use nalgebra::Vector3;
 
 use crate::{
@@ -14,8 +15,6 @@ use crate::{
         sensor::{Bias, Gain, Readout},
     },
 };
-
-pub mod out;
 
 #[derive(PartialEq)]
 pub enum CalibrationStatus {
@@ -71,7 +70,7 @@ impl Calibration {
 }
 
 pub struct IMU {
-    interval: time::Duration,
+    interval: Duration,
     ahrs: Mahony,
     calibration: Calibration,
     acceleration: Vector3<f32>,
@@ -80,7 +79,7 @@ pub struct IMU {
 impl IMU {
     pub fn new(sample_rate: usize) -> Self {
         let config = config::get().imu;
-        let interval = time::Duration::from_micros((1000_000 / sample_rate) as u64);
+        let interval = Duration::micros(1000_000 / sample_rate as u64);
         let (kp, ki) = (config.mahony.kp.into(), config.mahony.ki.into());
         let calibration = Calibration {
             accelerometer: Sensor {

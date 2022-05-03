@@ -1,6 +1,5 @@
-use core::time::Duration;
-
 use embedded_hal::{digital::v2::OutputPin, timer::CountDown};
+use fugit::NanosDurationU64 as Duration;
 use hal::thread::Thread;
 
 pub struct LED<P, C> {
@@ -22,10 +21,10 @@ impl<E, T: From<Duration>, P: OutputPin<Error = E>, C: CountDown<Time = T>> Thre
             return;
         }
         if self.on {
-            self.count_down.start(Duration::from_millis(980));
+            self.count_down.start(Duration::millis(980));
             self.pin.set_high().ok();
         } else {
-            self.count_down.start(Duration::from_millis(20));
+            self.count_down.start(Duration::millis(20));
             self.pin.set_low().ok();
         }
         self.on = !self.on;

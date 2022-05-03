@@ -1,18 +1,15 @@
 #[macro_use]
 extern crate log;
-extern crate pro_flight;
 
 pub mod simulator;
 
 pub use simulator::{Config, Simulator};
 
-use std::{
-    sync::atomic::{AtomicUsize, Ordering},
-    time,
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use actix_web::{get, post, put, web, App, HttpResponse, HttpServer, Responder};
 use async_std::sync::Mutex;
+use fugit::NanosDurationU64;
 use pro_flight::{
     protocol::serial::gnss::out::GNSS,
     types::{
@@ -24,8 +21,8 @@ use pro_flight::{
 static TICK: AtomicUsize = AtomicUsize::new(0);
 
 #[no_mangle]
-fn get_jiffies() -> time::Duration {
-    time::Duration::from_millis(TICK.load(Ordering::Relaxed) as u64)
+fn get_jiffies() -> NanosDurationU64 {
+    NanosDurationU64::millis(TICK.load(Ordering::Relaxed) as u64)
 }
 
 static SIMULATOR: Mutex<Option<Simulator>> = Mutex::new(None);
