@@ -22,7 +22,7 @@ debug = []
 
 [dependencies]
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
-cortex-m = "0.6"
+cortex-m = "0.7"
 chips = { path = "../../chips", features = ["stm32"] }
 drone-core = { path = "../../drone-os/drone-core" }
 drivers = { path = "../../drivers", features = ["stm32"] }
@@ -46,10 +46,10 @@ features = ["dma", "exti", "flash", "rtc", "spi"]
 [dependencies.pro-flight]
 path = "../.."
 default-features = false
-features = ["sleep-ms", "default-config"]
+features = ["default-config"]
 
 [dependencies.stm32f4xx-hal]
-version = "0.9.0"
+version = "0.11"
 features = ["stm32f405", "rt", "usb_fs"]
 
 [profile.release]

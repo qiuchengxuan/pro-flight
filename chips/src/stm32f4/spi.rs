@@ -19,10 +19,7 @@ impl BaudrateControl {
 
 #[macro_export]
 macro_rules! __define_spi {
-    (
-        $spi:ident =>
-        ($gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:ident, $into_af:ident)
-    ) => {
+    ($spi:ident => ($gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:literal)) => {
         type $sclk = gpio::$gpio::$sclk<Input<Floating>>;
         type $miso = gpio::$gpio::$miso<Input<Floating>>;
         type $mosi = gpio::$gpio::$mosi<Input<Floating>>;
@@ -31,9 +28,9 @@ macro_rules! __define_spi {
             sr: SPI::CSpiSr,
             dr: SPI::CSpiDr,
             cr2: SPI::SSpiCr2,
-            sclk: gpio::$gpio::$sclk<Alternate<gpio::$af>>,
-            miso: gpio::$gpio::$miso<Alternate<gpio::$af>>,
-            mosi: gpio::$gpio::$mosi<Alternate<gpio::$af>>,
+            sclk: gpio::$gpio::$sclk<Alternate<PushPull, $af>>,
+            miso: gpio::$gpio::$miso<Alternate<PushPull, $af>>,
+            mosi: gpio::$gpio::$mosi<Alternate<PushPull, $af>>,
         }
 
         impl $spi<spi::$spi> {
@@ -55,7 +52,8 @@ macro_rules! __define_spi {
                     r.write_br(baudrate.0).set_ssm().set_ssi().set_mstr().set_spe()
                 });
                 regs.spi_cr2.store(|r| r.set_rxneie().set_errie());
-                let (sclk, miso, mosi) = (sclk.$into_af(), miso.$into_af(), mosi.$into_af());
+                let (sclk, miso, mosi) =
+                    (sclk.into_alternate(), miso.into_alternate(), mosi.into_alternate());
                 let (sr, dr) = (regs.spi_sr.into_copy(), regs.spi_dr.into_copy());
                 Self { sr, dr, cr2: regs.spi_cr2, sclk, miso, mosi }
             }
@@ -118,23 +116,17 @@ macro_rules! __define_spi {
 macro_rules! __define_spis {
     () => {};
     (
-        $spi:ident => (
-            $gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:ident, $into_af:ident
-        )
-        $($spis:ident => (
-            $gpios:ident, $sclks:ident, $misos:ident, $mosis:ident, $afs:ident, $into_afs:ident
-        ))*
+        $spi:ident => ($gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:literal)
+        $($spis:ident => ($gpios:ident, $sclks:ident, $misos:ident, $mosis:ident, $afs:literal))*
     ) => {
-        __define_spi!{$spi => ($gpio, $sclk, $miso, $mosi, $af, $into_af)}
-        __define_spis!{$($spis => ($gpios, $sclks, $misos, $mosis, $afs, $into_afs))*}
+        __define_spi!{$spi => ($gpio, $sclk, $miso, $mosi, $af)}
+        __define_spis!{$($spis => ($gpios, $sclks, $misos, $mosis, $afs))*}
     }
 }
 
 #[macro_export]
 macro_rules! define_spis {
-    ($($spi:ident => (
-        $gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:ident, $into_af:ident
-    ))+) => {
+    ($($spi:ident => ($gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:literal))+) => {
         use drone_core::sync::spsc::oneshot;
         use drone_core::fib::{FiberFuture, FiberFn, FiberState};
         use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*, thr::ThrNvic};
@@ -153,6 +145,6 @@ macro_rules! define_spis {
 
         type R = Result<u32, Error>;
 
-        __define_spis!{$($spi => ($gpio, $sclk, $miso, $mosi, $af, $into_af))+}
+        __define_spis!{$($spi => ($gpio, $sclk, $miso, $mosi, $af))+}
     };
 }

@@ -1,9 +1,9 @@
 use core::slice::from_raw_parts;
 
 use crc::Hasher32;
-use stm32f4xx_hal::stm32;
+use stm32f4xx_hal::pac;
 
-pub struct CRC(pub stm32::CRC);
+pub struct CRC(pub pac::CRC);
 
 impl Hasher32 for CRC {
     fn reset(&mut self) {

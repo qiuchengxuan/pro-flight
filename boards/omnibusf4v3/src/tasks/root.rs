@@ -59,9 +59,9 @@ use stm32f4xx_hal::{
     adc::Adc,
     gpio::{Edge, ExtiPin},
     otg_fs::{UsbBus, USB},
+    pac,
     prelude::*,
     serial::Serial,
-    stm32,
 };
 
 use crate::{
@@ -79,7 +79,7 @@ macro_rules! into_interrupt {
         let mut int = $gpio.into_pull_up_input();
         int.make_interrupt_source(&mut $syscfg);
         int.enable_interrupt(&mut $peripherals.EXTI);
-        int.trigger_on_edge(&mut $peripherals.EXTI, Edge::FALLING);
+        int.trigger_on_edge(&mut $peripherals.EXTI, Edge::Falling);
         int
     }};
 }
@@ -96,7 +96,7 @@ fn never_complete(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
 pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut threads = thread::init(thr_init);
     threads.hard_fault.add_once(|| panic!("Hard Fault"));
-    let mut peripherals = stm32::Peripherals::take().unwrap();
+    let mut peripherals = pac::Peripherals::take().unwrap();
     let rcc = peripherals.RCC.constrain();
     let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).require_pll48clk().freeze();
     systick::init(periph_sys_tick!(reg), threads.sys_tick);
@@ -105,7 +105,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let (usb_global, usb_device, usb_pwrclk) =
         (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
     let gpio_a = peripherals.GPIOA.split();
-    let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate_af10(), gpio_a.pa12.into_alternate_af10());
+    let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate(), gpio_a.pa12.into_alternate());
     let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clocks.hclk() };
     static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
     let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
@@ -207,7 +207,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::millis(1));
 
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
-    cs_osd.set_high().ok();
+    cs_osd.set_high();
     let event = event::Event::default();
     let max7456 = max7456::init(spi, cs_osd).unwrap();
     let max7456 = max7456.into_dma(event.clone(), tx).unwrap();
@@ -217,9 +217,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut max7456 = Schedule::new(thread, TickTimer::default(), standard.refresh_interval());
 
     if let Some(config) = config::get().peripherals.serials.get("USART1") {
-        let pins = (gpio_a.pa9.into_alternate_af7(), gpio_a.pa10.into_alternate_af7());
+        let pins = (gpio_a.pa9.into_alternate(), gpio_a.pa10.into_alternate());
         let serial_config = usart::to_serial_config(&config);
-        let usart1 = Serial::usart1(peripherals.USART1, pins, serial_config, clocks).unwrap();
+        let usart1 = Serial::new(peripherals.USART1, pins, serial_config, &clocks).unwrap();
         let dma_rx = dma::Stream::new(periph_dma2_ch5!(reg), threads.dma2_stream5);
         if let Some(receiver) = serial::make_receiver(config) {
             usart::init(usart1.into_dma(), dma_rx, 4, receiver);
@@ -231,13 +231,13 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     if let Some(config) = config::get().peripherals.serials.get("USART6") {
         if let SerialConfig::RC(RC::SBUS(sbus_config)) = config {
             if sbus_config.rx_inverted {
-                gpio_c.pc8.into_push_pull_output().set_high().ok();
+                gpio_c.pc8.into_push_pull_output().set_high();
                 trace!("USART6 rx inverted");
             }
         }
-        let pins = (gpio_c.pc6.into_alternate_af8(), gpio_c.pc7.into_alternate_af8());
+        let pins = (gpio_c.pc6.into_alternate(), gpio_c.pc7.into_alternate());
         let serial_config = usart::to_serial_config(&config);
-        let usart6 = Serial::usart6(peripherals.USART6, pins, serial_config, clocks).unwrap();
+        let usart6 = Serial::new(peripherals.USART6, pins, serial_config, &clocks).unwrap();
         let dma_rx = dma::Stream::new(periph_dma2_ch1!(reg), threads.dma2_stream1);
         if let Some(receiver) = serial::make_receiver(config) {
             usart::init(usart6.into_dma(), dma_rx, 5, receiver);
@@ -247,7 +247,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     info!("Initialize PWMs");
     let tims = (peripherals.TIM1, peripherals.TIM2, peripherals.TIM3, peripherals.TIM5);
     let pins = (gpio_b.pb0, gpio_b.pb1, gpio_a.pa2, gpio_a.pa3, gpio_a.pa1, gpio_a.pa8);
-    let pwms = crate::pwm::init(tims, pins, clocks, &config::get().peripherals.pwms);
+    let pwms = crate::pwm::init(tims, pins, &clocks, &config::get().peripherals.pwms);
     let mut servos = PWMs::new(pwms);
     let mut fcs = FCS::new(SAMPLE_RATE);
     threads.fcs.add_fn(never_complete(move || {

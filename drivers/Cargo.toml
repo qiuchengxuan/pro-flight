@@ -7,7 +7,7 @@ version = "0.0.1"
 
 [dependencies]
 bmp280-core = "0.2"
-cortex-m = { version = "0.6", optional = true }
+cortex-m = { version = "0.7", optional = true }
 embedded-hal = "0.2"
 fixed-point = { path = "../fixed-point" }
 fugit = "0.3"
@@ -22,7 +22,7 @@ usb-device = "0.2.8"
 usbd-serial = "0.1.1"
 
 [dependencies.stm32f4xx-hal]
-version = "0.9.0"
+version = "0.11"
 features = ["stm32f405", "rt", "usb_fs"]
 optional = true
 

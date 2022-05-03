@@ -7,7 +7,7 @@ use core::{
 use pro_flight::io::Error;
 use stm32f4xx_hal::{
     otg_fs::{UsbBus, USB},
-    stm32,
+    pac,
 };
 use usb_device::{bus::UsbBusAllocator, prelude::*};
 use usbd_serial::{SerialPort, UsbError};
@@ -19,7 +19,7 @@ static RX_FULL: AtomicBool = AtomicBool::new(false);
 
 unsafe fn poll() {
     if RX_FULL.fetch_or(true, Ordering::Relaxed) {
-        cortex_m::peripheral::NVIC::mask(stm32::Interrupt::OTG_FS)
+        cortex_m::peripheral::NVIC::mask(pac::Interrupt::OTG_FS)
     }
     let device = &mut *USB_DEVICE.as_mut_ptr();
     let serial_port = SERIAL_PORT.as_mut().unwrap();
@@ -68,7 +68,7 @@ pub fn read_bytes(buffer: &mut [u8]) -> Result<usize, Error> {
         None => Ok(0),
     };
     if RX_FULL.fetch_and(false, Ordering::Relaxed) {
-        unsafe { cortex_m::peripheral::NVIC::unmask(stm32::Interrupt::OTG_FS) }
+        unsafe { cortex_m::peripheral::NVIC::unmask(pac::Interrupt::OTG_FS) }
     }
     result
 }

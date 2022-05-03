@@ -44,8 +44,6 @@ void = { version = "1", default-features = false }
 name = "pro_flight"
 
 [features]
-sleep-ms = []
-sleep-us = []
 std = ["serde/std", "nalgebra/std"]
 default-config = []
 default = []

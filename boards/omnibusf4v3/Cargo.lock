@@ -144,12 +144,9 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "cast"
-version = "0.2.7"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c24dab4283a142afa2fdca129b80ad2c6284e073930f964c3a1293c225ee39a"
-dependencies = [
- "rustc_version 0.4.0",
-]
+checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cfg-if"
@@ -162,7 +159,7 @@ name = "chips"
 version = "0.0.1"
 dependencies = [
  "chrono",
- "cortex-m 0.6.7",
+ "cortex-m 0.7.4",
  "crc",
  "drone-core",
  "drone-cortexm",
@@ -229,19 +226,18 @@ dependencies = [
 
 [[package]]
 name = "cortex-m-rt"
-version = "0.6.15"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "454f278bf469e2de0a4d22ea019d169d8944f86957c8207a39e3f66c32be2fc6"
+checksum = "3c433da385b720d5bb9f52362fa2782420798e68d40d67bfe4b0d992aba5dfe7"
 dependencies = [
  "cortex-m-rt-macros",
- "r0",
 ]
 
 [[package]]
 name = "cortex-m-rt-macros"
-version = "0.6.15"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8e3aa52243e26f5922fa522b0814019e0c98fc567e2756d715dce7ad7a81f49"
+checksum = "f0f6f3e36f203cfedbc78b357fb28730aa2c6dc1ab060ee5c2405e843988d3c7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -302,7 +298,7 @@ name = "drivers"
 version = "0.0.1"
 dependencies = [
  "bmp280-core",
- "cortex-m 0.6.7",
+ "cortex-m 0.7.4",
  "embedded-hal",
  "fixed-point",
  "fugit",
@@ -1034,7 +1030,7 @@ version = "0.1.0"
 dependencies = [
  "chips",
  "chrono",
- "cortex-m 0.6.7",
+ "cortex-m 0.7.4",
  "cortex-m-semihosting",
  "drivers",
  "drone-core",
@@ -1142,12 +1138,6 @@ checksum = "a1feb54ed693b93a84e14094943b84b7c4eae204c512b7ccb95ab0c66d278ad1"
 dependencies = [
  "proc-macro2",
 ]
-
-[[package]]
-name = "r0"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2a38df5b15c8d5c7e8654189744d8e396bddc18ad48041a500ce52d6948941f"
 
 [[package]]
 name = "rand_core"
@@ -1345,11 +1335,11 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stm32f4"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da3d56009c8f32e4f208dbea17df72484154d1040a8969b75d8c73eb7b18fe8f"
+checksum = "379f030a0586d0aa3574cb6497392142ddf125c8146b7b580b4b6b46db9d7dc9"
 dependencies = [
- "bare-metal 0.2.5",
+ "bare-metal 1.0.0",
  "cortex-m 0.7.4",
  "cortex-m-rt",
  "vcell",
@@ -1357,9 +1347,9 @@ dependencies = [
 
 [[package]]
 name = "stm32f4xx-hal"
-version = "0.9.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89b4cb13b1bb36e7381eaf8941062b1eba172542b9d4f72dc50c35c4ac6260f2"
+checksum = "a9e687d08bd5a2d188109b8c325cb09f1c9f231b2c45e46bcbb1270bf5e912a3"
 dependencies = [
  "bare-metal 1.0.0",
  "cast",
@@ -1367,6 +1357,7 @@ dependencies = [
  "cortex-m-rt",
  "embedded-dma",
  "embedded-hal",
+ "fugit",
  "nb 1.0.0",
  "rand_core",
  "rtcc",

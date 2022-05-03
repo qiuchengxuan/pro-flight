@@ -1,6 +1,6 @@
 use hal::dma::Peripheral;
 
-use stm32f4xx_hal::{adc::Adc, stm32};
+use stm32f4xx_hal::{adc::Adc, pac};
 
 pub struct AdcPeripheral(usize);
 
@@ -20,7 +20,7 @@ pub trait IntoDMA {
     fn into_dma(self) -> AdcPeripheral;
 }
 
-impl IntoDMA for Adc<stm32::ADC2> {
+impl IntoDMA for Adc<pac::ADC2> {
     fn into_dma(mut self) -> AdcPeripheral {
         AdcPeripheral(self.data_register_address() as usize)
     }

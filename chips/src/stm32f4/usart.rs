@@ -3,8 +3,8 @@ use hal::dma::Peripheral;
 use embedded_hal::serial;
 use stm32f4xx_hal::{
     dma::traits::PeriAddress,
+    pac,
     serial::{Error, Pins, Rx, Serial},
-    stm32,
 };
 
 pub struct UsartPeripheral<RX> {
@@ -66,5 +66,5 @@ macro_rules! dma_usart {
     };
 }
 
-dma_usart!(1, stm32::USART1);
-dma_usart!(6, stm32::USART6);
+dma_usart!(1, pac::USART1);
+dma_usart!(6, pac::USART6);
