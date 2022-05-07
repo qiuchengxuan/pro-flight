@@ -19,16 +19,17 @@ fn ratio(axis: i16) -> f32 {
 impl PIDs {
     fn config_to_pid(config: &crate::config::fcs::PID) -> Pid<f32> {
         let (kp, ki, kd) = (config.kp.into(), config.ki.into(), config.kd.into());
-        Pid::new(kp, ki, kd, 1.0, 1.0, 1.0, 1.0, 0.0)
+        Pid::new(kp, ki, kd, f32::MAX, f32::MAX, f32::MAX, f32::MAX, 0.0)
     }
 
     pub fn new(config: &crate::config::fcs::PIDs) -> Self {
         let roll = Self::config_to_pid(&config.roll);
         let pitch = Self::config_to_pid(&config.pitch);
         let yaw = Self::config_to_pid(&config.yaw);
-        let max_rates =
-            (config.roll.max_rate as f32, config.pitch.max_rate as f32, config.yaw.max_rate as f32);
-        Self { roll, pitch, yaw, max_rates }
+        let max_roll = config.roll.max_rate as f32;
+        let max_pitch = config.pitch.max_rate as f32;
+        let max_yaw = config.yaw.max_rate as f32;
+        Self { roll, pitch, yaw, max_rates: (max_roll, max_pitch, max_yaw) }
     }
 
     pub fn reconfigure(&mut self, config: &crate::config::fcs::PIDs) {
@@ -40,9 +41,9 @@ impl PIDs {
         self.pitch.setpoint = ratio(axes.pitch) * self.max_rates.1;
         self.yaw.setpoint = ratio(axes.yaw) * self.max_rates.2;
 
-        let roll = self.roll.next_control_output(gyro.0.y().raw).output;
-        let pitch = -self.pitch.next_control_output(gyro.0.x().raw).output;
-        let yaw = self.yaw.next_control_output(gyro.0.z().raw).output;
+        let roll = self.roll.next_control_output(gyro.0.y().raw).output / 100.0;
+        let pitch = self.pitch.next_control_output(gyro.0.x().raw).output / 100.0;
+        let yaw = self.yaw.next_control_output(gyro.0.z().raw).output / 100.0;
         Axes {
             throttle: axes.throttle,
             roll: (roll * i16::MAX as f32) as i16,

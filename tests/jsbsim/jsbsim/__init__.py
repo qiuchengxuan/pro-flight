@@ -64,6 +64,9 @@ class JSBSim:
     def vario(self) -> float:  # ft/s
         return self._variometer.get_vario()
 
-    def step(self, control: Control):
+    def control(self, control: Control):
         self._fcs.set(control)
         return self._session.step()
+
+    def hold(self):
+        return self._session.hold()

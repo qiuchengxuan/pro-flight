@@ -98,6 +98,7 @@ impl IMU {
         }
     }
 
+    /// gyro x, y, z means spin around x, y and z axis, clock-wise is positive
     pub fn update(&mut self, acceleration: Readout, gyro: Readout) {
         if self.calibration.status != CalibrationStatus::Calibrated {
             self.calibration.calibrate(gyro);

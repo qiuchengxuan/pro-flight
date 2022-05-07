@@ -21,8 +21,7 @@ from simulator import Fixed, Position, Simulator
 
 XSI = 'http://www.w3.org/2001/XMLSchema-instance'
 HREF = 'http://jsbsim.sf.net/JSBSimScript.xsl'
-SIMULATE_TIME = 0.2  # seconds
-DELTA_TIME = 0.001  # seconds
+SIMULATE_TIME = 10.0  # seconds
 ALTIMETER_RATE = 10
 GNSS_RATE = 10
 
@@ -31,7 +30,7 @@ RASCAL_XML = 'aircraft/rascal/rascal.xml'
 
 def initialize() -> str:
     initialize = E.initialize(
-        E.ubody('200.0', unit='FT/SEC'),
+        E.ubody('50.0', unit='KTS'),
         E.vbody('0.0', unit='FT/SEC'),
         E.wbody('0.0', unit='FT/SEC'),
         E.longitude('-95.163839', unit='DEG'),
@@ -62,7 +61,7 @@ def make_script(input_port: int) -> str:
     run_script = xml.runscript(
         E.use(aircraft='rascal', initialize='takeoff'),
         E.input(port=str(input_port)),
-        E.run(*events, start='0.0', end=str(SIMULATE_TIME / DELTA_TIME), dt=str(DELTA_TIME)),
+        E.run(*events, start='0.0', end=str(SIMULATE_TIME), dt='0.0001'),
         name='Rascal take off',
         **{location: 'http://jsbsim.sf.net/JSBSimScript.xsd'}
     )
@@ -89,17 +88,16 @@ def start_jsbsim(port: int):
 
 def start_simulator(simulator: str, sock: str, simulator_config: str):
     cmd = 'RUST_LOG=debug %s -l %s --config %s' % (simulator, sock, simulator_config)
-    cmd += ' --rate 1000 --altimeter-rate 10'
-    print(cmd)
+    cmd += ' --rate 100 --altimeter-rate 10'
     return subprocess.Popen(cmd, shell=True)
 
 
-def jsbsim_to_simulator(jsbsim_api: JSBSim, simulator_api: Simulator, iteration: int):
+def jsbsim_to_simulator(jsbsim_api: JSBSim, simulator_api: Simulator, time_ms: int):
     simulator_api.update_input(Input(throttle=1.0))
     altitude_cm = jsbsim_api.altitude * 30.48
-    if iteration % ALTIMETER_RATE == 0:
+    if time_ms % (1000 / ALTIMETER_RATE) == 0:
         simulator_api.update_altitude(int(altitude_cm))
-    if iteration % GNSS_RATE == 0:
+    if time_ms % (1000 / GNSS_RATE) == 0:
         p = jsbsim_api.position
         v = jsbsim_api.velocity
         gnss = GNSS(
@@ -135,6 +133,7 @@ def main():
         f.write(make_script(jsbsim_port))
     jsbsim = start_jsbsim(jsbsim_port)
     jsbsim_api = JSBSim(jsbsim_port)
+    jsbsim_api.hold()
 
     sock = '/tmp/simulator.sock'
     simulator = start_simulator(args.simulator, sock, args.simulator_config)
@@ -143,29 +142,34 @@ def main():
     while not os.path.exists('/tmp/simulator.sock'):
         time.sleep(0.1)
 
-    total = int(SIMULATE_TIME / DELTA_TIME)
-    print('total %dms' % total)
-    try:
-        for i in range(total):
-            jsbsim_to_simulator(jsbsim_api, simulator_api, i)
-
+    print('total %fs' % SIMULATE_TIME)
+    begin = time.time()
+    elapsed = 0.0
+    while elapsed < SIMULATE_TIME:
+        now = time.time()
+        elapsed = now - begin
+        try:
+            time_ms = int(elapsed * 1000)
+            jsbsim_to_simulator(jsbsim_api, simulator_api, time_ms)
             telemetry = simulator_api.get_telemetry()
             atti = jsbsim_api.attitude
             fcs = telemetry.fcs.normalize()
-            jsbsim_api.step(Control(fcs.engines[0], fcs.aileron_right, fcs.elevator, fcs.rudder))
+            jsbsim_api.control(Control(fcs.engines[0], fcs.aileron_right, fcs.elevator, fcs.rudder))
             status = '%dkt, %dft,' % (jsbsim_api.speed.cas, jsbsim_api.height)
             atti = jsbsim_api.attitude
-            attitude = 'atti={%.2f %.2f, %.2f}' % (atti.roll, atti.pitch, atti.true_heading)
+            gyro = jsbsim_api.gyro
+            rate = 'gyro={%.1f %.1f, %.1f}' % (gyro.y, gyro.x, gyro.z)
+            attitude = 'atti={%.1f %.1f, %.1f}' % (atti.roll, atti.pitch, atti.true_heading)
             control = 'ctrl={T: %.2f| %.2f %.2f %.2f}' % (
                 fcs.engines[0], fcs.aileron_right, fcs.elevator, fcs.rudder
             )
-            print('%dms: ' % (i + 1) + ' '.join([status, attitude, control]))
+            print('%.3fs: %s' % (elapsed, ' '.join([status, attitude, rate, control])))
             simulator_api.tick()
             if jsbsim_api.height <= 1:
-                print('Crashed after %dms' % i)
+                print('Crashed after %.3fs' % elapsed)
                 break
-    except KeyboardInterrupt:
-        pass
+        except KeyboardInterrupt:
+            break
     jsbsim.kill(signal.SIGINT)
     simulator.kill()
     for path in [RASCAL_XML, 'aircraft/rascal/takeoff.xml', 'rascal_test.xml', sock]:

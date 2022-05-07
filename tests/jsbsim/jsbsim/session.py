@@ -38,6 +38,9 @@ class Session:
         self._set_attributes[attribute] = value
         self._exec('set %s = %s' % (attribute, str(value)))
 
+    def hold(self):
+        self._exec('hold')
+
     def step(self):
         self._attributes.clear()
         self._exec('iterate 1')
