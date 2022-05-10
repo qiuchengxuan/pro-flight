@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct Entry<T> {
     timestamp: Duration,
     data: Option<T>,
@@ -29,16 +29,16 @@ impl<T: Default> Default for Entry<T> {
     }
 }
 
-impl<T: Copy + Default> Entry<T> {
+impl<T: Clone + Default> Entry<T> {
     fn read(&self) -> T {
-        self.data.unwrap_or_default()
+        self.data.clone().unwrap_or_default()
     }
 
     fn read_within(&self, max_timestamp: Duration) -> Option<T> {
         if self.timestamp > max_timestamp {
             return None;
         }
-        self.data
+        self.data.clone()
     }
 }
 
@@ -66,7 +66,7 @@ macro_rules! datastore {
                 concat_idents!(setter = write_, $names {
                     pub fn setter(&self, data: $types) {
                         let entry = Entry{timestamp: jiffies::get(), data: Some(data)};
-                        if self.$names.write(entry).is_err() {
+                        if self.$names.write(entry.clone()).is_err() {
                             error!("Write {} conflict", core::any::type_name::<$types>())
                         }
                     }

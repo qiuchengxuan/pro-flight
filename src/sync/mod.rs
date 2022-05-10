@@ -17,7 +17,7 @@ impl<T: Default> Default for ReadSpinLock<T> {
     }
 }
 
-impl<T: Copy> ReadSpinLock<T> {
+impl<T: Clone> ReadSpinLock<T> {
     pub fn write(&self, data: T) -> Result<(), bool> {
         let relaxed = Ordering::Relaxed;
         self.write_lock.compare_exchange(false, true, relaxed, relaxed)?;
@@ -30,7 +30,7 @@ impl<T: Copy> ReadSpinLock<T> {
     pub fn read(&self) -> T {
         loop {
             let version = self.version.load(Ordering::Acquire);
-            let data = self.data;
+            let data = self.data.clone();
             if version == self.version.load(Ordering::Relaxed) {
                 return data;
             }

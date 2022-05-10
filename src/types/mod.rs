@@ -5,7 +5,6 @@ pub mod coordinate;
 #[macro_use]
 pub mod measurement;
 pub mod sensor;
-pub mod vec;
 pub mod waypoint;
 
 pub type RSSI = u16;

@@ -1,6 +1,8 @@
 use core::str::FromStr;
 
-use crate::{config::inputs::command, types::vec::Vec};
+use heapless::Vec;
+
+use crate::config::inputs::command;
 
 #[derive(Copy, Clone, Eq, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -36,7 +38,7 @@ pub struct Axes {
     pub yaw: i16,
 }
 
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Control {
     pub rssi: RSSI,
     pub axes: Axes,

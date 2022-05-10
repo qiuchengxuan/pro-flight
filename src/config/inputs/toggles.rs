@@ -1,10 +1,9 @@
-use super::command;
-use crate::{
-    config::pathset::{Error, Path, PathClear, PathSet, Value},
-    types::vec::Vec,
-};
+use heapless::Vec;
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+use super::command;
+use crate::config::pathset::{Error, Path, PathClear, PathSet, Value};
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Toggle {
     pub channel: u8,
     pub choices: Vec<command::Id, 3>,
@@ -33,7 +32,7 @@ impl PathSet for Toggle {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Toggles(pub Vec<Toggle, 4>);
 
 impl Toggles {

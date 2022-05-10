@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-#[derive(Copy, Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct Collection {
     pub altitude: Altitude,
     pub control: Control,

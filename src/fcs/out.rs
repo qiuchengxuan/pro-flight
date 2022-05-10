@@ -1,11 +1,12 @@
+use heapless::Vec;
 use serde::ser::SerializeMap;
 
 use crate::{
     config::{fcs::Configuration, peripherals::pwm::ServoType},
-    types::{control, vec::Vec},
+    types::control,
 };
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FixedWing {
     pub engines: [u16; 1],
     pub control_surface: Vec<(ServoType, i16), 4>,
@@ -49,7 +50,7 @@ impl FixedWing {
     }
 }
 
-#[derive(Copy, Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum FCS {
     FixedWing(FixedWing),
