@@ -12,7 +12,7 @@ pub struct PIDs {
 impl PIDs {
     fn config_to_pid(config: &crate::config::fcs::PID) -> Pid<f32> {
         let (kp, ki, kd) = (config.kp.into(), config.ki.into(), config.kd.into());
-        Pid::new(kp, ki, kd, 100.0, 15.0, 15.0, 100.0, 0.0)
+        Pid::new(kp, ki, kd, 100.0, 10.0, 10.0, 100.0, 0.0)
     }
 
     pub fn new(config: &crate::config::fcs::PIDs) -> Self {

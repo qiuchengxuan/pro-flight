@@ -5,6 +5,9 @@ battery:
   warning-cell-voltage: 3.5
 fcs:
   configuration: airplane
+  gyroscope:
+    LPF:
+      frequency: 20
   envelop:
     max-roll: 67
     min-pitch: -15

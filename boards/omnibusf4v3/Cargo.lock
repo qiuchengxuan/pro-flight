@@ -938,10 +938,12 @@ checksum = "39617bc909d64b068dcffd0e3e31679195b5576d0c83fadc52690268cc2b2b55"
 
 [[package]]
 name = "mpu6000"
-version = "0.2.1"
-source = "git+https://github.com/qiuchengxuan/mpu6000.git#f10846a4f88d16bb1fcbf165812256f46165a5c7"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8787d1b6f5493e9ded7a590e6c98faed43db8cdc295eaa0cc196bd816e4275b0"
 dependencies = [
  "embedded-hal",
+ "fixed-point",
 ]
 
 [[package]]
@@ -1142,9 +1144,9 @@ checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 
 [[package]]
 name = "regex"
-version = "1.5.5"
+version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a11647b6b25ff05a515cb92c365cec08801e83423a235b51e231e1808747286"
+checksum = "d83f127d94bdbcda4c8cc2e50f6f84f4b611f69c902699ca385a39c3a75f9ff1"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1153,9 +1155,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.25"
+version = "0.6.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
+checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "riscv"

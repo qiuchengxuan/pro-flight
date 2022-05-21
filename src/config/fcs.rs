@@ -26,6 +26,43 @@ impl FromStr for Configuration {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LPF {
+    pub frequency: u16,
+}
+
+impl Default for LPF {
+    fn default() -> Self {
+        Self { frequency: 20 }
+    }
+}
+
+impl PathSet for LPF {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "frequency" => self.frequency = core::cmp::max(value.parse()?, 1),
+            _ => return Err(Error::UnknownPath),
+        }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Gyroscope {
+    #[serde(rename = "LPF")]
+    pub lpf: LPF,
+}
+
+impl PathSet for Gyroscope {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "LPF" => self.lpf.set(path, value)?,
+            _ => return Err(Error::UnknownPath),
+        }
+        Ok(())
+    }
+}
+
 #[derive(Copy, Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PID {
     #[serde(rename = "max-rate")]
@@ -120,6 +157,7 @@ impl PathSet for Envelop {
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FCS {
     pub configuration: Configuration,
+    pub gyroscope: Gyroscope,
     pub envelop: Envelop,
     pub pids: PIDs,
 }
@@ -128,6 +166,7 @@ impl Default for FCS {
     fn default() -> Self {
         Self {
             configuration: Configuration::Airplane,
+            gyroscope: Gyroscope::default(),
             envelop: Default::default(),
             pids: Default::default(),
         }
@@ -141,6 +180,7 @@ impl PathSet for FCS {
                 self.configuration = value.parse_or(Configuration::Airplane)?;
                 Ok(())
             }
+            "gyroscope" => self.gyroscope.set(path, value),
             "envelop" => self.envelop.set(path, value),
             "pids" => self.pids.set(path, value),
             _ => Err(Error::UnknownPath),

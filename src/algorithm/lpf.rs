@@ -1,4 +1,5 @@
-pub struct LPF<T> {
+#[derive(Copy, Clone, Debug)]
+pub struct LPF<T: Copy> {
     alpha: T,
     value: T,
 }

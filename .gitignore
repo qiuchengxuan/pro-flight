@@ -8,3 +8,5 @@ __pycache__
 /*.dfu
 /build
 /tests/jsbsim/rascal_test.xml
+/tests/jsbsim/aircraft/rascal
+/drone-os

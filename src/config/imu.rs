@@ -1,4 +1,4 @@
-use fixed_point::FixedPoint;
+use fixed_point::{fixed, FixedPoint};
 
 use crate::types::sensor::{Bias, Gain, Rotation};
 
@@ -44,8 +44,8 @@ impl PathSet for Magnetometer {
     }
 }
 
-const DEFAULT_KP: FixedPoint<i32, 3> = FixedPoint(0_250);
-const DEFAULT_KI: FixedPoint<i32, 3> = FixedPoint(0_005);
+const DEFAULT_KP: FixedPoint<i32, 3> = fixed!(0.25, 3);
+const DEFAULT_KI: FixedPoint<i32, 3> = fixed!(0.005, 3);
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Mahony {

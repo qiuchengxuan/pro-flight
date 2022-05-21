@@ -1,7 +1,8 @@
 use alloc::boxed::Box;
-use core::future::Future;
+use core::{convert::TryInto, future::Future};
 
 use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
+use fixed_point::FixedPoint;
 use fugit::NanosDurationU64 as Duration;
 use hal::dma::{Channel, Peripheral, TransferOption, BD, DMA};
 use mpu6000::{
@@ -43,26 +44,32 @@ impl From<config::imu::IMU> for Converter {
     }
 }
 
+type Readouts = (Readout, Readout, FixedPoint<i16, 2>);
+
 impl Converter {
     fn convert_acceleration(&self, accel: &mpu6000::Acceleration) -> Readout {
-        let axes = Axes { x: -accel.0 as i32, y: -accel.1 as i32, z: -accel.2 as i32 };
+        let axes = Axes { x: -accel.0[0] as i32, y: -accel.0[1] as i32, z: -accel.0[2] as i32 };
         let sensitive: f32 = self.accelerometer.into();
         Readout { axes, sensitive: sensitive as u16 }
     }
 
     fn convert_gyro(&self, gyro: &mpu6000::Gyro) -> Readout {
-        let axes =
-            Axes { x: (gyro.0 as i32) * 10, y: (gyro.1 as i32) * 10, z: (gyro.2 as i32) * 10 };
+        let axes = Axes {
+            x: (gyro.0[0] as i32) * 10,
+            y: (gyro.0[1] as i32) * 10,
+            z: (gyro.0[2] as i32) * 10,
+        };
         let sensitive: f32 = self.gyroscope.into();
         Readout { axes, sensitive: (sensitive * 10.0) as u16 }
     }
 
-    pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> (Readout, Readout) {
-        let acceleration: mpu6000::Acceleration = bytes[..6].into();
-        let gyro: mpu6000::Gyro = bytes[8..].into();
+    pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> Result<Readouts, ()> {
+        let acceleration: mpu6000::Acceleration = (&bytes[..6]).try_into()?;
+        let temperature: mpu6000::Temperature = (&bytes[6..8]).try_into()?;
+        let gyro: mpu6000::Gyro = (&bytes[8..]).try_into()?;
         let acceleration = self.convert_acceleration(&acceleration).rotate(rotation);
         let gyro = self.convert_gyro(&gyro).rotate(rotation);
-        (acceleration, gyro)
+        Ok((acceleration, gyro, temperature.celcius()))
     }
 }
 
@@ -155,7 +162,8 @@ where
             future.await;
             self.cs.set_high().ok();
             if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
-                let (acceleration, gyro) = convertor.convert(&buffer[1..], rotation);
+                let (acceleration, gyro, _temperature) =
+                    convertor.convert(&buffer[1..], rotation).unwrap();
                 handler(acceleration, gyro);
             }
         }
