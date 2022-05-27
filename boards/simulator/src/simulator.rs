@@ -8,7 +8,6 @@ use pro_flight::{
     types::{
         control,
         measurement::{unit, Acceleration, Altitude, Gyro, ENU},
-        sensor::{Axes, Readout},
     },
 };
 
@@ -22,8 +21,8 @@ pub struct Simulator {
     imu: IMU,
     ins: INS,
     fcs: FCS,
-    acceleration: Option<Readout>,
-    gyro: Option<Readout>,
+    acceleration: Option<[f32; 3]>,
+    gyro: Option<[f32; 3]>,
 }
 
 impl Simulator {
@@ -48,40 +47,24 @@ impl Simulator {
     }
 
     pub fn update_acceleration(&mut self, acceleration: Acceleration<ENU>) {
-        let acceleration = Readout {
-            axes: Axes {
-                x: (acceleration.0.raw[0] * 32768.0) as i32,
-                y: (acceleration.0.raw[1] * 32768.0) as i32,
-                z: (acceleration.0.raw[2] * 32768.0) as i32,
-            },
-            sensitive: 32768,
-        };
         match self.gyro.take() {
             Some(gyro) => {
                 trace!("Invoke INS update");
-                self.imu.update(acceleration, gyro);
+                self.imu.update(acceleration.0.raw.into(), gyro.into());
                 self.ins.update()
             }
-            None => self.acceleration = Some(acceleration),
+            None => self.acceleration = Some(acceleration.0.raw.into()),
         }
     }
 
     pub fn update_gyro(&mut self, gyro: Gyro<unit::DEGs>) {
-        let gyro = Readout {
-            axes: Axes {
-                x: (gyro.0.raw[0] * 32768.0) as i32,
-                y: (gyro.0.raw[1] * 32768.0) as i32,
-                z: (gyro.0.raw[2] * 32768.0) as i32,
-            },
-            sensitive: 32768,
-        };
         match self.acceleration.take() {
             Some(acceleration) => {
                 trace!("Invoke INS update");
-                self.imu.update(acceleration, gyro);
+                self.imu.update(acceleration.into(), gyro.0.raw.into());
                 self.ins.update()
             }
-            None => self.gyro = Some(gyro),
+            None => self.gyro = Some(gyro.0.raw.into()),
         }
     }
 

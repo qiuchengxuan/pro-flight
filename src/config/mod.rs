@@ -14,7 +14,7 @@ use fixed_point::fixed;
 
 use crate::{
     io::Read,
-    types::sensor::{Axes, Bias, Gain},
+    types::sensor::{Bias, Gain},
 };
 pub use battery::Battery;
 pub use fcs::FCS;
@@ -28,20 +28,6 @@ pub use peripherals::{
     Peripherals,
 };
 use yaml::YamlParser;
-
-impl PathSet for Axes {
-    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
-        let key = path.str()?;
-        let value = value.parse()?;
-        match key {
-            "x" => self.x = value,
-            "y" => self.y = value,
-            "z" => self.z = value,
-            _ => return Err(Error::UnknownPath),
-        }
-        Ok(())
-    }
-}
 
 impl PathSet for Bias {
     fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {

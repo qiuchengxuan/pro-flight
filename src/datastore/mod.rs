@@ -2,6 +2,7 @@ use core::mem::MaybeUninit;
 
 use concat_idents::concat_idents;
 use fugit::NanosDurationU64 as Duration;
+use nalgebra::Vector3;
 
 use crate::{
     fcs::out::FCS,
@@ -13,7 +14,6 @@ use crate::{
     types::{
         control::Control,
         measurement::{voltage::Voltage, Altitude},
-        sensor::Magnetism,
     },
 };
 
@@ -83,7 +83,7 @@ datastore! {
     gnss: GNSS,
     imu: IMU,
     ins: INS,
-    magnetism: Magnetism,
+    magnetism: Vector3<f32>,
     voltage: Voltage
 }
 

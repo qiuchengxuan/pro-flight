@@ -12,11 +12,7 @@ use mpu6000::{
     ClockSource, IntPinConfig, Interrupt,
 };
 pub use mpu6000::{bus::SpiBus, MPU6000, SPI_MODE};
-use pro_flight::{
-    config,
-    sys::time::TickTimer,
-    types::sensor::{Axes, Readout, Rotation},
-};
+use pro_flight::{config, sys::time::TickTimer, types::sensor::Rotation};
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 pub const NUM_MEASUREMENT_REGS: usize = 14;
@@ -44,31 +40,23 @@ impl From<config::imu::IMU> for Converter {
     }
 }
 
-type Readouts = (Readout, Readout, FixedPoint<i16, 2>);
+type Readouts = ([f32; 3], [f32; 3], FixedPoint<i16, 2>);
 
 impl Converter {
-    fn convert_acceleration(&self, accel: &mpu6000::Acceleration) -> Readout {
-        let axes = Axes { x: -accel.0[0] as i32, y: -accel.0[1] as i32, z: -accel.0[2] as i32 };
-        let sensitive: f32 = self.accelerometer.into();
-        Readout { axes, sensitive: sensitive as u16 }
+    fn convert_acceleration(&self, accel: mpu6000::Acceleration) -> [f32; 3] {
+        accel / self.accelerometer
     }
 
-    fn convert_gyro(&self, gyro: &mpu6000::Gyro) -> Readout {
-        let axes = Axes {
-            x: (gyro.0[0] as i32) * 10,
-            y: (gyro.0[1] as i32) * 10,
-            z: (gyro.0[2] as i32) * 10,
-        };
-        let sensitive: f32 = self.gyroscope.into();
-        Readout { axes, sensitive: (sensitive * 10.0) as u16 }
+    fn convert_gyro(&self, gyro: mpu6000::Gyro) -> [f32; 3] {
+        gyro / self.gyroscope
     }
 
     pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> Result<Readouts, ()> {
         let acceleration: mpu6000::Acceleration = (&bytes[..6]).try_into()?;
         let temperature: mpu6000::Temperature = (&bytes[6..8]).try_into()?;
         let gyro: mpu6000::Gyro = (&bytes[8..]).try_into()?;
-        let acceleration = self.convert_acceleration(&acceleration).rotate(rotation);
-        let gyro = self.convert_gyro(&gyro).rotate(rotation);
+        let acceleration = rotation.rotate(self.convert_acceleration(acceleration));
+        let gyro = rotation.rotate(self.convert_gyro(gyro));
         Ok((acceleration, gyro, temperature.celcius()))
     }
 }
@@ -146,7 +134,7 @@ where
     TX: DMA<Future = TXF>,
     CS: OutputPin<Error = E> + Send + Unpin + 'static,
 {
-    pub async fn run(mut self, mut handler: impl FnMut(Readout, Readout)) {
+    pub async fn run(mut self, mut handler: impl FnMut([f32; 3], [f32; 3])) {
         let convertor = Converter::from(config::get().imu);
         let rotation = config::get().imu.rotation;
         loop {

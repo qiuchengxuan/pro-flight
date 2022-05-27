@@ -173,7 +173,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
     threads.mpu6000.add_fn(fiber_yield(move || int.clear_interrupt_pending_bit()));
     threads.mpu6000.add_exec(mpu6000.run(move |accel, gyro| {
-        imu.update(accel, gyro);
+        imu.update(accel.into(), gyro.into());
         ins_thread.wakeup()
     }));
     threads.mpu6000.enable_int();
