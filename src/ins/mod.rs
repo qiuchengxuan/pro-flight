@@ -30,7 +30,7 @@ impl INS {
         let ds = datastore::acquire();
         let gnss = ds.read_gnss_within(self.interval);
         let imu = ds.read_imu();
-        let altitude = ds.read_altitude_within(self.interval);
+        let altitude = ds.read_baro_altitude_within(self.interval);
         let vs = altitude.map(|alt| self.variometer.update(alt));
         let acceleration = imu.acceleration.to_enu(imu.quaternion);
 

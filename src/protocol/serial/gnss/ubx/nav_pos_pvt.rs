@@ -30,11 +30,11 @@ impl Valid {
 #[repr(u8)]
 pub enum FixType {
     NoFix = 0,
-    DeadReckoningOnly,
-    TwoDemension,
-    ThreeDemension,
-    GNSSPlusDeadReckoningCombined,
-    TimeOnlyFix,
+    DeadReckoningOnly = 1,
+    TwoDemension = 2,
+    ThreeDemension = 3,
+    GNSSPlusDeadReckoningCombined = 4,
+    TimeOnlyFix = 5,
 }
 
 impl Default for FixType {

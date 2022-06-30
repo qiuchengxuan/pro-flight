@@ -118,6 +118,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     threads.otg_fs.enable_int();
 
     logger::init(Box::leak(Box::new([0u8; 1024])));
+    datastore::init();
 
     reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en().set_crcen());
     reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
@@ -201,7 +202,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let (spi, cs_baro, _) = bmp280.free().free();
     let bmp280 = DmaBMP280::new(rx.clone(), tx.clone(), cs_baro, compensator);
     let ds = datastore::acquire();
-    threads.bmp280.add_exec(bmp280.run(move |v| ds.write_altitude(v.into())));
+    threads.bmp280.add_exec(bmp280.run(move |v| ds.write_baro_altitude(v.into())));
     let thread = into_thread(threads.bmp280);
     let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::millis(1));
 
@@ -258,8 +259,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let mut servos = Schedule::new(thread, TickTimer::default(), Duration::millis(20));
 
     threads.sys_tick.add_fn(fiber_yield(move || {
-        max7456.wakeup();
         bmp280.wakeup();
+        max7456.wakeup();
         servos.wakeup();
     }));
 

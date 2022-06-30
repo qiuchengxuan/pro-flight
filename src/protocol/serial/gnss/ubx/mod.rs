@@ -54,34 +54,30 @@ impl UBX {
         };
 
         match payload.fix_type {
-            UBXFixType::ThreeDemension | UBXFixType::GNSSPlusDeadReckoningCombined => {
-                let altitude = Distance::new(payload.height_above_msl / 10, unit::CentiMeter);
-                let position = Position {
-                    latitude: payload.latitude.into(),
-                    longitude: payload.longitude.into(),
-                    altitude: Altitude(altitude),
-                };
+            UBXFixType::ThreeDemension | UBXFixType::GNSSPlusDeadReckoningCombined => (),
+            _ => return Some(GNSS { datetime, fixed: None }),
+        };
 
-                let h = payload.heading_of_motion;
-                let course =
-                    Course(FixedPoint(if h > 0 { h } else { 360_00000 + h } as i32 / 10000));
+        let altitude = Distance::new(payload.height_above_msl / 10, unit::CentiMeter);
+        let position = Position {
+            latitude: payload.latitude.into(),
+            longitude: payload.longitude.into(),
+            altitude: Altitude(altitude),
+        };
 
-                let h = payload.heading_of_vehicle;
-                let heading = match payload.flags1.heading_of_vehicle_valid() {
-                    true => Some(Heading(FixedPoint(
-                        if h > 0 { h } else { 360_00000 + h } as i32 / 10000,
-                    ))),
-                    false => None,
-                };
-                let (x, y, z) =
-                    (payload.velocity_east, payload.velocity_north, -payload.velocity_down);
-                let ground_speed = Velocity::new(payload.ground_speed, unit::MMs);
-                let velocity_vector = Some(VelocityVector::new(x, y, z, unit::MMs, ENU));
-                let fixed = Fixed { position, course, heading, ground_speed, velocity_vector };
-                Some(GNSS { datetime, fixed: Some(fixed) })
-            }
-            _ => Some(GNSS { datetime, fixed: None }),
-        }
+        let h = payload.heading_of_motion;
+        let course = Course(FixedPoint(if h > 0 { h } else { 360_00000 + h } as i32 / 10000));
+
+        let h = payload.heading_of_vehicle;
+        let heading = match payload.flags1.heading_of_vehicle_valid() {
+            true => Some(Heading(FixedPoint(if h > 0 { h } else { 360_00000 + h } as i32 / 10000))),
+            false => None,
+        };
+        let (x, y, z) = (payload.velocity_east, payload.velocity_north, -payload.velocity_down);
+        let ground_speed = Velocity::new(payload.ground_speed, unit::MMs);
+        let velocity_vector = Some(VelocityVector::new(x, y, z, unit::MMs, ENU));
+        let fixed = Fixed { position, course, heading, ground_speed, velocity_vector };
+        Some(GNSS { datetime, fixed: Some(fixed) })
     }
 
     pub fn receive(&mut self, mut bytes: &[u8]) -> Option<GNSS> {

@@ -6,7 +6,7 @@ use embedded_hal::{
     digital::v2::OutputPin,
 };
 use fugit::NanosDurationU64 as Duration;
-use hal::dma::{BufferDescriptor, TransferOption, TransferResult, DMA};
+use hal::dma::{BufferDescriptor, Error, TransferOption, TransferResult, DMA};
 use max7456::{
     character_memory::{build_store_char_operation, CHAR_DATA_SIZE, STORE_CHAR_BUFFER_SIZE},
     lines_writer::LinesWriter,
@@ -154,14 +154,15 @@ where
             if size == 0 {
                 continue;
             }
-            if self.tx.preserve(&self.bd).is_err() {
-                TickTimer::after(Duration::millis(1)).await;
-                continue;
-            }
             self.cs.set_low().ok();
-            if let Some(future) = self.tx.tx(&self.bd, TransferOption::default().size(size)).ok() {
-                future.await;
-            }
+            match self.tx.tx(&self.bd, TransferOption::default().size(size)) {
+                Ok(future) => future.await,
+                Err(Error::Busy) => {
+                    TickTimer::after(Duration::millis(1)).await;
+                    continue;
+                }
+                Err(e) => panic!("DMA error: {:?}", e),
+            };
             self.cs.set_high().ok();
         }
     }

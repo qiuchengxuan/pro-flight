@@ -83,23 +83,23 @@ where
 
     pub async fn run(mut self, mut handler: impl FnMut(Pressure)) {
         loop {
-            if self.tx.preserve(&self.tx_bd).is_err() {
-                TickTimer::after(Duration::millis(1)).await;
-                continue;
-            }
             let future = match self.rx.rx(&mut self.rx_bd, Default::default()) {
                 Ok(future) => future,
                 Err(Error::Busy) => {
+                    TickTimer::after(Duration::millis(1)).await;
                     continue;
                 }
                 Err(e) => panic!("DMA error: {:?}", e),
             };
             self.cs.set_low().ok();
             match self.tx.tx(&self.tx_bd, TransferOption::repeat().size(8)) {
+                Ok(_) => (),
                 Err(Error::Busy) => {
+                    TickTimer::after(Duration::millis(1)).await;
+                    self.rx.stop();
                     continue;
                 }
-                _ => (),
+                Err(e) => panic!("DMA error: {:?}", e),
             }
             future.await;
             self.cs.set_high().ok();

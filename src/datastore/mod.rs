@@ -77,7 +77,7 @@ macro_rules! datastore {
 }
 
 datastore! {
-    altitude: Altitude,
+    baro_altitude: Altitude,
     control: Control,
     fcs: FCS,
     gnss: GNSS,
@@ -87,8 +87,14 @@ datastore! {
     voltage: Voltage
 }
 
+static mut DATASTORE: MaybeUninit<DataStore> = MaybeUninit::uninit();
+
 #[inline]
 pub fn acquire() -> &'static DataStore {
-    static DATASTORE: MaybeUninit<DataStore> = MaybeUninit::uninit();
     unsafe { &*DATASTORE.as_ptr() }
+}
+
+#[inline]
+pub fn init() {
+    *unsafe { &mut *DATASTORE.as_mut_ptr() } = Default::default()
 }

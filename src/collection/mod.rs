@@ -14,7 +14,8 @@ use crate::{
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Collection {
-    pub altitude: Altitude,
+    #[serde(rename = "baro-altitude")]
+    pub baro_altitude: Altitude,
     pub control: Control,
     pub fcs: FCS,
     pub gnss: GNSS,
@@ -38,7 +39,7 @@ impl<'a> Collector<'a> {
 
     pub fn collect(&self) -> Collection {
         Collection {
-            altitude: self.0.read_altitude(),
+            baro_altitude: self.0.read_baro_altitude(),
             control: self.0.read_control_within(Duration::millis(100)).unwrap_or_default(),
             fcs: self.0.read_fcs(),
             gnss: self.0.read_gnss(),

@@ -64,10 +64,6 @@ pub trait DMA: Send + Sync + 'static {
     type Future: DMAFuture;
 
     fn setup_peripheral(&mut self, channel: Channel, periph: &mut dyn Peripheral);
-    fn preserve<'a, W: Copy + Default + 'static, const N: usize>(
-        &self,
-        bd: &'a BD<W, N>,
-    ) -> Result<(), Error>;
     fn tx<'a, W: Copy + Default + 'static, const N: usize>(
         &'a self,
         bd: &'a BD<W, N>,
