@@ -52,7 +52,9 @@ imu:
   mahony:
     kp: 0.25
     ki: 0.005
-  rotation: '270'
+  rotation:
+    pitch: 90.0
+    yaw: 180.0
 ins:
   speedometer:
     kp: 0.1

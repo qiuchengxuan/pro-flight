@@ -33,11 +33,16 @@ impl Terminal {
                 }
                 AsciiChar::ETB => {
                     // ^W or CTRL+W
-                    while self.buffer.len() > 0 {
-                        if self.buffer.pop().unwrap() == ' ' as u8 {
-                            break;
+                    loop {
+                        match self.buffer.pop() {
+                            Some(ch) => {
+                                print!("{}", &BACKSPACE);
+                                if ch == ' ' as u8 {
+                                    break;
+                                }
+                            }
+                            None => break,
                         }
-                        print!("{}", &BACKSPACE);
                     }
                 }
                 ch if ch.is_ascii_printable() => {

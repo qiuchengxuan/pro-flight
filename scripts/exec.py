@@ -5,7 +5,7 @@ import json
 import time
 from pathlib import Path
 
-from jsonpath import jsonpath
+import jq
 
 from cli import CLI
 
@@ -14,7 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--interval", help="Specify interval", type=float, default=1.0)
     parser.add_argument("-c", "--count", help="Specify count", type=int, default=1)
-    parser.add_argument("--jsonpath", help="Specify jsonpath", type=str)
+    parser.add_argument("--jq", help="Specify jq expression", type=str)
     parser.add_argument("serial", help="Specify serial device path", type=str)
     parser.add_argument("command", help="Specify command to execute", type=str)
     args = parser.parse_args()
@@ -27,8 +27,8 @@ def main():
 
     def tx():
         output = cli.tx(args.command)
-        if args.jsonpath is not None:
-            print(jsonpath(json.loads(output), args.jsonpath))
+        if args.jq is not None:
+            print(jq.compile(args.jq).input(json.loads(output)).first())
         else:
             print(output)
     try:

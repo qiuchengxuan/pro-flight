@@ -1,6 +1,6 @@
 crcmod
 dacite
-jsonpath
+jq
 lxml
 numba
 numpy

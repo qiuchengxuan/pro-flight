@@ -1,7 +1,7 @@
 pub mod out;
 
 use fugit::NanosDurationU64 as Duration;
-use nalgebra::Vector3;
+use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::{
     algorithm::mahony::{MagnetismOrHeading, Mahony},
@@ -68,6 +68,7 @@ pub struct IMU {
     interval: Duration,
     ahrs: Mahony,
     calibration: Calibration,
+    rotation: UnitQuaternion<f32>,
 }
 
 impl IMU {
@@ -89,15 +90,21 @@ impl IMU {
             remain: sample_rate,
             status: CalibrationStatus::Calibrating,
         };
+        let pitch: f32 = config.rotation.pitch.into();
+        let yaw: f32 = config.rotation.yaw.into();
+        let euler = Euler::new(0.0, -pitch / DEGREE_PER_DAG, -yaw / DEGREE_PER_DAG);
         Self {
             interval,
             ahrs: Mahony::new(sample_rate as f32, kp, ki, config.magnetometer.declination.into()),
             calibration,
+            rotation: euler.into(),
         }
     }
 
     /// gyro x, y, z means spin around x, y and z axis, clock-wise is positive
     pub fn update(&mut self, acceleration: Vector3<f32>, gyro: Vector3<f32>) {
+        let acceleration = self.rotation.transform_vector(&acceleration);
+        let gyro = self.rotation.transform_vector(&gyro);
         if self.calibration.status != CalibrationStatus::Calibrated {
             self.calibration.calibrate(gyro);
             return;

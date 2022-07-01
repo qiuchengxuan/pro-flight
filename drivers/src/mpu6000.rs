@@ -12,7 +12,7 @@ use mpu6000::{
     ClockSource, IntPinConfig, Interrupt,
 };
 pub use mpu6000::{bus::SpiBus, MPU6000, SPI_MODE};
-use pro_flight::{config, sys::time::TickTimer, types::sensor::Rotation};
+use pro_flight::{config, sys::time::TickTimer};
 
 pub const GYRO_SENSITIVE: GyroSensitive = gyro_sensitive!(+/-1000dps, 32.8LSB/dps);
 pub const NUM_MEASUREMENT_REGS: usize = 14;
@@ -51,12 +51,14 @@ impl Converter {
         gyro / self.gyroscope
     }
 
-    pub fn convert(&self, bytes: &[u8], rotation: Rotation) -> Result<Readouts, ()> {
+    pub fn convert(&self, bytes: &[u8]) -> Result<Readouts, ()> {
         let acceleration: mpu6000::Acceleration = (&bytes[..6]).try_into()?;
         let temperature: mpu6000::Temperature = (&bytes[6..8]).try_into()?;
         let gyro: mpu6000::Gyro = (&bytes[8..]).try_into()?;
-        let acceleration = rotation.rotate(self.convert_acceleration(acceleration));
-        let gyro = rotation.rotate(self.convert_gyro(gyro));
+        let mut acceleration = self.convert_acceleration(acceleration);
+        acceleration[2] = -acceleration[2]; // Z axis is inversed
+        let mut gyro = self.convert_gyro(gyro);
+        gyro[2] = -gyro[2]; // Z axis is inversed
         Ok((acceleration, gyro, temperature.celcius()))
     }
 }
@@ -136,7 +138,6 @@ where
 {
     pub async fn run(mut self, mut handler: impl FnMut([f32; 3], [f32; 3])) {
         let convertor = Converter::from(config::get().imu);
-        let rotation = config::get().imu.rotation;
         loop {
             let future = match self.rx.rx(&mut self.rx_bd, Default::default()) {
                 Ok(future) => future,
@@ -150,8 +151,7 @@ where
             future.await;
             self.cs.set_high().ok();
             if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
-                let (acceleration, gyro, _temperature) =
-                    convertor.convert(&buffer[1..], rotation).unwrap();
+                let (acceleration, gyro, _temperature) = convertor.convert(&buffer[1..]).unwrap();
                 handler(acceleration, gyro);
             }
         }

@@ -2,7 +2,7 @@ use core::f32::consts::PI;
 
 #[cfg(not(any(test, feature = "std")))]
 use micromath::F32Ext;
-use nalgebra::UnitQuaternion;
+use nalgebra::{Quaternion, UnitQuaternion};
 
 pub const DEGREE_PER_DAG: f32 = 180.0 / PI;
 
@@ -55,6 +55,21 @@ impl From<UnitQuaternion<f32>> for Euler {
         let pitch = if r21.abs() >= 1.0 { (PI / 2.0).copysign(r21) } else { (r21).asin() };
         let roll = -r20.atan2(r22);
         Self { roll, pitch, yaw }
+    }
+}
+
+impl Into<UnitQuaternion<f32>> for Euler {
+    fn into(self: Self) -> UnitQuaternion<f32> {
+        let (roll, pitch, yaw) = (self.roll * 0.5, self.pitch * 0.5, self.yaw * 0.5);
+        let (cr, sr) = (roll.cos(), roll.sin());
+        let (cp, sp) = (pitch.cos(), pitch.sin());
+        let (cy, sy) = (yaw.cos(), yaw.sin());
+        UnitQuaternion::new_unchecked(Quaternion::new(
+            cr * cp * cy + sr * sp * sy,
+            sr * cp * cy - cr * sp * sy,
+            cr * sp * cy + sr * cp * sy,
+            cr * cp * sy - sr * sp * cy,
+        ))
     }
 }
 

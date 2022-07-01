@@ -1,6 +1,6 @@
 use fixed_point::{fixed, FixedPoint};
 
-use crate::types::sensor::{Bias, Gain, Rotation};
+use crate::types::sensor::{Bias, Gain};
 
 use super::pathset::{Error, Path, PathSet, Value};
 
@@ -71,6 +71,23 @@ impl PathSet for Mahony {
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Serialize)]
+pub struct Rotation {
+    pub pitch: FixedPoint<i16, 2>,
+    pub yaw: FixedPoint<i16, 2>,
+}
+
+impl PathSet for Rotation {
+    fn set(&mut self, mut path: Path, value: Value) -> Result<(), Error> {
+        match path.str()? {
+            "pitch" => self.pitch = value.parse()?,
+            "yaw" => self.yaw = value.parse()?,
+            _ => return Err(Error::UnknownPath),
+        };
+        Ok(())
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct IMU {
     pub accelerometer: Accelerometer,
     pub magnetometer: Magnetometer,
@@ -84,10 +101,7 @@ impl PathSet for IMU {
             "accelerometer" => self.accelerometer.set(path, value),
             "magnetometer" => self.magnetometer.set(path, value),
             "mahony" => self.mahony.set(path, value),
-            "rotation" => {
-                self.rotation = value.parse()?;
-                Ok(())
-            }
+            "rotation" => self.rotation.set(path, value),
             _ => Err(Error::UnknownPath),
         }
     }
