@@ -2,22 +2,15 @@ use crate::types::{
     coordinate::Position,
     measurement::{
         unit::{CentiMeter, Meter, Ms},
-        Altitude, Displacement, Distance, VelocityVector, ENU, Z,
+        Altitude, Displacement, VelocityVector, ENU, Z,
     },
 };
-
-#[derive(PartialEq)]
-enum AltitudeSource {
-    Barometer,
-    GNSS,
-}
 
 pub struct Positioning {
     interval: f32,
     velocity_vector: VelocityVector<f32, Ms, ENU>,
     initial: Position,
     displacement: Displacement<f32, Meter, ENU>, // relative to initial position
-    altitude_source: AltitudeSource,
 }
 
 impl Positioning {
@@ -27,7 +20,6 @@ impl Positioning {
             velocity_vector: Default::default(),
             initial: Default::default(),
             displacement: Default::default(),
-            altitude_source: AltitudeSource::GNSS,
         }
     }
 
@@ -37,12 +29,8 @@ impl Positioning {
         altitude: Option<Altitude>,
         gnss: Option<Position>,
     ) {
-        if let Some(mut altitude) = altitude {
-            if self.altitude_source == AltitudeSource::GNSS {
-                self.altitude_source = AltitudeSource::Barometer;
-                if altitude.is_zero() {
-                    altitude += Distance::new(1, CentiMeter);
-                }
+        if let Some(altitude) = altitude {
+            if self.initial.altitude.is_zero() {
                 self.initial.altitude = altitude;
             }
             let height = altitude - self.initial.altitude;
@@ -59,9 +47,7 @@ impl Positioning {
             let displacement = position - self.initial;
             let z = self.displacement.raw[Z];
             self.displacement = displacement.t(|v| v as f32).u(Meter);
-            if self.altitude_source == AltitudeSource::Barometer {
-                self.displacement.raw[Z] = z;
-            }
+            self.displacement.raw[Z] = z;
         }
         let integral = (self.velocity_vector + v) / 2.0 * self.interval;
         self.displacement.raw += integral.u(Meter).raw;

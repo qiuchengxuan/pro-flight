@@ -47,7 +47,7 @@ impl hal::rtc::RTCReader for RTCReader {
         let year: BCD = (reg.yt(), reg.yu()).into();
         let month: BCD = (reg.mt() as u32, reg.mu()).into();
         let day: BCD = (reg.dt(), reg.du()).into();
-        NaiveDate::from_ymd(year.0 as i32 + 1970, month.0, day.0)
+        NaiveDate::from_ymd_opt(year.0 as i32 + 1970, month.0, day.0).unwrap()
     }
 
     fn time(&self) -> NaiveTime {
@@ -56,7 +56,7 @@ impl hal::rtc::RTCReader for RTCReader {
         let minute: BCD = (reg.mnt(), reg.mnu()).into();
         let second: BCD = (reg.st(), reg.su()).into();
         let sub_second = (PREDIV_S - self.ssr.load().ss()) / (PREDIV_S + 1);
-        NaiveTime::from_hms_milli(hour.0, minute.0, second.0, sub_second)
+        NaiveTime::from_hms_milli_opt(hour.0, minute.0, second.0, sub_second).unwrap()
     }
 }
 

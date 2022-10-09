@@ -149,18 +149,18 @@ pub struct NavPositionVelocityTime {
 impl NavPositionVelocityTime {
     pub fn date(&self) -> Option<NaiveDate> {
         if self.valid.valid_date() {
-            return Some(NaiveDate::from_ymd(self.year.into(), self.month.into(), self.day.into()));
+            return NaiveDate::from_ymd_opt(self.year.into(), self.month.into(), self.day.into());
         }
         None
     }
 
     pub fn time(&self) -> Option<NaiveTime> {
         if self.valid.valid_time() {
-            return Some(NaiveTime::from_hms(
+            return NaiveTime::from_hms_opt(
                 self.hour.into(),
                 self.minute.into(),
                 self.second.into(),
-            ));
+            );
         }
         None
     }

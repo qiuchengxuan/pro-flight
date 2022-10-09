@@ -69,7 +69,7 @@ impl Simulator {
     }
 
     pub fn update_altitude(&mut self, altitude: Altitude) {
-        datastore::acquire().write_altitude(altitude);
+        datastore::acquire().write_baro_altitude(altitude);
     }
 
     pub fn update_gnss(&mut self, gnss: GNSS) {

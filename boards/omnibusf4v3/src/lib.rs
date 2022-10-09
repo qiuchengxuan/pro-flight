@@ -2,6 +2,7 @@
 #![feature(lang_items)]
 #![feature(proc_macro_hygiene)]
 #![feature(slice_ptr_get)]
+#![feature(alloc_error_handler)]
 #![no_std]
 
 extern crate alloc;
@@ -128,7 +129,7 @@ fn begin_panic(pi: &PanicInfo<'_>) -> ! {
     }
 }
 
-#[lang = "oom"]
+#[alloc_error_handler]
 fn oom(layout: Layout) -> ! {
     println!("Couldn't allocate memory of size {}. Aborting!", layout.size());
     stdout().flush().ok();

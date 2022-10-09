@@ -29,16 +29,21 @@ static mut RTC_READER: Option<Box<dyn RTCReader>> = None;
 static mut RTC_WRITER: Option<Box<dyn RTCWriter>> = None;
 
 pub fn date() -> NaiveDate {
-    unsafe { RTC_READER.as_ref() }.map(|rtc| rtc.date()).unwrap_or(NaiveDate::from_ymd(1970, 1, 1))
+    unsafe { RTC_READER.as_ref() }
+        .map(|rtc| rtc.date())
+        .or(NaiveDate::from_ymd_opt(1970, 1, 1))
+        .unwrap()
+}
+
+fn jiffies_time() -> Option<NaiveTime> {
+    let jiffies = jiffies::get();
+    let nanos = jiffies.to_nanos();
+    let (seconds, nanos) = (nanos / 1_000_000_000, nanos % 1_000_000_000);
+    NaiveTime::from_num_seconds_from_midnight_opt(seconds as u32, nanos as u32)
 }
 
 pub fn time() -> NaiveTime {
-    unsafe { RTC_READER.as_ref() }.map(|rtc| rtc.time()).unwrap_or_else(|| {
-        let jiffies = jiffies::get();
-        let nanos = jiffies.to_nanos();
-        let (seconds, nanos) = (nanos / 1_000_000_000, nanos % 1_000_000_000);
-        NaiveTime::from_num_seconds_from_midnight(seconds as u32, nanos as u32)
-    })
+    unsafe { RTC_READER.as_ref() }.map(|rtc| rtc.time()).or_else(jiffies_time).unwrap()
 }
 
 pub fn now() -> NaiveDateTime {

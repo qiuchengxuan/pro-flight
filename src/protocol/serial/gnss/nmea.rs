@@ -40,10 +40,10 @@ fn to_fixed_point(decimal: nmea0183::types::IntegerDecimal) -> FixedPoint<i32, 1
 }
 
 pub fn rmc_to_datetime(rmc: &RMC) -> NaiveDateTime {
-    NaiveDateTime::new(
-        NaiveDate::from_ymd(rmc.date.year.into(), rmc.date.month.into(), rmc.date.day.into()),
-        NaiveTime::from_hms(rmc.time.hour.into(), rmc.time.minute.into(), rmc.time.seconds.into()),
-    )
+    let (date, time) = (rmc.date, rmc.time);
+    let date = NaiveDate::from_ymd_opt(date.year.into(), date.month.into(), date.day.into());
+    let time = NaiveTime::from_hms_opt(time.hour.into(), time.minute.into(), time.seconds.into());
+    NaiveDateTime::new(date.unwrap(), time.unwrap())
 }
 
 pub struct NMEA {
