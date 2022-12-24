@@ -75,7 +75,7 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         Ok(())
     }
 
-    pub fn load<'a, T: From<&'a [u32]> + Default>(&'a self) -> Result<Option<T>, E> {
+    pub fn load<T>(&self) -> Result<Option<&'static T>, E> {
         if self.read_offset == 0 {
             trace!("NVRAM empty");
             return Ok(None);
@@ -88,10 +88,10 @@ impl<E, F: Flash<u32, Error = E>> NVRAM<F> {
         }
         let sector = &sector[self.read_offset + 1..];
         trace!("Loading from NVRAM address 0x{:x}", sector.as_ptr() as *const _ as usize);
-        Ok(Some(T::from(&sector[..size / 4])))
+        Ok(Some(unsafe { &*(sector.as_ptr() as *const _ as *const T) }))
     }
 
-    pub fn store<'a, T: AsRef<[u32]>>(&mut self, t: T) -> Result<(), E> {
+    pub fn store<'a, T: AsRef<[u32]>>(&mut self, t: &T) -> Result<(), E> {
         let sector = &self.sectors[self.active_sector];
         let words = t.as_ref();
         let offset = self.write_offset;

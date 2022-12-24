@@ -39,7 +39,7 @@ where
     let chunk_size = rx.chunk_size();
     let callback = Box::leak(Box::new(move |result: TransferResult<u8>| match usart.read() {
         Err(nb::Error::Other(Error::Parity)) => rx.reset(),
-        Err(nb::Error::Other(Error::Framing)) => {
+        Err(nb::Error::Other(Error::FrameFormat)) => {
             rx.receive(result.into());
             rx.reset();
         }

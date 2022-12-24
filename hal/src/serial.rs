@@ -1,5 +1,5 @@
 pub enum Error {
-    Framing,
+    FrameFormat,
     Noise,
     Overrun,
     Parity,

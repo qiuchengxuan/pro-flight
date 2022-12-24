@@ -1,5 +1,5 @@
 [workspace]
-members = ["chips"]
+members = ["chips", "drivers", "hal"]
 exclude = ["drone-os", "boards"]
 
 [package]

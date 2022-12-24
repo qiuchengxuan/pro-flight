@@ -9,7 +9,7 @@ use chips::stm32f4::{
     dfu, dma,
     flash::{Flash, Sector},
     rtc,
-    softint::into_thread,
+    softint::executor,
     spi::BaudrateControl,
     systick,
     usart::IntoDMA as _,
@@ -20,7 +20,7 @@ use drivers::{
     max7456::{self, IntoDMA as _},
     mpu6000::{self, IntoDMA as _, MPU6000Init, SpiBus, MPU6000},
     nvram::NVRAM,
-    stm32::{usart, usb_serial, voltage_adc},
+    stm32::{usart, voltage_adc},
 };
 use drone_core::fib::{FiberState, ThrFiberClosure, Yielded};
 use drone_cortexm::{reg::prelude::*, thr::prelude::*};
@@ -31,11 +31,11 @@ use drone_stm32_map::periph::{
     spi::{periph_spi1, periph_spi3},
     sys_tick::periph_sys_tick,
 };
-use fugit::NanosDurationU64 as Duration;
+use fugit::{ExtU32, NanosDurationU64 as Duration};
 use hal::{
     dma::DMA,
     persist::PersistDatastore,
-    thread::{Schedule, Thread},
+    waker::{Schedule, Waker},
 };
 use pro_flight::{
     cli::CLI,
@@ -57,8 +57,7 @@ use pro_flight::{
 };
 use stm32f4xx_hal::{
     adc::Adc,
-    gpio::{Edge, ExtiPin},
-    otg_fs::{UsbBus, USB},
+    gpio::{self, Edge, ExtiPin},
     pac,
     prelude::*,
     serial::Serial,
@@ -66,7 +65,6 @@ use stm32f4xx_hal::{
 };
 
 use crate::{
-    board_name,
     spi::{Spi1, Spi3},
     thread,
     thread::ThrsInit,
@@ -75,7 +73,7 @@ use crate::{
 
 const SAMPLE_RATE: usize = 1000;
 
-macro_rules! into_interrupt {
+macro_rules! enable_interrupt {
     ($syscfg:ident, $peripherals:ident, $gpio:expr) => {{
         let mut int = $gpio.into_pull_up_input();
         int.make_interrupt_source(&mut $syscfg);
@@ -92,39 +90,7 @@ fn fiber_yield(mut f: impl FnMut()) -> impl FnMut() -> FiberState<(), ()> {
     }
 }
 
-/// The root task handler.
-#[inline(never)]
-pub fn handler(reg: Regs, thr_init: ThrsInit) {
-    let mut threads = thread::init(thr_init);
-    threads.hard_fault.add_once(|| panic!("Hard Fault"));
-    let mut peripherals = pac::Peripherals::take().unwrap();
-    let rcc = peripherals.RCC.constrain();
-    let clocks = rcc.cfgr.use_hse(8.mhz()).sysclk(168.mhz()).require_pll48clk().freeze();
-    systick::init(periph_sys_tick!(reg), threads.sys_tick);
-    thread::setup_priority(&mut threads);
-
-    let (usb_global, usb_device, usb_pwrclk) =
-        (peripherals.OTG_FS_GLOBAL, peripherals.OTG_FS_DEVICE, peripherals.OTG_FS_PWRCLK);
-    let gpio_a = peripherals.GPIOA.split();
-    let (pin_dm, pin_dp) = (gpio_a.pa11.into_alternate(), gpio_a.pa12.into_alternate());
-    let usb = USB { usb_global, usb_device, usb_pwrclk, pin_dm, pin_dp, hclk: clocks.hclk() };
-    static mut USB_BUFFER: [u32; 1024] = [0u32; 1024];
-    let bus = UsbBus::new(usb, unsafe { &mut USB_BUFFER[..] });
-    let poll = usb_serial::init(bus, board_name());
-    threads.otg_fs.add_fn(move || {
-        poll();
-        Yielded::<(), ()>(())
-    });
-    threads.otg_fs.enable_int();
-
-    logger::init(Box::leak(Box::new([0u8; 1024])));
-    datastore::init();
-
-    reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en().set_crcen());
-    reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
-    reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
-
-    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), rtc::ClockSource::HSE);
+fn check_sysinfo<P: PersistDatastore>(persist: &mut P) {
     let mut sysinfo: SystemInfo = persist.load();
     match sysinfo.reboot_reason {
         RebootReason::Bootloader => {
@@ -134,6 +100,34 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         }
         _ => (),
     };
+}
+
+/// The root task handler.
+#[inline(never)]
+pub fn handler(reg: Regs, thr_init: ThrsInit) {
+    let mut threads = thread::init(thr_init);
+    threads.hard_fault.add_once(|| panic!("Hard Fault"));
+    let mut peripherals = pac::Peripherals::take().unwrap();
+    let rcc = peripherals.RCC.constrain();
+    let clocks = rcc.cfgr.use_hse(8.MHz()).sysclk(168.MHz()).require_pll48clk().freeze();
+    systick::init(periph_sys_tick!(reg), threads.sys_tick);
+    thread::setup_priority(&mut threads);
+    let gpio_a = peripherals.GPIOA.split();
+
+    let pac::Peripherals { OTG_FS_GLOBAL, OTG_FS_DEVICE, OTG_FS_PWRCLK, .. } = peripherals;
+    let otg_fs = (OTG_FS_GLOBAL, OTG_FS_DEVICE, OTG_FS_PWRCLK);
+    let gpio::gpioa::Parts { pa11, pa12, .. } = gpio_a;
+    super::usb_serial::init(otg_fs, (pa11, pa12), clocks.hclk(), threads.otg_fs);
+
+    logger::init(Box::leak(Box::new([0u8; 1024])));
+    datastore::init();
+
+    reg.rcc_ahb1enr.modify(|r| r.set_dma1en().set_dma2en().set_crcen());
+    reg.rcc_apb1enr.modify(|r| r.set_pwren().set_spi3en());
+    reg.rcc_apb2enr.modify(|r| r.set_spi1en().set_adc2en());
+
+    let (rtc, mut persist) = rtc::init(periph_rtc!(reg), rtc::ClockSource::HSE);
+    check_sysinfo(&mut persist);
 
     let mut syscfg = peripherals.SYSCFG.constrain();
     let (gpio_b, gpio_c) = (peripherals.GPIOB.split(), peripherals.GPIOC.split());
@@ -148,7 +142,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let sector2 = unsafe { Sector::new(2).unwrap().as_slice() };
     let mut nvram = NVRAM::new(flash, [sector1, sector2]);
     match nvram.init().and(nvram.load()) {
-        Ok(Some(ref config)) => config::replace(&config),
+        Ok(Some(config)) => config::replace(config),
         Ok(None) => config::reset(),
         Err(error) => error!("Load config failed: {:?}", error),
     }
@@ -165,17 +159,17 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
 
     let mut ins = ins::INS::new(SAMPLE_RATE, Variometer::new(bmp280::SAMPLE_RATE));
     threads.ins.add_fn(fiber_yield(move || ins.update()));
-    let mut ins_thread = into_thread(threads.ins);
+    let mut ins_waker = executor(threads.ins);
 
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), threads.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), threads.dma2_stream3);
     let mut imu = IMU::new(SAMPLE_RATE);
     let mpu6000 = mpu6000.into_dma((rx, 3), (tx, 3));
-    let mut int = into_interrupt!(syscfg, peripherals, gpio_c.pc4);
+    let mut int = enable_interrupt!(syscfg, peripherals, gpio_c.pc4);
     threads.mpu6000.add_fn(fiber_yield(move || int.clear_interrupt_pending_bit()));
     threads.mpu6000.add_exec(mpu6000.run(move |accel, gyro| {
         imu.update(accel.into(), gyro.into());
-        ins_thread.wakeup()
+        ins_waker.wakeup()
     }));
     threads.mpu6000.enable_int();
 
@@ -203,8 +197,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let bmp280 = DmaBMP280::new(rx.clone(), tx.clone(), cs_baro, compensator);
     let ds = datastore::acquire();
     threads.bmp280.add_exec(bmp280.run(move |v| ds.write_baro_altitude(v.into())));
-    let thread = into_thread(threads.bmp280);
-    let mut bmp280 = Schedule::new(thread, TickTimer::default(), Duration::millis(1));
+    let waker = executor(threads.bmp280);
+    let mut bmp280 = Schedule::new(waker, TickTimer::default(), Duration::millis(1));
 
     let mut cs_osd = gpio_a.pa15.into_push_pull_output();
     cs_osd.set_high();
@@ -212,9 +206,9 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     let max7456 = max7456::init(spi, cs_osd).unwrap();
     let max7456 = max7456.into_dma(event.clone(), tx).unwrap();
     threads.max7456.add_exec(max7456.run());
-    let thread = into_thread(threads.max7456);
+    let waker = executor(threads.max7456);
     let standard = config::get().osd.standard;
-    let mut max7456 = Schedule::new(thread, TickTimer::default(), standard.refresh_interval());
+    let mut max7456 = Schedule::new(waker, TickTimer::default(), standard.refresh_interval());
 
     if let Some(config) = config::get().peripherals.serials.get("USART1") {
         let pins = (gpio_a.pa9.into_alternate(), gpio_a.pa10.into_alternate());
@@ -255,8 +249,8 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         servos.update();
     }));
 
-    let thread = into_thread(threads.fcs);
-    let mut servos = Schedule::new(thread, TickTimer::default(), Duration::millis(20));
+    let waker = executor(threads.fcs);
+    let mut servos = Schedule::new(waker, TickTimer::default(), Duration::millis(20));
 
     threads.sys_tick.add_fn(fiber_yield(move || {
         bmp280.wakeup();
@@ -265,7 +259,7 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     }));
 
     let mut watchdog = IndependentWatchdog::new(peripherals.IWDG);
-    watchdog.start(500.ms());
+    watchdog.start(500.millis());
 
     let commands =
         commands!((bootloader, [persist]), (osd, [event]), (save, [nvram]), (telemetry, []));

@@ -28,7 +28,7 @@ where
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         self.rx.read().map_err(|e| {
             e.map(|e| match e {
-                Error::Framing => hal::serial::Error::Framing,
+                Error::FrameFormat => hal::serial::Error::FrameFormat,
                 Error::Noise => hal::serial::Error::Noise,
                 Error::Overrun => hal::serial::Error::Overrun,
                 Error::Parity => hal::serial::Error::Parity,

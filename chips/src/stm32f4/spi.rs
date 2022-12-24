@@ -20,17 +20,17 @@ impl BaudrateControl {
 #[macro_export]
 macro_rules! __define_spi {
     ($spi:ident => ($gpio:ident, $sclk:ident, $miso:ident, $mosi:ident, $af:literal)) => {
-        type $sclk = gpio::$gpio::$sclk<Input<Floating>>;
-        type $miso = gpio::$gpio::$miso<Input<Floating>>;
-        type $mosi = gpio::$gpio::$mosi<Input<Floating>>;
+        type $sclk = gpio::$gpio::$sclk<Input>;
+        type $miso = gpio::$gpio::$miso<Input>;
+        type $mosi = gpio::$gpio::$mosi<Input>;
 
         pub struct $spi<SPI: SpiMap> {
             sr: SPI::CSpiSr,
             dr: SPI::CSpiDr,
             cr2: SPI::SSpiCr2,
-            sclk: gpio::$gpio::$sclk<Alternate<PushPull, $af>>,
-            miso: gpio::$gpio::$miso<Alternate<PushPull, $af>>,
-            mosi: gpio::$gpio::$mosi<Alternate<PushPull, $af>>,
+            sclk: gpio::$gpio::$sclk<Alternate<$af>>,
+            miso: gpio::$gpio::$miso<Alternate<$af>>,
+            mosi: gpio::$gpio::$mosi<Alternate<$af>>,
         }
 
         impl $spi<spi::$spi> {
@@ -132,7 +132,7 @@ macro_rules! define_spis {
         use drone_cortexm::{fib, reg::prelude::*, thr::prelude::*, thr::ThrNvic};
         use drone_stm32_map::periph::spi::{self, traits::*, SpiPeriph, SpiMap};
         use embedded_hal::spi::{Mode, Phase, Polarity};
-        use stm32f4xx_hal::gpio::{self, Alternate, Floating, Input, Output, PullUp, PushPull};
+        use stm32f4xx_hal::gpio::{self, Alternate, Input, Output, Pull, PushPull};
 
         use hal::dma;
 

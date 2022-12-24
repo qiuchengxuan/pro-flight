@@ -103,13 +103,6 @@ impl core::fmt::Display for Config {
     }
 }
 
-impl From<&[u32]> for Config {
-    fn from(words: &[u32]) -> Self {
-        let config: &Config = unsafe { mem::transmute(words.as_ptr() as *const Self) };
-        config.clone()
-    }
-}
-
 impl AsRef<[u32]> for Config {
     fn as_ref(&self) -> &[u32] {
         let length = mem::size_of::<Self>() / mem::size_of::<u32>();

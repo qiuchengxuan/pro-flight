@@ -7,4 +7,4 @@ pub mod flash;
 pub mod persist;
 pub mod rtc;
 pub mod serial;
-pub mod thread;
+pub mod waker;

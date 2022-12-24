@@ -27,7 +27,7 @@ features = ["dma", "exti", "flash", "rtc", "spi"]
 optional = true
 
 [dependencies.stm32f4xx-hal]
-version = "0.11"
+version = "0.14"
 features = ["stm32f405", "rt", "usb_fs"]
 optional = true
 

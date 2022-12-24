@@ -52,17 +52,17 @@ macro_rules! priority {
     }};
 }
 
-pub fn setup_priority(thread: &mut Thrs) {
-    thread.otg_fs.set_priority(priority!(Priority::Immediate));
-    thread.fcs.set_priority(priority!(Priority::Immediate));
-    thread.dma1_stream0.set_priority(priority!(Priority::System));
-    thread.dma1_stream5.set_priority(priority!(Priority::System));
-    thread.dma2_stream0.set_priority(priority!(Priority::System));
-    thread.dma2_stream1.set_priority(priority!(Priority::System));
-    thread.dma2_stream3.set_priority(priority!(Priority::System));
-    thread.dma2_stream5.set_priority(priority!(Priority::System));
-    thread.bmp280.set_priority(priority!(Priority::Sensor));
-    thread.mpu6000.set_priority(priority!(Priority::Sensor));
-    thread.ins.set_priority(priority!(Priority::Normal));
-    thread.max7456.set_priority(priority!(Priority::Telemetry));
+pub fn setup_priority(threads: &mut Thrs) {
+    threads.otg_fs.set_priority(priority!(Priority::Immediate));
+    threads.fcs.set_priority(priority!(Priority::Immediate));
+    threads.dma1_stream0.set_priority(priority!(Priority::System));
+    threads.dma1_stream5.set_priority(priority!(Priority::System));
+    threads.dma2_stream0.set_priority(priority!(Priority::System));
+    threads.dma2_stream1.set_priority(priority!(Priority::System));
+    threads.dma2_stream3.set_priority(priority!(Priority::System));
+    threads.dma2_stream5.set_priority(priority!(Priority::System));
+    threads.bmp280.set_priority(priority!(Priority::Sensor));
+    threads.mpu6000.set_priority(priority!(Priority::Sensor));
+    threads.ins.set_priority(priority!(Priority::Normal));
+    threads.max7456.set_priority(priority!(Priority::Telemetry));
 }

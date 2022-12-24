@@ -1,16 +1,16 @@
 use drone_core::thr::ThrExec;
 use drone_cortexm::thr::ThrNvic;
-use hal::thread::Thread;
+use hal::waker::Waker;
 
 pub struct SoftThread<T>(T);
 
-impl<T: ThrExec> Thread for SoftThread<T> {
+impl<T: ThrExec> Waker for SoftThread<T> {
     fn wakeup(&mut self) {
         self.0.wakeup()
     }
 }
 
-pub fn into_thread<T: ThrNvic + ThrExec>(thread: T) -> impl Thread {
+pub fn executor<T: ThrNvic + ThrExec>(thread: T) -> impl Waker {
     thread.enable_int();
     SoftThread(thread)
 }

@@ -8,17 +8,15 @@ use stm32f4xx_hal::{
     gpio::{
         gpioa::{PA1, PA2, PA3, PA8},
         gpiob::{PB0, PB1},
-        Floating, Input,
+        Input,
     },
     pac,
     prelude::*,
     rcc::Clocks,
-    timer::Timer,
 };
 
-type Default = Input<Floating>;
 type PWMs = (pac::TIM1, pac::TIM2, pac::TIM3, pac::TIM5);
-type PINs = (PB0<Default>, PB1<Default>, PA2<Default>, PA3<Default>, PA1<Default>, PA8<Default>);
+type PINs = (PB0<Input>, PB1<Input>, PA2<Input>, PA3<Input>, PA1<Input>, PA8<Input>);
 type PwmPins = Vec<(&'static str, Box<dyn PwmPin<Duty = u16> + Send + 'static>)>;
 
 pub fn init(pwms: PWMs, pins: PINs, clocks: &Clocks, cfg: &Config) -> PwmPins {
@@ -29,18 +27,18 @@ pub fn init(pwms: PWMs, pins: PINs, clocks: &Clocks, cfg: &Config) -> PwmPins {
     let (pb0, pb1, pa2, pa3, pa1, pa8) = pins;
     let pb0_1 = (pb0.into_alternate(), pb1.into_alternate());
     let rate = if rate1 > 0 && rate2 > 0 { min(rate1, rate2) } else { rate1 + rate2 };
-    let (pwm1, pwm2) = Timer::new(tim3, clocks).pwm(pb0_1, rate.hz());
+    let (pwm1, pwm2) = tim3.pwm_hz(pb0_1, rate.Hz(), clocks).split();
 
     let rate3 = cfg.get("PWM3").map(|o| o.rate()).unwrap_or(50) as u32;
     let rate4 = cfg.get("PWM4").map(|o| o.rate()).unwrap_or(50) as u32;
     let pa2_3 = (pa2.into_alternate(), pa3.into_alternate());
     let rate = if rate3 > 0 && rate4 > 0 { min(rate3, rate4) } else { rate3 + rate4 };
-    let (pwm4, pwm3) = Timer::new(tim2, clocks).pwm(pa2_3, rate.hz());
+    let (pwm4, pwm3) = tim2.pwm_hz(pa2_3, rate.Hz(), clocks).split();
 
     let rate = cfg.get("PWM5").map(|o| o.rate()).unwrap_or(50) as u32;
-    let pwm5 = Timer::new(tim5, clocks).pwm(pa1.into_alternate(), rate.hz());
+    let pwm5 = tim5.pwm_hz(pa1.into_alternate(), rate.Hz(), clocks).split();
     let rate = cfg.get("PWM6").map(|o| o.rate()).unwrap_or(50) as u32;
-    let pwm6 = Timer::new(tim1, clocks).pwm(pa8.into_alternate(), rate.hz());
+    let pwm6 = tim1.pwm_hz(pa8.into_alternate(), rate.Hz(), clocks).split();
 
     let mut pwms: PwmPins = vec![
         ("PWM1", Box::new(pwm1)),

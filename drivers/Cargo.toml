@@ -22,7 +22,7 @@ usb-device = "0.2.8"
 usbd-serial = "0.1.1"
 
 [dependencies.stm32f4xx-hal]
-version = "0.11"
+version = "0.14"
 features = ["stm32f405", "rt", "usb_fs"]
 optional = true
 
