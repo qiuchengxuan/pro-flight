@@ -1,5 +1,5 @@
 use ascii::{AsciiChar, ToAsciiChar};
-use fugit::NanosDurationU64 as Duration;
+use fugit::NanosDurationU32 as Duration;
 
 use crate::{
     io::{self, Read, Write},

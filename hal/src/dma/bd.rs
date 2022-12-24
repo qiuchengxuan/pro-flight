@@ -55,28 +55,15 @@ impl<'a, W> AsMut<[W]> for Buffer<'a, W> {
     }
 }
 
-impl<W: Copy + Default + 'static, const N: usize> Drop for BufferDescriptor<W, N> {
-    fn drop(&mut self) {
-        if let Some(callback) = self.meta.callback.take() {
-            core::mem::drop(unsafe { Box::from_raw(callback) });
-        }
-    }
-}
-
 impl<W: Copy + Default + 'static, const N: usize> BufferDescriptor<W, N> {
     pub fn new(array: [W; N]) -> Self {
         Self { meta: Meta { size: N, ..Default::default() }, buffer: array }
     }
 
-    pub unsafe fn get_buffer(&self) -> &[W; N] {
-        &self.buffer
-    }
-
-    pub fn with_callback<C>(callback: C) -> Self
+    pub fn with_callback<C>(callback: &'static mut C) -> Self
     where
         C: FnMut(TransferResult<W>) + Send + 'static,
     {
-        let callback = Box::leak(Box::new(callback));
         Self {
             meta: Meta { size: N, callback: Some(callback), ..Default::default() },
             buffer: [W::default(); N],
@@ -94,17 +81,18 @@ impl<W: Copy + Default + 'static, const N: usize> BufferDescriptor<W, N> {
         }
     }
 
-    pub fn set_size(&mut self, size: usize) {
-        self.meta.size = size
+    pub fn limit_size(&mut self, size: usize) -> usize {
+        self.meta.size = core::cmp::min(size, N);
+        self.meta.size
     }
 
-    pub fn try_get_buffer<'a>(&'a mut self) -> Result<Buffer<'a, W>, Owner> {
+    pub fn cpu_try_take<'a>(&'a mut self) -> Result<Buffer<'a, W>, Owner> {
         self.meta
             .take_ownership(Owner::CPU)
             .map(move |_| Buffer { meta: &self.meta, buffer: &mut self.buffer[..] })
     }
 
-    pub fn try_take(&self) -> Result<&[W], Owner> {
+    pub fn dma_try_take(&self) -> Result<&[W], Owner> {
         self.meta.take_ownership(Owner::DMA).map(|_| &self.buffer[..])
     }
 }

@@ -34,7 +34,8 @@ thr::nvic! {
             10: pub mpu6000; // exti4
             11: pub dma1_stream0; // BMP280/MAX7456 rx
             16: pub dma1_stream5; // BMP280 tx
-            23: pub ins; // exti5-9
+            23: pub sdcard; // exti5-9
+            40: pub ins; // exti10-15
             56: pub dma2_stream0; // mpu6000 rx
             57: pub dma2_stream1; // USART3/I2C-2
             58: pub dma2_stream2; // ADC2
@@ -63,6 +64,7 @@ pub fn setup_priority(threads: &mut Thrs) {
     threads.dma2_stream5.set_priority(priority!(Priority::System));
     threads.bmp280.set_priority(priority!(Priority::Sensor));
     threads.mpu6000.set_priority(priority!(Priority::Sensor));
+    threads.sdcard.set_priority(priority!(Priority::Normal));
     threads.ins.set_priority(priority!(Priority::Normal));
     threads.max7456.set_priority(priority!(Priority::Telemetry));
 }

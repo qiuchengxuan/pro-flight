@@ -10,12 +10,12 @@ use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     timer::CountDown,
 };
-use fugit::NanosDurationU64 as Duration;
+use fugit::{NanosDurationU32 as Duration, NanosDurationU64};
 use hal::rtc::{RTCReader, RTCWriter};
 use nb;
 use void::Void;
 
-pub const STEP_THRESHOLD: Duration = Duration::secs(5);
+pub const STEP_THRESHOLD: NanosDurationU64 = NanosDurationU64::secs(5);
 
 use super::jiffies;
 
@@ -53,7 +53,7 @@ pub fn now() -> NaiveDateTime {
 pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
     let now = now();
     let delta = (datetime.time() - now.time()).abs().num_nanoseconds().unwrap_or_default() as u64;
-    if datetime.date() != now.date() || Duration::nanos(delta) > STEP_THRESHOLD {
+    if datetime.date() != now.date() || NanosDurationU64::nanos(delta) > STEP_THRESHOLD {
         match unsafe { RTC_WRITER.as_ref() } {
             Some(w) => w.set_datetime(datetime),
             None => return Err(Error::NotInitialized),
@@ -62,16 +62,16 @@ pub fn update(datetime: &NaiveDateTime) -> Result<(), Error> {
     Ok(())
 }
 
-pub struct TickTimer(Duration);
+pub struct TickTimer(NanosDurationU64);
 
 impl Default for TickTimer {
     fn default() -> Self {
-        Self(Duration::secs(0))
+        Self(NanosDurationU64::secs(0))
     }
 }
 
 impl TickTimer {
-    pub fn after<T: Into<Duration>>(duration: T) -> Self {
+    pub fn after(duration: Duration) -> Self {
         let mut timer = Self::default();
         timer.start(duration);
         timer
@@ -90,7 +90,7 @@ impl CountDown for TickTimer {
     type Time = Duration;
 
     fn start<T: Into<Duration>>(&mut self, duration: T) {
-        self.0 = jiffies::get() + duration.into();
+        self.0 = jiffies::get() + duration.into().convert();
     }
 
     fn wait(&mut self) -> Result<(), nb::Error<Void>> {
@@ -100,14 +100,14 @@ impl CountDown for TickTimer {
 
 impl<T: Into<u32>> DelayMs<T> for TickTimer {
     fn delay_ms(&mut self, ms: T) {
-        self.start(Duration::millis(ms.into() as u64));
+        self.start(Duration::millis(ms.into()));
         nb::block!(self.wait()).unwrap();
     }
 }
 
 impl<T: Into<u32>> DelayUs<T> for TickTimer {
     fn delay_us(&mut self, us: T) {
-        self.start(Duration::micros(us.into() as u64));
+        self.start(Duration::micros(us.into()));
         nb::block!(self.wait()).unwrap();
     }
 }

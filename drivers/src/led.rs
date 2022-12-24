@@ -1,5 +1,5 @@
 use embedded_hal::{digital::v2::OutputPin, timer::CountDown};
-use fugit::NanosDurationU64 as Duration;
+use fugit::NanosDurationU32 as Duration;
 use hal::waker::Waker;
 
 pub struct LED<P, C> {

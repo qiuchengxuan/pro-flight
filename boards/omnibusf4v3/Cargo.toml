@@ -35,6 +35,11 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 synopsys-usb-otg = { version = "0.2.4", features = ["cortex-m"], optional = true }
 cortex-m-semihosting = { version = "0.5", optional = true }
 
+[dependencies.async-embedded-sdmmc]
+version = "0.1"
+default-features = false
+features = ["fugit", "log-max-level-off"]
+
 [dependencies.drone-cortexm]
 path = "../../drone-os/drone-cortexm"
 features = ["bit-band", "floating-point-unit", "memory-protection-unit"]
@@ -42,6 +47,11 @@ features = ["bit-band", "floating-point-unit", "memory-protection-unit"]
 [dependencies.drone-stm32-map]
 path = "../../drone-os/drone-stm32-map"
 features = ["dma", "exti", "flash", "rtc", "spi"]
+
+[dependencies.embedded-exfat]
+git = "https://github.com/qiuchengxuan/exfat.git"
+default-features = false
+features = ["log-max-level-off", "max-filename-size-30"]
 
 [dependencies.pro-flight]
 path = "../.."

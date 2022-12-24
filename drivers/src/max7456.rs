@@ -5,7 +5,7 @@ use embedded_hal::{
     blocking::spi::{Transfer, Write},
     digital::v2::OutputPin,
 };
-use fugit::NanosDurationU64 as Duration;
+use fugit::NanosDurationU32 as Duration;
 use hal::dma::{BufferDescriptor, Error, TransferOption, TransferResult, DMA};
 use max7456::{
     character_memory::{build_store_char_operation, CHAR_DATA_SIZE, STORE_CHAR_BUFFER_SIZE},
@@ -94,7 +94,7 @@ where
     async fn enable_display(&mut self, enable: bool) {
         let mut video_mode_0 = self.video_mode_0;
         video_mode_0.set(VideoMode0::EnableDisplay, enable as u8);
-        let mut buffer = self.bd.as_mut().try_get_buffer().unwrap();
+        let mut buffer = self.bd.as_mut().cpu_try_take().unwrap();
         buffer[0] = Registers::VideoMode0 as u8;
         buffer[1] = video_mode_0.value;
         mem::drop(buffer);
@@ -103,7 +103,7 @@ where
     }
 
     async fn upload_char(&mut self, bytes: &[u8], index: u8) {
-        let mut buffer = self.bd.as_mut().try_get_buffer().unwrap();
+        let mut buffer = self.bd.as_mut().cpu_try_take().unwrap();
         let mut char_data = [0u8; CHAR_DATA_SIZE];
         char_data.copy_from_slice(bytes);
         build_store_char_operation(&char_data, index, buffer.as_mut());
@@ -143,7 +143,7 @@ where
                 self.upload_font().await;
                 self.event.clear();
             }
-            let size = match self.bd.try_get_buffer() {
+            let size = match self.bd.cpu_try_take() {
                 Ok(mut buffer) => {
                     let frame = osd.draw(&mut frame_buf);
                     let mut writer = LinesWriter::new(frame, Default::default());

@@ -196,7 +196,7 @@ impl<M: DmaChMap> DMA for Stream<M> {
             if self.is_busy() {
                 return Err(Error::Busy);
             }
-            let bytes = bd.try_take().map_err(|_| Error::BufferDescripter)?;
+            let bytes = bd.dma_try_take().map_err(|_| Error::BufferDescripter)?;
             self.reg.memory0_address.store_bits(bytes.as_ptr() as *const _ as u32);
             let msize = mem::size_of::<W>() as u32 - 1;
             self.reg.interrupt_clear.clear_all();
@@ -231,12 +231,11 @@ impl<M: DmaChMap> DMA for Stream<M> {
             if self.is_busy() {
                 return Err(Error::Busy);
             }
-            let buffer = bd.try_take().map_err(|_| Error::BufferDescripter)?;
+            let buffer = bd.dma_try_take().map_err(|_| Error::BufferDescripter)?;
             self.reg.memory0_address.store_bits(buffer.as_ptr() as *const _ as u32);
             let msize = mem::size_of::<W>() as u32 - 1;
             self.reg.interrupt_clear.clear_all();
-            let num_of_data = cmp::min(buffer.len(), option.size.unwrap_or(buffer.len()));
-            bd.set_size(num_of_data);
+            let num_of_data = bd.limit_size(option.size.unwrap_or(buffer.len()));
             self.reg.number_of_data.store_bits(num_of_data as u32);
             self.reg.configuration.modify_reg(|r, v| {
                 r.minc().set(v);

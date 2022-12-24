@@ -28,10 +28,12 @@ use drone_stm32_map::periph::{
     dma::*,
     flash::periph_flash,
     rtc::periph_rtc,
-    spi::{periph_spi1, periph_spi3},
+    spi::{periph_spi1, periph_spi2, periph_spi3},
     sys_tick::periph_sys_tick,
 };
-use fugit::{ExtU32, NanosDurationU64 as Duration};
+use embedded_hal::spi::MODE_3;
+use exfat::types::SectorID;
+use fugit::{ExtU32, NanosDurationU32 as Duration};
 use hal::{
     dma::DMA,
     persist::PersistDatastore,
@@ -65,7 +67,7 @@ use stm32f4xx_hal::{
 };
 
 use crate::{
-    spi::{Spi1, Spi3},
+    spi::{Spi1, Spi2, Spi3},
     thread,
     thread::ThrsInit,
     Regs,
@@ -100,6 +102,28 @@ fn check_sysinfo<P: PersistDatastore>(persist: &mut P) {
         }
         _ => (),
     };
+}
+
+struct DummyIO([[u8; 512]; 4]);
+
+impl exfat::io::IO for DummyIO {
+    type Error = ();
+
+    fn set_sector_size_shift(&mut self, shift: u8) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn read<'a>(&'a mut self, id: SectorID) -> Result<&'a [[u8; 512]], Self::Error> {
+        Ok(&self.0[..])
+    }
+
+    fn write(&mut self, id: SectorID, offset: usize, data: &[u8]) -> Result<(), Self::Error> {
+        Ok(self.0[0].copy_from_slice(data))
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 /// The root task handler.
@@ -147,6 +171,10 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Err(error) => error!("Load config failed: {:?}", error),
     }
 
+    let mut ins = ins::INS::new(SAMPLE_RATE, Variometer::new(bmp280::SAMPLE_RATE));
+    threads.ins.add_fn(fiber_yield(move || ins.update()));
+    let mut ins_waker = executor(threads.ins);
+
     let pins = (gpio_a.pa5, gpio_a.pa6, gpio_a.pa7);
     let baudrate = BaudrateControl::new(clock::PCLK2, 1000u32.pow(2));
     let spi = Spi1::new(periph_spi1!(reg), pins, baudrate, mpu6000::SPI_MODE);
@@ -156,11 +184,6 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
         Ok(_) => info!("MPU6000 init OK"),
         Err(_) => error!("MPU6000 init failed"),
     }
-
-    let mut ins = ins::INS::new(SAMPLE_RATE, Variometer::new(bmp280::SAMPLE_RATE));
-    threads.ins.add_fn(fiber_yield(move || ins.update()));
-    let mut ins_waker = executor(threads.ins);
-
     let rx = dma::Stream::new(periph_dma2_ch0!(reg), threads.dma2_stream0);
     let tx = dma::Stream::new(periph_dma2_ch3!(reg), threads.dma2_stream3);
     let mut imu = IMU::new(SAMPLE_RATE);
@@ -247,6 +270,28 @@ pub fn handler(reg: Regs, thr_init: ThrsInit) {
     threads.fcs.add_fn(fiber_yield(move || {
         fcs.update();
         servos.update();
+    }));
+
+    info!("Initialize SDCARD");
+    let sdcard_present = gpio_b.pb7;
+    let pins = (gpio_b.pb13, gpio_b.pb14, gpio_b.pb15);
+    let spi = Spi2::new(periph_spi2!(reg), pins, baudrate, MODE_3);
+    let cs = gpio_b.pb12.into_push_pull_output();
+    let mut bus = sdmmc::bus::spi::bus::Bus::new(spi, cs, TickTimer::default());
+    let card = bus.init(TickTimer::default()).unwrap();
+    let _sd = sdmmc::SD::init(bus, card).unwrap();
+    let mut exfat = exfat::ExFAT::new(DummyIO([[0u8; 512]; 4])).unwrap();
+    let mut root = exfat.root_directory().unwrap();
+    let mut root_dir = root.open().unwrap();
+    if let Some(entryset) = root_dir.find("config.yml").unwrap() {
+        root_dir.open(&entryset).unwrap();
+    }
+    threads.sdcard.add_fn(fiber_yield(move || {
+        if sdcard_present.is_high() {
+            trace!("SDCARD eject");
+            return;
+        }
+        trace!("SDCARD insert");
     }));
 
     let waker = executor(threads.fcs);

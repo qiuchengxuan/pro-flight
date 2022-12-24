@@ -46,7 +46,7 @@ where
         _ => rx.receive(result.into()),
     }));
     let mut rx_bd = Box::new(BufferDescriptor::<u8, 64>::with_callback(callback));
-    let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+    let address = rx_bd.cpu_try_take().unwrap().as_ptr();
     trace!("DMA address 0x{:x}", address as usize);
     dma.setup_rx(Box::leak(rx_bd), TransferOption::circle().size(chunk_size)).ok();
 }

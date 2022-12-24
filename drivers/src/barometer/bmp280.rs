@@ -15,7 +15,7 @@ use embedded_hal::{
     },
     digital::v2::OutputPin,
 };
-use fugit::NanosDurationU64 as Duration;
+use fugit::NanosDurationU32 as Duration;
 use hal::dma::{BufferDescriptor, Error, TransferOption, DMA};
 use pro_flight::{sys::time::TickTimer, types::measurement::Pressure};
 
@@ -75,7 +75,7 @@ where
 {
     pub fn new(rx: RX, tx: TX, cs: CS, compensator: Compensator) -> Self {
         let mut rx_bd = Box::new(BufferDescriptor::<u8, 8>::default());
-        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+        let address = rx_bd.cpu_try_take().unwrap().as_ptr();
         trace!("Init BMP280 DMA address at 0x{:x}", address as usize);
         let tx_bd = Box::new(BufferDescriptor::<u8, 1>::new([Register::PressureMsb as u8 | 0x80]));
         Self { rx, tx, cs, rx_bd, tx_bd, compensator }
@@ -103,7 +103,7 @@ where
             }
             future.await;
             self.cs.set_high().ok();
-            if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
+            if let Some(buffer) = self.rx_bd.cpu_try_take().ok() {
                 handler(self.compensator.convert(&buffer));
             }
             TickTimer::after(Duration::micros(62_500)).await;

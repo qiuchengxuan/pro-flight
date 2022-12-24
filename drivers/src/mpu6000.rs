@@ -3,7 +3,7 @@ use core::{convert::TryInto, future::Future};
 
 use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
 use fixed_point::FixedPoint;
-use fugit::NanosDurationU64 as Duration;
+use fugit::NanosDurationU32 as Duration;
 use hal::dma::{Channel, Peripheral, TransferOption, BD, DMA};
 use mpu6000::{
     self,
@@ -120,7 +120,7 @@ where
         let (mut tx, ch) = tx;
         tx.setup_peripheral(ch, &mut spi);
         let mut rx_bd = Box::new(BD::<u8, { 1 + NUM_MEASUREMENT_REGS }>::default());
-        let address = rx_bd.try_get_buffer().unwrap().as_ptr();
+        let address = rx_bd.cpu_try_take().unwrap().as_ptr();
         trace!("Init MPU6000 DMA address at 0x{:x}", address as usize);
         let byte = Register::AccelerometerXHigh as u8 | 0x80;
         let tx_bd = Box::new(BD::<u8, 1>::new([byte]));
@@ -150,7 +150,7 @@ where
             self.tx.tx(&self.tx_bd, TransferOption::repeat().size(1 + NUM_MEASUREMENT_REGS)).ok();
             future.await;
             self.cs.set_high().ok();
-            if let Some(buffer) = self.rx_bd.try_get_buffer().ok() {
+            if let Some(buffer) = self.rx_bd.cpu_try_take().ok() {
                 let (acceleration, gyro, _temperature) = convertor.convert(&buffer[1..]).unwrap();
                 handler(acceleration, gyro);
             }

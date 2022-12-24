@@ -70,7 +70,7 @@ impl<W> Meta<W> {
         self.owner.store(Owner::Free as u8, Ordering::Relaxed);
     }
 
-    pub fn take_ownership(&self, owner: Owner) -> Result<(), Owner> {
+    pub(super) fn take_ownership(&self, owner: Owner) -> Result<(), Owner> {
         let relaxed = Ordering::Relaxed;
         match self.owner.compare_exchange(Owner::Free as u8, owner as u8, relaxed, relaxed) {
             Ok(_) => Ok(()),

@@ -1,6 +1,6 @@
 use core::fmt::{Display, Formatter};
 
-use fugit::NanosDurationU64 as Duration;
+use fugit::NanosDurationU32 as Duration;
 
 use super::pathset::{Error, Path, PathSet, Value};
 use crate::types::Ratio;
